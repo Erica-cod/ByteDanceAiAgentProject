@@ -1,0 +1,256 @@
+/* Markdown 内容样式 */
+.streaming-markdown {
+  line-height: 1.6;
+  color: #333;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 标题样式 - 减小间距 */
+.streaming-markdown h1,
+.streaming-markdown h2,
+.streaming-markdown h3,
+.streaming-markdown h4,
+.streaming-markdown h5,
+.streaming-markdown h6 {
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.streaming-markdown h1 {
+  font-size: 1.8em;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 0.3em;
+}
+
+.streaming-markdown h2 {
+  font-size: 1.4em;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.3em;
+}
+
+.streaming-markdown h3 {
+  font-size: 1.2em;
+}
+
+/* 段落样式 - 减小间距 */
+.streaming-markdown p {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+/* 列表样式 - 减小间距 */
+.streaming-markdown ul,
+.streaming-markdown ol {
+  margin-top: 0.4em;
+  margin-bottom: 0.6em;
+  padding-left: 2em;
+}
+
+.streaming-markdown li {
+  margin-bottom: 0.3em;
+}
+
+/* 代码块样式 - 减小间距 */
+.streaming-markdown pre {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin-top: 0.5em;
+  margin-bottom: 0.6em;
+  border: 1px solid #e1e4e8;
+}
+
+.streaming-markdown code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.streaming-markdown pre code {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+}
+
+/* 行内代码样式 */
+.streaming-markdown .inline-code {
+  background-color: #f6f8fa;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  border: 1px solid #e1e4e8;
+  color: #e83e8c;
+}
+
+/* 引用块样式 - 减小间距 */
+.streaming-markdown blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0.5em;
+  margin-bottom: 0.6em;
+  color: #666;
+  font-style: italic;
+}
+
+/* 水平分割线 - 减小间距 */
+.streaming-markdown hr {
+  border: none;
+  border-top: 2px solid #eee;
+  margin: 1em 0;
+}
+
+/* 表格样式 - 减小间距 */
+.streaming-markdown .table-wrapper {
+  overflow-x: auto;
+  margin-top: 0.5em;
+  margin-bottom: 0.6em;
+}
+
+.streaming-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.streaming-markdown th,
+.streaming-markdown td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.streaming-markdown th {
+  background-color: #f6f8fa;
+  font-weight: 600;
+}
+
+.streaming-markdown tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* 链接样式 */
+.streaming-markdown a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.streaming-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* 图片样式 - 减小间距 */
+.streaming-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.6em 0;
+}
+
+/* 任务列表样式 */
+.streaming-markdown input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+/* 删除线样式 */
+.streaming-markdown del {
+  color: #999;
+}
+
+/* 加粗样式 */
+.streaming-markdown strong {
+  font-weight: 600;
+  color: #000;
+}
+
+/* 斜体样式 */
+.streaming-markdown em {
+  font-style: italic;
+}
+
+/* 代码高亮样式（基于 highlight.js） */
+.streaming-markdown .hljs {
+  background-color: #f6f8fa;
+}
+
+.streaming-markdown .hljs-comment,
+.streaming-markdown .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.streaming-markdown .hljs-keyword,
+.streaming-markdown .hljs-selector-tag,
+.streaming-markdown .hljs-subst {
+  color: #d73a49;
+}
+
+.streaming-markdown .hljs-number,
+.streaming-markdown .hljs-literal,
+.streaming-markdown .hljs-variable,
+.streaming-markdown .hljs-template-variable,
+.streaming-markdown .hljs-tag .hljs-attr {
+  color: #005cc5;
+}
+
+.streaming-markdown .hljs-string,
+.streaming-markdown .hljs-doctag {
+  color: #032f62;
+}
+
+.streaming-markdown .hljs-title,
+.streaming-markdown .hljs-section,
+.streaming-markdown .hljs-selector-id {
+  color: #6f42c1;
+  font-weight: bold;
+}
+
+.streaming-markdown .hljs-type,
+.streaming-markdown .hljs-class .hljs-title {
+  color: #6f42c1;
+}
+
+.streaming-markdown .hljs-tag,
+.streaming-markdown .hljs-name,
+.streaming-markdown .hljs-attribute {
+  color: #22863a;
+  font-weight: normal;
+}
+
+.streaming-markdown .hljs-regexp,
+.streaming-markdown .hljs-link {
+  color: #032f62;
+}
+
+.streaming-markdown .hljs-symbol,
+.streaming-markdown .hljs-bullet {
+  color: #e36209;
+}
+
+.streaming-markdown .hljs-built_in,
+.streaming-markdown .hljs-builtin-name {
+  color: #005cc5;
+}
+
+.streaming-markdown .hljs-meta {
+  color: #6a737d;
+}
+
+.streaming-markdown .hljs-deletion {
+  background: #ffeef0;
+}
+
+.streaming-markdown .hljs-addition {
+  background: #f0fff4;
+}
+
+.streaming-markdown .hljs-emphasis {
+  font-style: italic;
+}
+
+.streaming-markdown .hljs-strong {
+  font-weight: bold;
+}
+

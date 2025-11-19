@@ -1,0 +1,29 @@
+{
+  "name": "ai-agent-app",
+  "version": "1.0.0",
+  "description": "AI Agent 应用 - 抖音搜索训练营",
+  "scripts": {
+    "dev": "modern dev",
+    "build": "modern build",
+    "start": "modern start",
+    "serve": "modern serve"
+  },
+  "dependencies": {
+    "@modern-js/runtime": "^2.68.0",
+    "highlight.js": "^11.11.1",
+    "node-fetch": "^2.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@modern-js/app-tools": "^2.68.0",
+    "@modern-js/plugin-bff": "^2.68.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}
