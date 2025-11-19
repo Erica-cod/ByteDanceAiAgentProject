@@ -1,3 +1,11 @@
+import { connectToDatabase } from '../db/connection';
+import { ConversationService } from '../services/conversationService';
+import { MessageService } from '../services/messageService';
+import { UserService } from '../services/userService';
+
+// Initialize database connection
+connectToDatabase().catch(console.error);
+
 // 兴趣教练的 system prompt
 const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
 
@@ -11,6 +19,8 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 interface ChatRequest {
   message: string;
   modelType: 'local' | 'volcano';
+  conversationId?: string;
+  userId: string;
 }
 
 // 调用本地 Ollama 模型
@@ -75,7 +85,13 @@ function extractThinkingAndContent(text: string) {
 }
 
 // 为 Hono 处理流式响应并转换为 SSE 格式
-async function streamToSSEResponse(stream: any, c: any) {
+async function streamToSSEResponse(
+  stream: any, 
+  c: any, 
+  conversationId: string, 
+  userId: string, 
+  modelType: 'local' | 'volcano'
+) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
@@ -124,6 +140,22 @@ async function streamToSSEResponse(stream: any, c: any) {
                     thinking: thinking || undefined,
                   });
                   await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                  
+                  // 保存 AI 回复到数据库
+                  try {
+                    await MessageService.addMessage(
+                      conversationId,
+                      userId,
+                      'assistant',
+                      content || accumulatedText,
+                      thinking || undefined,
+                      modelType
+                    );
+                    await ConversationService.incrementMessageCount(conversationId, userId);
+                    console.log('✅ AI message saved to database');
+                  } catch (dbError) {
+                    console.error('❌ Failed to save AI message:', dbError);
+                  }
                 }
                 
                 await writer.write(encoder.encode('data: [DONE]\n\n'));
@@ -289,15 +321,51 @@ module.exports.post = async (c: any) => {
     
     // Modern.js BFF 的请求体在 c.data 中
     const body: ChatRequest = c.data;
-    const { message, modelType } = body;
+    const { message, modelType, conversationId: reqConversationId, userId } = body;
 
     console.log('解析后的 message:', message);
     console.log('解析后的 modelType:', modelType);
+    console.log('解析后的 conversationId:', reqConversationId);
+    console.log('解析后的 userId:', userId);
 
     if (!message || !message.trim()) {
       console.log('消息内容为空');
-      // 直接返回对象，Modern.js 会自动处理
       return { error: '消息内容不能为空' };
+    }
+
+    if (!userId) {
+      return { error: 'userId is required' };
+    }
+
+    // 确保用户存在
+    await UserService.getOrCreateUser(userId);
+
+    // 如果没有 conversationId，创建新对话
+    let conversationId = reqConversationId;
+    if (!conversationId) {
+      const conversation = await ConversationService.createConversation(
+        userId,
+        message.slice(0, 50) + (message.length > 50 ? '...' : '') // 使用前50个字符作为标题
+      );
+      conversationId = conversation.conversationId;
+      console.log('✅ Created new conversation:', conversationId);
+    }
+
+    // 保存用户消息到数据库
+    try {
+      await MessageService.addMessage(
+        conversationId,
+        userId,
+        'user',
+        message,
+        undefined,
+        modelType
+      );
+      await ConversationService.incrementMessageCount(conversationId, userId);
+      console.log('✅ User message saved to database');
+    } catch (dbError) {
+      console.error('❌ Failed to save user message:', dbError);
+      // 继续处理，不阻止 AI 回复
     }
 
     if (modelType === 'local') {
@@ -305,7 +373,7 @@ module.exports.post = async (c: any) => {
       const stream = await callLocalModel(message);
       
       // 将流式响应转换为 SSE 格式并返回
-      return streamToSSEResponse(stream, c);
+      return streamToSSEResponse(stream, c, conversationId, userId, modelType);
     } else if (modelType === 'volcano') {
       return { error: '火山云模型接入功能待实现' };
     } else {
