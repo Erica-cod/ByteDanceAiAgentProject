@@ -1,7 +1,7 @@
 // Single Conversation API
-import { connectToDatabase } from '../../db/connection';
-import { ConversationService } from '../../services/conversationService';
-import { MessageService } from '../../services/messageService';
+import { connectToDatabase } from '../../db/connection.js';
+import { ConversationService } from '../../services/conversationService.js';
+import { MessageService } from '../../services/messageService.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);

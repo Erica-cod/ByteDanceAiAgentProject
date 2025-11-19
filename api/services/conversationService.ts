@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '../db/connection';
-import { Conversation, Message } from '../db/models';
+import { getDatabase } from '../db/connection.js';
+import { Conversation, Message } from '../db/models.js';
 
 export class ConversationService {
   /**

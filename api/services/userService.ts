@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '../db/connection';
-import { User } from '../db/models';
+import { getDatabase } from '../db/connection.js';
+import { User } from '../db/models.js';
 
 export class UserService {
   /**

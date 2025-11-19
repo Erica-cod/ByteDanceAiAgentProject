@@ -12,7 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - OLLAMA_API_URL=http://ollama:11434
+      - OLLAMA_API_URL=http://host.docker.internal:11434  # 连接主机 Ollama
       - OLLAMA_MODEL=deepseek-r1:7b
       - MONGODB_URI=mongodb://mongodb:27017/ai-agent
     depends_on:

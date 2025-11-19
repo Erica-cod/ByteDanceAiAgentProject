@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '../db/connection';
-import { Message } from '../db/models';
+import { getDatabase } from '../db/connection.js';
+import { Message } from '../db/models.js';
 
 export class MessageService {
   /**

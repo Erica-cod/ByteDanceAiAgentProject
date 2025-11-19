@@ -1,7 +1,7 @@
-import { connectToDatabase } from '../db/connection';
-import { ConversationService } from '../services/conversationService';
-import { MessageService } from '../services/messageService';
-import { UserService } from '../services/userService';
+import { connectToDatabase } from '../db/connection.js';
+import { ConversationService } from '../services/conversationService.js';
+import { MessageService } from '../services/messageService.js';
+import { UserService } from '../services/userService.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -315,7 +315,7 @@ async function streamToSSE(stream: any, res: any) {
 }
 
 // Modern.js BFF API 路由（请求体在 c.data 中）
-module.exports.post = async (c: any) => {
+export const post = async (c: any) => {
   try {
     console.log('=== 收到聊天请求 ===');
     

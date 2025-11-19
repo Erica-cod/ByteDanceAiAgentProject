@@ -1,7 +1,7 @@
 # Multi-stage build for Modern.js application
 
 # Stage 1: Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -30,7 +30,8 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/modern.config.ts ./
-COPY --from=builder /app/api ./api
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./
 
 # Expose port
 EXPOSE 8080

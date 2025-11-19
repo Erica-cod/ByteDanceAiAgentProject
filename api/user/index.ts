@@ -1,6 +1,6 @@
 // User Management API
-import { connectToDatabase } from '../db/connection';
-import { UserService } from '../services/userService';
+import { connectToDatabase } from '../db/connection.js';
+import { UserService } from '../services/userService.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
