@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
+import { getUserId, initializeUser } from '../utils/userManager';
 import './ChatInterface.css';
 
 interface Message {
@@ -15,6 +16,8 @@ const ChatInterface: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [modelType, setModelType] = useState<'local' | 'volcano'>('local');
+  const [userId] = useState<string>(getUserId()); // 获取或生成 userId
+  const [conversationId, setConversationId] = useState<string | null>(null); // 当前对话 ID
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -27,7 +30,12 @@ const ChatInterface: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // 从本地存储加载历史记录
+  // 初始化用户
+  useEffect(() => {
+    initializeUser(userId);
+  }, [userId]);
+
+  // 从本地存储加载历史记录（临时保留，后续会从数据库加载）
   useEffect(() => {
     const savedMessages = localStorage.getItem('chatHistory');
     if (savedMessages) {
@@ -86,6 +94,8 @@ const ChatInterface: React.FC = () => {
         body: JSON.stringify({
           message: inputValue,
           modelType: modelType,
+          userId: userId,
+          conversationId: conversationId,
         }),
         signal: abortControllerRef.current.signal,
       });
