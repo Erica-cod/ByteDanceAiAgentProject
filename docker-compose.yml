@@ -14,8 +14,10 @@ services:
       - PORT=8080
       - OLLAMA_API_URL=http://ollama:11434
       - OLLAMA_MODEL=deepseek-r1:7b
+      - MONGODB_URI=mongodb://mongodb:27017/ai-agent
     depends_on:
       - ollama
+      - mongodb
     restart: unless-stopped
     networks:
       - app-network
@@ -38,10 +40,33 @@ services:
     networks:
       - app-network
 
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb-service
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=ai-agent
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   ollama-data:
+  mongodb-data:
+  mongodb-config:
 
