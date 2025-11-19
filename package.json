@@ -6,7 +6,11 @@
     "dev": "modern dev",
     "build": "modern build",
     "start": "modern start",
-    "serve": "modern serve"
+    "serve": "modern serve",
+    "docker:build": "docker build -t bytedance-ai-agent .",
+    "docker:run": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "docker:logs": "docker-compose logs -f app"
   },
   "dependencies": {
     "@modern-js/runtime": "^2.68.0",
@@ -22,6 +26,7 @@
     "@modern-js/app-tools": "^2.68.0",
     "@modern-js/plugin-bff": "^2.68.0",
     "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.13",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "typescript": "^5.0.0"

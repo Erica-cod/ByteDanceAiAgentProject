@@ -17,8 +17,9 @@ interface ChatRequest {
 async function callLocalModel(message: string) {
   const fetch = (await import('node-fetch')).default;
   const modelName = process.env.OLLAMA_MODEL || 'deepseek-r1:7b';
+  const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
   
-  const response = await fetch('http://localhost:11434/api/chat', {
+  const response = await fetch(`${ollamaUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
