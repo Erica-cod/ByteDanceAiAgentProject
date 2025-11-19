@@ -79,13 +79,28 @@ export class ConversationService {
   /**
    * Delete conversation (soft delete)
    */
-  static async deleteConversation(conversationId: string, userId: string): Promise<boolean> {
+  static async deleteConversation(userId: string, conversationId: string): Promise<boolean> {
     const db = getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const result = await collection.updateOne(
       { conversationId, userId },
       { $set: { isActive: false, updatedAt: new Date() } }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Update conversation title
+   */
+  static async updateConversationTitle(userId: string, conversationId: string, newTitle: string): Promise<boolean> {
+    const db = getDatabase();
+    const collection = db.collection<Conversation>('conversations');
+
+    const result = await collection.updateOne(
+      { conversationId, userId },
+      { $set: { title: newTitle, updatedAt: new Date() } }
     );
 
     return result.modifiedCount > 0;

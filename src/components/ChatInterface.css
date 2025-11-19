@@ -1,11 +1,20 @@
-.chat-container {
+/* 应用容器 - 包含侧边栏和聊天区域 */
+.app-container {
   display: flex;
-  flex-direction: column;
   height: 100vh;
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   background: white;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+/* 聊天容器 */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: white;
 }
 
 .chat-header {

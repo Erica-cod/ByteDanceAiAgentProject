@@ -1,6 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
+import ConversationList from './ConversationList';
 import { getUserId, initializeUser } from '../utils/userManager';
+import {
+  getConversations,
+  createConversation,
+  getConversationMessages,
+  deleteConversation,
+  Conversation,
+} from '../utils/conversationAPI';
 import './ChatInterface.css';
 
 interface Message {
@@ -18,6 +26,8 @@ const ChatInterface: React.FC = () => {
   const [modelType, setModelType] = useState<'local' | 'volcano'>('local');
   const [userId] = useState<string>(getUserId()); // 获取或生成 userId
   const [conversationId, setConversationId] = useState<string | null>(null); // 当前对话 ID
+  const [conversations, setConversations] = useState<Conversation[]>([]); // 对话列表
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -35,21 +45,92 @@ const ChatInterface: React.FC = () => {
     initializeUser(userId);
   }, [userId]);
 
-  // 从本地存储加载历史记录（临时保留，后续会从数据库加载）
+  // 加载对话列表
+  const loadConversations = async () => {
+    setIsLoadingConversations(true);
+    try {
+      const convs = await getConversations(userId);
+      setConversations(convs);
+      
+      // 如果有对话但没有选中的，自动选中最新的
+      if (convs.length > 0 && !conversationId) {
+        const latest = convs[0];
+        setConversationId(latest.conversationId);
+        await loadConversationMessages(latest.conversationId);
+      }
+    } catch (error) {
+      console.error('加载对话列表失败:', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
+
+  // 加载指定对话的历史消息
+  const loadConversationMessages = async (convId: string) => {
+    try {
+      const msgs = await getConversationMessages(userId, convId);
+      // 转换消息格式
+      const formattedMessages: Message[] = msgs.map((msg) => ({
+        id: msg.messageId,
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking,
+        timestamp: new Date(msg.timestamp).getTime(),
+      }));
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('加载消息失败:', error);
+      setMessages([]);
+    }
+  };
+
+  // 初始加载对话列表
   useEffect(() => {
-    const savedMessages = localStorage.getItem('chatHistory');
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (error) {
-        console.error('加载历史记录失败:', error);
+    loadConversations();
+  }, [userId]);
+
+  // 保存消息到本地存储（向后兼容）
+  const saveMessages = (newMessages: Message[]) => {
+    if (conversationId) {
+      localStorage.setItem(`chat_${conversationId}`, JSON.stringify(newMessages));
+    }
+  };
+
+  // 新建对话
+  const handleNewConversation = async () => {
+    const newConv = await createConversation(userId, `对话 ${conversations.length + 1}`);
+    if (newConv) {
+      setConversations([newConv, ...conversations]);
+      setConversationId(newConv.conversationId);
+      setMessages([]);
+    }
+  };
+
+  // 切换对话
+  const handleSelectConversation = async (convId: string) => {
+    if (convId === conversationId) return;
+    setConversationId(convId);
+    await loadConversationMessages(convId);
+  };
+
+  // 删除对话
+  const handleDeleteConversation = async (convId: string) => {
+    const success = await deleteConversation(userId, convId);
+    if (success) {
+      const updatedConvs = conversations.filter((c) => c.conversationId !== convId);
+      setConversations(updatedConvs);
+      
+      // 如果删除的是当前对话，切换到第一个对话或清空
+      if (convId === conversationId) {
+        if (updatedConvs.length > 0) {
+          setConversationId(updatedConvs[0].conversationId);
+          await loadConversationMessages(updatedConvs[0].conversationId);
+        } else {
+          setConversationId(null);
+          setMessages([]);
+        }
       }
     }
-  }, []);
-
-  // 保存消息到本地存储
-  const saveMessages = (newMessages: Message[]) => {
-    localStorage.setItem('chatHistory', JSON.stringify(newMessages));
   };
 
   // 发送消息
@@ -213,17 +294,29 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // 清空历史
-  const clearHistory = () => {
-    if (window.confirm('确定要清空聊天记录吗？')) {
-      setMessages([]);
-      localStorage.removeItem('chatHistory');
+  // 清空当前对话
+  const clearHistory = async () => {
+    if (!conversationId) return;
+    
+    if (window.confirm('确定要清空当前对话的聊天记录吗？')) {
+      // 删除当前对话并创建新对话
+      await handleDeleteConversation(conversationId);
+      await handleNewConversation();
     }
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-header">
+    <div className="app-container">
+      <ConversationList
+        conversations={conversations}
+        currentConversationId={conversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
+        isLoading={isLoadingConversations}
+      />
+      <div className="chat-container">
+        <div className="chat-header">
         <h1>AI 兴趣教练</h1>
         <div className="header-controls">
           <label className="model-switch">
@@ -315,6 +408,7 @@ const ChatInterface: React.FC = () => {
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
