@@ -1,14 +1,55 @@
+# Dependencies
 node_modules
-npm-debug.log
-dist
+npm-debug.log*
+
+# Development files
 .git
 .gitignore
-README.md
-.env
-.env.*
-.DS_Store
-.idea
-.vscode
 *.md
-jenkins_home
+!README.md
 
+# Environment files (copy manually in Dockerfile)
+.env.local
+.env.development
+
+# Build artifacts (will be generated)
+dist
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scripts (not needed in production)
+scripts/force-gpu-load.ps1
+scripts/monitor-ollama.ps1
+start-dev.ps1
+start-prod.ps1
+fix-ollama-gpu.ps1
+
+# Documentation
+docs
+DEPLOYMENT_GUIDE.md
+ENV_CONFIG.md
+MONGODB_FEATURE_SUMMARY.md
+PROGRESS.md
+RESUME_PROJECT_DESCRIPTION.md
+
+# Old backups
+api/_old_backup
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Logs
+logs
+*.log

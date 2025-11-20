@@ -12,12 +12,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - OLLAMA_API_URL=http://host.docker.internal:11434  # 连接主机 Ollama
+      - OLLAMA_API_URL=http://host.docker.internal:11434  # Connect to host Ollama
       - OLLAMA_MODEL=deepseek-r1:7b
-      - MONGODB_URI=mongodb://mongodb:27017/ai-agent
-    depends_on:
-      - ollama
-      - mongodb
+      - MONGODB_URI=mongodb://host.docker.internal:27017/ai-agent  # Connect to host MongoDB
     restart: unless-stopped
     networks:
       - app-network
@@ -28,45 +25,12 @@ services:
       retries: 3
       start_period: 40s
 
-  # Ollama Service (Optional: if you want to run Ollama in Docker)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-service
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    restart: unless-stopped
-    networks:
-      - app-network
-
-  # MongoDB Database
-  mongodb:
-    image: mongo:7.0
-    container_name: mongodb-service
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_DATABASE=ai-agent
-    volumes:
-      - mongodb-data:/data/db
-      - mongodb-config:/data/configdb
-    restart: unless-stopped
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
+  # NOTE: Ollama and MongoDB run on host machine, not in containers
+  # To start MongoDB independently: docker-compose -f docker-compose.db.yml up -d
 
 networks:
   app-network:
     driver: bridge
 
-volumes:
-  ollama-data:
-  mongodb-data:
-  mongodb-config:
+volumes: {}
 

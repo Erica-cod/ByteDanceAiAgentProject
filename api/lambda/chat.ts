@@ -1,12 +1,33 @@
+/**
+ * Chat API - 符合 Modern.js BFF 规范
+ * 路由: /api/chat
+ * 
+ * 支持流式响应 (SSE)
+ */
+
+// 加载环境变量
+import '../config/env.js';
+import type { RequestOption } from '@modern-js/runtime/server';
 import { connectToDatabase } from '../db/connection.js';
 import { ConversationService } from '../services/conversationService.js';
 import { MessageService } from '../services/messageService.js';
 import { UserService } from '../services/userService.js';
+import { errorResponse } from './_utils/response.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
 
-// 兴趣教练的 system prompt
+// ============= 类型定义 =============
+
+interface ChatRequestData {
+  message: string;
+  modelType: 'local' | 'volcano';
+  conversationId?: string;
+  userId: string;
+}
+
+// ============= System Prompt =============
+
 const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
 
 1. 通过提问了解用户的兴趣倾向和个性特点
@@ -14,16 +35,15 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 3. 分享相关的资源和学习路径
 4. 鼓励用户坚持并享受兴趣带来的乐趣
 
+**重要**：在回答之前，请先在 <think></think> 标签内展示你的思考过程，然后再给出最终回答。
+
 请用友好、鼓励的语气与用户交流，用简洁明了的语言回答问题。`;
 
-interface ChatRequest {
-  message: string;
-  modelType: 'local' | 'volcano';
-  conversationId?: string;
-  userId: string;
-}
+// ============= 工具函数 =============
 
-// 调用本地 Ollama 模型
+/**
+ * 调用本地 Ollama 模型
+ */
 async function callLocalModel(message: string) {
   const fetch = (await import('node-fetch')).default;
   const modelName = process.env.OLLAMA_MODEL || 'deepseek-r1:7b';
@@ -39,6 +59,11 @@ async function callLocalModel(message: string) {
         { role: 'user', content: message },
       ],
       stream: true,
+      keep_alive: '30m', // 保持模型在内存中 30 分钟，避免频繁重新加载
+      // 强制使用 GPU - 所有层都加载到 GPU
+      options: {
+        num_gpu: 999,  // 强制所有层使用 GPU（999 表示尽可能多）
+      }
     }),
   });
 
@@ -49,7 +74,9 @@ async function callLocalModel(message: string) {
   return response.body;
 }
 
-// 提取 thinking 内容（处理 <think> 标签）
+/**
+ * 提取 thinking 内容（处理 <think> 标签）
+ */
 function extractThinkingAndContent(text: string) {
   let thinking = '';
   let content = text;
@@ -84,10 +111,11 @@ function extractThinkingAndContent(text: string) {
   return { thinking, content };
 }
 
-// 为 Hono 处理流式响应并转换为 SSE 格式
+/**
+ * 为 Hono 处理流式响应并转换为 SSE 格式
+ */
 async function streamToSSEResponse(
   stream: any, 
-  c: any, 
   conversationId: string, 
   userId: string, 
   modelType: 'local' | 'volcano'
@@ -104,6 +132,13 @@ async function streamToSSEResponse(
   // 异步处理流
   (async () => {
     try {
+      // 首先发送 conversationId（用于前端同步）
+      const initData = JSON.stringify({
+        conversationId: conversationId,
+        type: 'init'
+      });
+      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+      
       for await (const chunk of stream) {
         const chunkStr = chunk.toString();
         buffer += chunkStr;
@@ -206,135 +241,35 @@ async function streamToSSEResponse(
   });
 }
 
-// 处理流式响应并转换为 SSE 格式（Express/Node 版本，保留以备用）
-async function streamToSSE(stream: any, res: any) {
-  let buffer = '';
-  let accumulatedText = '';
-  let lastSentContent = '';
-  let lastSentThinking = '';
+// ============= API 函数 =============
 
-  // 设置 SSE 响应头
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  return new Promise<void>((resolve, reject) => {
-    stream.on('data', (chunk: Buffer) => {
-      const chunkStr = chunk.toString();
-      buffer += chunkStr;
-      
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const jsonData = JSON.parse(line);
-
-            if (jsonData.message && jsonData.message.content !== undefined) {
-              // 累积文本（Ollama 返回的是增量内容）
-              accumulatedText += jsonData.message.content;
-              
-              // 提取 thinking 和 content
-              const { thinking, content } = extractThinkingAndContent(accumulatedText);
-
-              // 只有当内容有变化时才发送
-              if (content !== lastSentContent || thinking !== lastSentThinking) {
-                const sseData = JSON.stringify({
-                  content: content,
-                  thinking: thinking || undefined,
-                });
-
-                res.write(`data: ${sseData}\n\n`);
-                lastSentContent = content;
-                lastSentThinking = thinking;
-              }
-            }
-
-            if (jsonData.done) {
-              // 发送最终数据
-              if (accumulatedText) {
-                const { thinking, content } = extractThinkingAndContent(accumulatedText);
-                const sseData = JSON.stringify({
-                  content: content || accumulatedText,
-                  thinking: thinking || undefined,
-                });
-                res.write(`data: ${sseData}\n\n`);
-              }
-              
-              res.write('data: [DONE]\n\n');
-              res.end();
-              resolve();
-              return;
-            }
-          } catch (error) {
-            console.error('解析流数据失败:', error);
-          }
-        }
-      }
-    });
-
-    stream.on('end', () => {
-      if (buffer.trim()) {
-        try {
-          const jsonData = JSON.parse(buffer);
-          if (jsonData.message?.content) {
-            accumulatedText += jsonData.message.content;
-            const { thinking, content } = extractThinkingAndContent(accumulatedText);
-            
-            const sseData = JSON.stringify({
-              content: content || accumulatedText,
-              thinking: thinking || undefined,
-            });
-            res.write(`data: ${sseData}\n\n`);
-          }
-        } catch (error) {
-          console.error('解析最后数据失败:', error);
-        }
-      }
-      res.write('data: [DONE]\n\n');
-      res.end();
-      resolve();
-    });
-
-    stream.on('error', (error: Error) => {
-      console.error('流处理错误:', error);
-      const errorData = JSON.stringify({ error: error.message });
-      res.write(`data: ${errorData}\n\n`);
-      res.end();
-      reject(error);
-    });
-
-    // 处理客户端断开连接
-    res.on('close', () => {
-      console.log('客户端断开连接');
-      stream.destroy();
-      resolve();
-    });
-  });
-}
-
-// Modern.js BFF API 路由（请求体在 c.data 中）
-export const post = async (c: any) => {
+/**
+ * POST /api/chat - 发送聊天消息（流式响应）
+ * 
+ * @param data - 请求数据 { message, modelType, conversationId?, userId }
+ * @returns SSE 流式响应
+ */
+export async function post({
+  data,
+}: RequestOption<any, ChatRequestData>) {
   try {
     console.log('=== 收到聊天请求 ===');
     
-    // Modern.js BFF 的请求体在 c.data 中
-    const body: ChatRequest = c.data;
-    const { message, modelType, conversationId: reqConversationId, userId } = body;
+    const { message, modelType, conversationId: reqConversationId, userId } = data;
 
     console.log('解析后的 message:', message);
     console.log('解析后的 modelType:', modelType);
     console.log('解析后的 conversationId:', reqConversationId);
     console.log('解析后的 userId:', userId);
 
+    // 参数验证
     if (!message || !message.trim()) {
       console.log('消息内容为空');
-      return { error: '消息内容不能为空' };
+      return errorResponse('消息内容不能为空');
     }
 
     if (!userId) {
-      return { error: 'userId is required' };
+      return errorResponse('userId is required');
     }
 
     // 确保用户存在
@@ -368,19 +303,21 @@ export const post = async (c: any) => {
       // 继续处理，不阻止 AI 回复
     }
 
+    // 调用模型
     if (modelType === 'local') {
       console.log('开始调用本地模型...');
       const stream = await callLocalModel(message);
       
       // 将流式响应转换为 SSE 格式并返回
-      return streamToSSEResponse(stream, c, conversationId, userId, modelType);
+      return streamToSSEResponse(stream, conversationId, userId, modelType);
     } else if (modelType === 'volcano') {
-      return { error: '火山云模型接入功能待实现' };
+      return errorResponse('火山云模型接入功能待实现');
     } else {
-      return { error: '不支持的模型类型' };
+      return errorResponse('不支持的模型类型');
     }
   } catch (error: any) {
     console.error('处理聊天请求失败:', error);
-    return { error: error.message || '服务器内部错误' };
+    return errorResponse(error.message || '服务器内部错误');
   }
-};
+}
+

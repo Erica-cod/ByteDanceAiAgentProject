@@ -57,6 +57,29 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, classNam
               </div>
             );
           },
+          // 自定义列表项渲染 - 解决流式渲染时的对齐问题 AI辅助修改：react-markdown 在内容增加时，会自动在列表项中插入 <p> 标签包裹文本，导致换行和错位。
+          li(props: any) {
+            const { node, children, ...rest } = props;
+            return (
+              <li {...rest}>
+                {children}
+              </li>
+            );
+          },
+          // 自定义段落渲染 - 在列表项中的段落特殊处理
+          p(props: any) {
+            const { node, children, ...rest } = props;
+            // 检查父元素是否是列表项
+            const isInListItem = node?.position && 
+              node.parent?.type === 'listItem';
+            
+            if (isInListItem) {
+              // 列表项中的段落使用 span 替代，避免换行
+              return <span className="list-item-text">{children}</span>;
+            }
+            
+            return <p {...rest}>{children}</p>;
+          },
         }}
       >
         {content}

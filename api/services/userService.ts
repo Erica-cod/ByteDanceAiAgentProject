@@ -7,7 +7,7 @@ export class UserService {
    * Get or create user by userId
    */
   static async getOrCreateUser(userId?: string, metadata?: any): Promise<User> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<User>('users');
 
     // If no userId provided, generate a new one
@@ -44,7 +44,7 @@ export class UserService {
    * Get user by userId
    */
   static async getUserById(userId: string): Promise<User | null> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<User>('users');
     return await collection.findOne({ userId });
   }
@@ -53,7 +53,7 @@ export class UserService {
    * Update user profile
    */
   static async updateUser(userId: string, updates: Partial<User>): Promise<boolean> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<User>('users');
     
     const result = await collection.updateOne(

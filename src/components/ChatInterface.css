@@ -2,18 +2,17 @@
 .app-container {
   display: flex;
   height: 100vh;
-  max-width: 1600px;
-  margin: 0 auto;
+  width: 100%;  /* 占满整个视口宽度 */
+  min-width: 800px;  /* 最小宽度，屏幕太窄时出现横向滚动条 */
   background: white;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
 /* 聊天容器 */
 .chat-container {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
+  flex: 1;  /* 占据除侧边栏外的所有剩余空间 */
+  overflow: hidden;  /* 防止内容溢出 */
   background: white;
 }
 
@@ -91,7 +90,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
+  flex: 1;  /* 让空状态占据所有可用空间 */
+  width: 100%;  /* 强制占据父容器全部宽度 */
   color: #999;
   font-size: 16px;
 }
@@ -136,6 +136,32 @@
   border-radius: 8px;
   max-height: 300px;
   overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* 滚动锚点（不可见，仅用于定位） */
+.thinking-anchor {
+  height: 0;
+  overflow: hidden;
+}
+
+/* 自定义滚动条样式 */
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+  background: #e1f0ff;
+  border-radius: 3px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #4a90e2;
+  border-radius: 3px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb:hover {
+  background: #357abd;
 }
 
 .thinking-label {

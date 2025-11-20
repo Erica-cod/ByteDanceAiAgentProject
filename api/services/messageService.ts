@@ -14,7 +14,7 @@ export class MessageService {
     thinking?: string,
     modelType?: 'local' | 'volcano'
   ): Promise<Message> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Message>('messages');
 
     const message: Message = {
@@ -41,7 +41,7 @@ export class MessageService {
     limit: number = 50,
     skip: number = 0
   ): Promise<{ messages: Message[]; total: number }> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Message>('messages');
 
     const messages = await collection
@@ -60,7 +60,7 @@ export class MessageService {
    * Get message by ID (with user verification)
    */
   static async getMessage(messageId: string, userId: string): Promise<Message | null> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Message>('messages');
     
     return await collection.findOne({ messageId, userId });
@@ -70,7 +70,7 @@ export class MessageService {
    * Delete all messages in a conversation
    */
   static async deleteConversationMessages(conversationId: string, userId: string): Promise<number> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Message>('messages');
 
     const result = await collection.deleteMany({ conversationId, userId });
@@ -81,7 +81,7 @@ export class MessageService {
    * Get user's total message count
    */
   static async getUserMessageCount(userId: string): Promise<number> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Message>('messages');
     
     return await collection.countDocuments({ userId });
