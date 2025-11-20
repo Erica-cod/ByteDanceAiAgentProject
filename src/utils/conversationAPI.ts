@@ -69,6 +69,26 @@ export async function createConversation(userId: string, title?: string): Promis
 }
 
 /**
+ * 获取单个对话的详细信息（包含最新的 messageCount）
+ */
+export async function getConversationDetails(
+  userId: string,
+  conversationId: string
+): Promise<Conversation | null> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}?userId=${userId}`);
+    if (!response.ok) {
+      throw new Error('获取对话详情失败');
+    }
+    const data = await response.json();
+    return data.success ? data.data.conversation : null;
+  } catch (error) {
+    console.error('获取对话详情失败:', error);
+    return null;
+  }
+}
+
+/**
  * 获取对话的所有消息
  */
 export async function getConversationMessages(
@@ -76,14 +96,23 @@ export async function getConversationMessages(
   conversationId: string
 ): Promise<Message[]> {
   try {
+    console.log('🌐 API 调用: GET /api/conversations/' + conversationId, { userId });
     const response = await fetch(`/api/conversations/${conversationId}?userId=${userId}`);
+    console.log('📡 API 响应状态:', response.status, response.statusText);
+    
     if (!response.ok) {
       throw new Error('获取消息失败');
     }
+    
     const data = await response.json();
-    return data.success ? data.data.messages : [];
+    console.log('📦 API 返回数据:', data);
+    
+    const messages = data.success ? data.data.messages : [];
+    console.log('💬 提取的消息列表:', messages);
+    
+    return messages;
   } catch (error) {
-    console.error('获取消息失败:', error);
+    console.error('❌ 获取消息失败:', error);
     return [];
   }
 }

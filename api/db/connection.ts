@@ -2,6 +2,7 @@ import { MongoClient, Db } from 'mongodb';
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
+let connecting: Promise<Db> | null = null;
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-agent';
 
@@ -10,21 +11,31 @@ export async function connectToDatabase(): Promise<Db> {
     return db;
   }
 
-  try {
-    client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    db = client.db();
-    
-    console.log('✅ MongoDB connected successfully');
-    
-    // Create indexes
-    await createIndexes();
-    
-    return db;
-  } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
-    throw error;
+  // 如果正在连接中，返回相同的 Promise
+  if (connecting) {
+    return connecting;
   }
+
+  connecting = (async () => {
+    try {
+      client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      db = client.db();
+      
+      console.log('✅ MongoDB connected successfully');
+      
+      // Create indexes
+      await createIndexes();
+      
+      return db;
+    } catch (error) {
+      console.error('❌ MongoDB connection failed:', error);
+      connecting = null;
+      throw error;
+    }
+  })();
+
+  return connecting;
 }
 
 async function createIndexes() {
@@ -60,10 +71,19 @@ export async function closeDatabase(): Promise<void> {
   }
 }
 
-export function getDatabase(): Db {
-  if (!db) {
-    throw new Error('Database not connected. Call connectToDatabase() first.');
+export async function getDatabase(): Promise<Db> {
+  if (!db && !connecting) {
+    // 如果数据库未连接且没有在连接中，自动连接
+    await connectToDatabase();
+  } else if (connecting) {
+    // 如果正在连接中，等待连接完成
+    await connecting;
   }
+  
+  if (!db) {
+    throw new Error('Database connection failed');
+  }
+  
   return db;
 }
 

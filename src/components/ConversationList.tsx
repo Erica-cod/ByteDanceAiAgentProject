@@ -9,6 +9,7 @@ interface ConversationListProps {
   onNewConversation: () => void;
   onDeleteConversation: (conversationId: string) => void;
   isLoading?: boolean;
+  messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -18,6 +19,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onNewConversation,
   onDeleteConversation,
   isLoading = false,
+  messageCountRefs,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -81,7 +83,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 <div className="conversation-info">
                   <div className="conversation-title">{conversation.title}</div>
                   <div className="conversation-meta">
-                    <span className="message-count">{conversation.messageCount} 条消息</span>
+                    <span className="message-count">
+                      <span 
+                        ref={(el) => {
+                          if (el && messageCountRefs) {
+                            messageCountRefs.current.set(conversation.conversationId, el);
+                          }
+                        }}
+                      >
+                        {conversation.messageCount}
+                      </span>
+                      {' 条消息'}
+                    </span>
                     <span className="conversation-time">{formatDate(conversation.updatedAt)}</span>
                   </div>
                 </div>

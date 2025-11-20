@@ -31,7 +31,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/modern.config.ts ./
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/api ./api
+COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/.env.production ./.env.production
 
 # Expose port
 EXPOSE 8080

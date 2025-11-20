@@ -7,7 +7,7 @@ export class ConversationService {
    * Create a new conversation
    */
   static async createConversation(userId: string, title?: string): Promise<Conversation> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const conversation: Conversation = {
@@ -32,7 +32,7 @@ export class ConversationService {
     limit: number = 20,
     skip: number = 0
   ): Promise<{ conversations: Conversation[]; total: number }> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const conversations = await collection
@@ -51,7 +51,7 @@ export class ConversationService {
    * Get conversation by ID (with user verification)
    */
   static async getConversation(conversationId: string, userId: string): Promise<Conversation | null> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
     
     return await collection.findOne({ conversationId, userId });
@@ -65,7 +65,7 @@ export class ConversationService {
     userId: string,
     updates: Partial<Conversation>
   ): Promise<boolean> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const result = await collection.updateOne(
@@ -80,7 +80,7 @@ export class ConversationService {
    * Delete conversation (soft delete)
    */
   static async deleteConversation(userId: string, conversationId: string): Promise<boolean> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const result = await collection.updateOne(
@@ -95,7 +95,7 @@ export class ConversationService {
    * Update conversation title
    */
   static async updateConversationTitle(userId: string, conversationId: string, newTitle: string): Promise<boolean> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     const result = await collection.updateOne(
@@ -110,7 +110,7 @@ export class ConversationService {
    * Increment message count
    */
   static async incrementMessageCount(conversationId: string, userId: string): Promise<void> {
-    const db = getDatabase();
+    const db = await getDatabase();
     const collection = db.collection<Conversation>('conversations');
 
     await collection.updateOne(

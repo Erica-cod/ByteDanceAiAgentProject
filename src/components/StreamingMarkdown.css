@@ -1,20 +1,20 @@
 /* Markdown 内容样式 */
 .streaming-markdown {
-  line-height: 1.6;
+  line-height: 1.5;  /* 减小行高 */
   color: #333;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
-/* 标题样式 - 减小间距 */
+/* 标题样式 - 进一步减小间距 */
 .streaming-markdown h1,
 .streaming-markdown h2,
 .streaming-markdown h3,
 .streaming-markdown h4,
 .streaming-markdown h5,
 .streaming-markdown h6 {
-  margin-top: 0.8em;
-  margin-bottom: 0.4em;
+  margin-top: 0.6em;  /* 从 0.8em 减到 0.6em */
+  margin-bottom: 0.3em;  /* 从 0.4em 减到 0.3em */
   font-weight: 600;
   line-height: 1.3;
 }
@@ -35,32 +35,92 @@
   font-size: 1.2em;
 }
 
-/* 段落样式 - 减小间距 */
+/* 段落样式 - 进一步减小间距 */
 .streaming-markdown p {
-  margin-top: 0.4em;
-  margin-bottom: 0.4em;
+  margin-top: 0.25em;  /* 从 0.4em 减到 0.25em */
+  margin-bottom: 0.25em;  /* 从 0.4em 减到 0.25em */
 }
 
-/* 列表样式 - 减小间距 */
+/* 首段落不需要上边距 */
+.streaming-markdown p:first-child {
+  margin-top: 0;
+}
+
+/* 末段落不需要下边距 */
+.streaming-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+/* 列表样式 - 进一步减小间距 */
 .streaming-markdown ul,
 .streaming-markdown ol {
-  margin-top: 0.4em;
-  margin-bottom: 0.6em;
-  padding-left: 2em;
+  margin-top: 0.3em;  /* 从 0.4em 减到 0.3em */
+  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
+  padding-left: 2em;  /* 恢复到 2em 确保足够空间 */
 }
 
 .streaming-markdown li {
-  margin-bottom: 0.3em;
+  margin-bottom: 0.3em;  /* 增加到 0.3em 给嵌套内容更多空间 */
+  line-height: 1.6;  /* 增加行高改善多行对齐 */
+  list-style-position: outside;  /* 标记在外部，不影响文本对齐 */
 }
 
-/* 代码块样式 - 减小间距 */
+/* 列表标记样式优化 */
+.streaming-markdown ul {
+  list-style-type: disc;  /* 确保使用圆点 */
+}
+
+.streaming-markdown ol {
+  list-style-type: decimal;  /* 使用数字 */
+  padding-left: 2.2em;  /* 数字列表需要稍多空间 */
+}
+
+/* 确保列表项内的内容对齐 */
+.streaming-markdown li > * {
+  vertical-align: baseline;
+}
+
+/* 列表项内的段落不要额外边距 */
+.streaming-markdown li > p {
+  margin: 0;
+  display: inline;  /* 段落内联显示，避免换行 */
+}
+
+/* 列表项中的文本容器（span 替代 p） */
+.streaming-markdown .list-item-text {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}
+
+/* 列表项内的加粗文本 */
+.streaming-markdown li > strong,
+.streaming-markdown li > p > strong {
+  font-weight: 600;
+}
+
+/* 嵌套列表间距调整 */
+.streaming-markdown li > ul,
+.streaming-markdown li > ol {
+  margin-top: 0.3em;  /* 增加上边距 */
+  margin-bottom: 0.2em;
+  padding-left: 1.5em;  /* 嵌套列表缩进 */
+}
+
+/* 嵌套列表项样式 */
+.streaming-markdown li li {
+  line-height: 1.5;
+  margin-bottom: 0.2em;
+}
+
+/* 代码块样式 - 进一步减小间距 */
 .streaming-markdown pre {
   background-color: #f6f8fa;
   border-radius: 6px;
-  padding: 12px;
+  padding: 10px;  /* 从 12px 减到 10px */
   overflow-x: auto;
-  margin-top: 0.5em;
-  margin-bottom: 0.6em;
+  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
+  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
   border: 1px solid #e1e4e8;
 }
 
@@ -84,16 +144,21 @@
   color: #e83e8c;
 }
 
-/* 引用块样式 - 减小间距 */
+/* 引用块样式 - 进一步减小间距 */
 .streaming-markdown blockquote {
   border-left: 4px solid #ddd;
-  padding-left: 1em;
+  padding: 0.3em 0 0.3em 1em;  /* 添加上下内边距 */
   margin-left: 0;
   margin-right: 0;
-  margin-top: 0.5em;
-  margin-bottom: 0.6em;
+  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
+  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
   color: #666;
   font-style: italic;
+}
+
+/* 引用块内段落间距 */
+.streaming-markdown blockquote p {
+  margin: 0.2em 0;
 }
 
 /* 水平分割线 - 减小间距 */
@@ -103,11 +168,11 @@
   margin: 1em 0;
 }
 
-/* 表格样式 - 减小间距 */
+/* 表格样式 - 进一步减小间距 */
 .streaming-markdown .table-wrapper {
   overflow-x: auto;
-  margin-top: 0.5em;
-  margin-bottom: 0.6em;
+  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
+  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
 }
 
 .streaming-markdown table {
@@ -141,12 +206,12 @@
   text-decoration: underline;
 }
 
-/* 图片样式 - 减小间距 */
+/* 图片样式 - 进一步减小间距 */
 .streaming-markdown img {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
-  margin: 0.6em 0;
+  margin: 0.4em 0;  /* 从 0.6em 减到 0.4em */
 }
 
 /* 任务列表样式 */
@@ -159,10 +224,12 @@
   color: #999;
 }
 
-/* 加粗样式 */
+/* 加粗样式 - 优化对齐 */
 .streaming-markdown strong {
   font-weight: 600;
   color: #000;
+  vertical-align: baseline;  /* 确保基线对齐 */
+  display: inline;  /* 确保是行内元素 */
 }
 
 /* 斜体样式 */

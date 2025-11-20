@@ -7,6 +7,7 @@ import {
   createConversation,
   getConversationMessages,
   deleteConversation,
+  getConversationDetails,
   Conversation,
 } from '../utils/conversationAPI';
 import './ChatInterface.css';
@@ -30,6 +31,8 @@ const ChatInterface: React.FC = () => {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const thinkingEndRef = useRef<HTMLDivElement>(null); // thinking 区域底部锚点
+  const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map()); // 存储每个对话的消息计数 DOM 元素
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -37,8 +40,17 @@ const ChatInterface: React.FC = () => {
   };
 
   useEffect(() => {
+    // 先滚动 thinking 区域（如果存在）
+    if (thinkingEndRef.current) {
+      const thinkingContainer = thinkingEndRef.current.closest('.thinking-content');
+      if (thinkingContainer) {
+        thinkingContainer.scrollTop = thinkingContainer.scrollHeight;
+      }
+    }
+    // 然后滚动整个消息区域到底部
     scrollToBottom();
-  }, [messages]);
+  }, [messages]);//注意：这里的思考区域滚动会干扰消息区域的滚动，所以需要分开处理。我们首先滚动 thinking 区域，然后再滚动整个消息区域。
+  //至于thinking区域滚动到最底部，我们使用了一个锚点（.thinking-anchor），它是一个不可见的 div，用于触发滚动操作。
 
   // 初始化用户
   useEffect(() => {
@@ -68,7 +80,11 @@ const ChatInterface: React.FC = () => {
   // 加载指定对话的历史消息
   const loadConversationMessages = async (convId: string) => {
     try {
+      console.log('🔄 开始加载对话消息:', { userId, convId });
       const msgs = await getConversationMessages(userId, convId);
+      console.log('📦 收到消息数据:', msgs);
+      console.log('📊 消息数量:', msgs.length);
+      
       // 转换消息格式
       const formattedMessages: Message[] = msgs.map((msg) => ({
         id: msg.messageId,
@@ -77,9 +93,11 @@ const ChatInterface: React.FC = () => {
         thinking: msg.thinking,
         timestamp: new Date(msg.timestamp).getTime(),
       }));
+      
+      console.log('✅ 格式化后的消息:', formattedMessages);
       setMessages(formattedMessages);
     } catch (error) {
-      console.error('加载消息失败:', error);
+      console.error('❌ 加载消息失败:', error);
       setMessages([]);
     }
   };
@@ -108,7 +126,11 @@ const ChatInterface: React.FC = () => {
 
   // 切换对话
   const handleSelectConversation = async (convId: string) => {
-    if (convId === conversationId) return;
+    console.log('🔀 切换对话:', { from: conversationId, to: convId });
+    if (convId === conversationId) {
+      console.log('⚠️ 已经是当前对话，跳过');
+      return;
+    }
     setConversationId(convId);
     await loadConversationMessages(convId);
   };
@@ -217,6 +239,18 @@ const ChatInterface: React.FC = () => {
               const parsed = JSON.parse(data);
               console.log('接收到 SSE 数据:', parsed); // 调试日志
               
+              // 处理初始化消息（包含 conversationId）
+              if (parsed.type === 'init' && parsed.conversationId) {
+                console.log('收到 conversationId:', parsed.conversationId);
+                // 如果当前没有 conversationId，说明是新建的对话
+                if (!conversationId) {
+                  setConversationId(parsed.conversationId);
+                  // 重新加载对话列表
+                  loadConversations();
+                }
+                continue;
+              }
+              
               // 处理 thinking 和 content
               if (parsed.thinking !== undefined && parsed.thinking !== null) {
                 currentThinking = parsed.thinking;
@@ -261,6 +295,22 @@ const ChatInterface: React.FC = () => {
             : msg
         );
         saveMessages(final);
+        
+        // 实时更新对话列表中的消息计数（从服务器获取最新值）
+        if (conversationId) {
+          // 异步获取最新的对话详情
+          getConversationDetails(userId, conversationId).then((details: Conversation | null) => {
+            if (details) {
+              const countElement = messageCountRefs.current.get(conversationId);
+              if (countElement) {
+                countElement.textContent = `${details.messageCount}`;
+              }
+            }
+          }).catch((error: unknown) => {
+            console.error('更新消息计数失败:', error);
+          });
+        }
+        
         return final;
       });
     } catch (error: any) {
@@ -314,6 +364,7 @@ const ChatInterface: React.FC = () => {
         onNewConversation={handleNewConversation}
         onDeleteConversation={handleDeleteConversation}
         isLoading={isLoadingConversations}
+        messageCountRefs={messageCountRefs}
       />
       <div className="chat-container">
         <div className="chat-header">
@@ -351,7 +402,10 @@ const ChatInterface: React.FC = () => {
               {message.role === 'assistant' && message.thinking && (
                 <div className="thinking-content">
                   <div className="thinking-label">思考过程：</div>
-                  <div className="thinking-text">{message.thinking}</div>
+                  <div className="thinking-text">
+                    {message.thinking}
+                    <div ref={thinkingEndRef} className="thinking-anchor" />
+                  </div>
                 </div>
               )}
               <div className="message-text">

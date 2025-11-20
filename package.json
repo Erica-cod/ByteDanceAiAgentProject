@@ -1,19 +1,36 @@
 {
   "name": "ai-agent-app",
   "version": "1.0.0",
+  "type": "module",
   "description": "AI Agent 应用 - 抖音搜索训练营",
   "scripts": {
-    "dev": "modern dev",
-    "build": "modern build",
-    "start": "modern start",
-    "serve": "modern serve",
+    "predev": "node scripts/clean-port.js",
+    "prestart": "node scripts/clean-port.js",
+    "preserve": "node scripts/clean-port.js",
+    "preserve:local": "node scripts/clean-port.js",
+    "dev": "cross-env NODE_ENV=development modern dev",
+    "build": "cross-env NODE_ENV=production modern build",
+    "start": "cross-env NODE_ENV=production modern start",
+    "serve": "cross-env NODE_ENV=production modern serve",
+    "dev:local": "cross-env NODE_ENV=development modern dev",
+    "serve:local": "cross-env NODE_ENV=development modern serve",
+    "start:dev": "powershell -ExecutionPolicy Bypass -File start-dev.ps1",
+    "start:prod": "powershell -ExecutionPolicy Bypass -File start-prod.ps1",
+    "fix:gpu": "powershell -ExecutionPolicy Bypass -File fix-ollama-gpu.ps1",
+    "force:gpu": "powershell -ExecutionPolicy Bypass -File scripts/force-gpu-load.ps1",
+    "monitor:ollama": "powershell -ExecutionPolicy Bypass -File monitor-ollama.ps1",
+    "monitor:cpu": "powershell -ExecutionPolicy Bypass -File check-cpu-realtime.ps1",
     "docker:build": "docker build -t bytedance-ai-agent .",
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
-    "docker:logs": "docker-compose logs -f app"
+    "docker:logs": "docker-compose logs -f app",
+    "db:status": "docker ps -a | findstr mongodb-global",
+    "db:logs": "docker logs -f mongodb-global",
+    "db:shell": "docker exec -it mongodb-global mongosh ai-agent"
   },
   "dependencies": {
     "@modern-js/runtime": "^2.68.0",
+    "dotenv": "^17.2.3",
     "highlight.js": "^11.11.1",
     "mongodb": "^7.0.0",
     "node-fetch": "^2.7.0",
@@ -32,6 +49,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@types/uuid": "^11.0.0",
+    "cross-env": "^10.1.0",
     "typescript": "^5.0.0"
   }
 }
