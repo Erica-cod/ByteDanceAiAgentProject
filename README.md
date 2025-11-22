@@ -18,6 +18,10 @@
 - GitHub Webhook: ✅ 已激活
 - 自动构建触发: ✅ 启用
 
+### 📚 相关文档
+- [完整部署指南](./DEPLOYMENT_GUIDE.md) - Jenkins 和 Docker CI/CD 配置
+- [ngrok Webhook 配置指南](./docs/NGROK_GITHUB_WEBHOOK_GUIDE.md) - 本地开发环境接收 GitHub webhook
+
 ## 开发
 
 ```bash
