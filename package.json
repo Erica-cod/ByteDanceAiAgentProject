@@ -26,7 +26,8 @@
     "docker:logs": "docker-compose logs -f app",
     "db:status": "docker ps -a | findstr mongodb-global",
     "db:logs": "docker logs -f mongodb-global",
-    "db:shell": "docker exec -it mongodb-global mongosh ai-agent"
+    "db:shell": "docker exec -it mongodb-global mongosh ai-agent",
+    "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1"
   },
   "dependencies": {
     "@modern-js/runtime": "^2.68.0",
