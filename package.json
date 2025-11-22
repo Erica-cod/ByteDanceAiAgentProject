@@ -27,7 +27,8 @@
     "db:status": "docker ps -a | findstr mongodb-global",
     "db:logs": "docker logs -f mongodb-global",
     "db:shell": "docker exec -it mongodb-global mongosh ai-agent",
-    "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1"
+    "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
+    "test:volcengine": "node test-volcengine.js"
   },
   "dependencies": {
     "@modern-js/runtime": "^2.68.0",

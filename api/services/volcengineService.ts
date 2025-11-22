@@ -91,9 +91,20 @@ export class VolcengineService {
     };
 
     console.log('🔥 调用火山引擎大模型:', {
+      url: this.apiUrl,
       model: this.model,
       messagesCount: messages.length,
       options,
+      hasApiKey: !!this.apiKey,
+    });
+
+    console.log('📡 发送请求到火山引擎:', {
+      url: this.apiUrl,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`,
+      },
     });
 
     const response = await fetch(this.apiUrl, {
