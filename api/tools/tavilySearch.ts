@@ -35,7 +35,7 @@ export interface SearchOptions {
   maxResults?: number;        // 最大结果数量，默认 5
   searchDepth?: 'basic' | 'advanced';  // 搜索深度，默认 basic
   includeAnswer?: boolean;    // 是否包含 AI 生成的答案摘要，默认 false
-  includeRawContent?: boolean; // 是否包含原始内容，默认 false
+  includeRawContent?: false | 'text' | 'markdown'; // 是否包含原始内容，默认 false
 }
 
 /**
