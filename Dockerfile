@@ -33,14 +33,20 @@ COPY --from=builder /app/modern.config.ts ./
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/api ./api
 COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/.env.production ./.env.production
+COPY --from=builder /app/.env.production ./dist/.env.production
 
 # Expose port
 EXPOSE 8080
 
 # Set environment to production
 ENV NODE_ENV=production
+# Set environment variables in Dockerfile to ensure they are available
+ENV OLLAMA_API_URL=http://host.docker.internal:11434
+ENV OLLAMA_MODEL=deepseek-r1:7b
+ENV MONGODB_URI=mongodb://mongodb-global:27017/ai-agent
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \

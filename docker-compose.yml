@@ -12,12 +12,14 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - OLLAMA_API_URL=http://host.docker.internal:11434  # Connect to host Ollama
+      - OLLAMA_API_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=deepseek-r1:7b
-      - MONGODB_URI=mongodb://host.docker.internal:27017/ai-agent  # Connect to host MongoDB
+      - MONGODB_URI=mongodb://mongodb-global:27017/ai-agent
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
-      - app-network
+      - shared-network
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
@@ -25,12 +27,15 @@ services:
       retries: 3
       start_period: 40s
 
-  # NOTE: Ollama and MongoDB run on host machine, not in containers
-  # To start MongoDB independently: docker-compose -f docker-compose.db.yml up -d
-
 networks:
-  app-network:
-    driver: bridge
+  shared-network:
+    external: true
+    name: shared-network
+
+  # NOTE: 
+  # - Ollama runs on host machine (accessed via host.docker.internal)
+  # - MongoDB runs in mongodb-global container
+  # - shared-network is created externally and mongodb-global is already connected
 
 volumes: {}
 

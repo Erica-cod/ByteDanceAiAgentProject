@@ -2,10 +2,20 @@
 /**
  * 端口清理脚本 - 在启动前自动清理占用的端口
  * 这个脚本会在每次 npm run serve/start 前自动执行
+ * 在 Docker 容器环境中会自动跳过
  */
 
 import { execSync } from 'child_process';
 import { platform } from 'os';
+import { existsSync } from 'fs';
+
+// 检测是否在 Docker 容器中运行
+const isDocker = existsSync('/.dockerenv') || existsSync('/run/.containerenv');
+
+if (isDocker) {
+  console.log('\n🐳 检测到 Docker 容器环境，跳过端口清理\n');
+  process.exit(0);
+}
 
 const PORT = process.env.PORT || 8080;
 const isWindows = platform() === 'win32';
