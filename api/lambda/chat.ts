@@ -695,10 +695,16 @@ export async function post({
       // 将流式响应转换为 SSE 格式并返回
       return streamToSSEResponse(stream, conversationId, userId, modelType, messages);
     } else if (modelType === 'volcano') {
-      console.log('开始调用火山引擎豆包模型...');
+      console.log('==========================================');
+      console.log('🌋 开始调用火山引擎豆包模型...');
+      console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
+      console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
+      console.log('🌐 API 端点:', process.env.ARK_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions');
+      console.log('==========================================');
       
       // 检查配置
       if (!volcengineService.isConfigured()) {
+        console.error('❌ 火山引擎 API 未配置！');
         return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
       }
 
@@ -708,7 +714,9 @@ export async function post({
         { role: 'user', content: message },
       ];
       
+      console.log('📨 准备发送消息到火山引擎，消息数量:', messages.length);
       const stream = await callVolcengineModel(messages);
+      console.log('✅ 已收到火山引擎的流式响应');
       
       // 将流式响应转换为 SSE 格式并返回
       return streamVolcengineToSSEResponse(stream, conversationId, userId, modelType, messages);
