@@ -8,6 +8,9 @@
 - ✅ SSE 流式响应
 - ✅ Markdown 渲染支持（代码高亮）
 - ✅ 本地 Ollama 模型集成
+- ✅ **Tavily 联网搜索** - AI 自主判断并调用搜索工具
+- ✅ MongoDB 持久化存储
+- ✅ 多对话管理
 - ✅ Docker 容器化部署
 - ✅ Jenkins CI/CD 自动化流水线
 
@@ -21,6 +24,8 @@
 ### 📚 相关文档
 - [完整部署指南](./DEPLOYMENT_GUIDE.md) - Jenkins 和 Docker CI/CD 配置
 - [ngrok Webhook 配置指南](./docs/NGROK_GITHUB_WEBHOOK_GUIDE.md) - 本地开发环境接收 GitHub webhook
+- [Tavily 搜索工具指南](./docs/TAVILY_SEARCH_GUIDE.md) - AI 联网搜索功能配置和使用
+- [数据库设计文档](./docs/DATABASE_DESIGN.md) - MongoDB 数据模型和API设计
 
 ## 开发
 
