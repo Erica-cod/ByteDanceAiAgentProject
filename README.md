@@ -1,6 +1,6 @@
 # AI Agent - 兴趣教练
 
-基于 Modern.js 构建的 AI Agent 应用，集成本地 Ollama 模型。
+基于 Modern.js 构建的 AI Agent 应用，支持本地 Ollama 模型和火山引擎豆包大模型。
 
 ## 特性
 
@@ -8,6 +8,7 @@
 - ✅ SSE 流式响应
 - ✅ Markdown 渲染支持（代码高亮）
 - ✅ 本地 Ollama 模型集成
+- ✅ **火山引擎豆包大模型** - 在线大模型支持
 - ✅ **Tavily 联网搜索** - AI 自主判断并调用搜索工具
 - ✅ MongoDB 持久化存储
 - ✅ 多对话管理
@@ -25,6 +26,7 @@
 - [完整部署指南](./DEPLOYMENT_GUIDE.md) - Jenkins 和 Docker CI/CD 配置
 - [ngrok Webhook 配置指南](./docs/NGROK_GITHUB_WEBHOOK_GUIDE.md) - 本地开发环境接收 GitHub webhook
 - [Tavily 搜索工具指南](./docs/TAVILY_SEARCH_GUIDE.md) - AI 联网搜索功能配置和使用
+- [火山引擎豆包大模型指南](./docs/VOLCENGINE_DOUBAO_GUIDE.md) - 火山引擎在线大模型集成和使用
 - [数据库设计文档](./docs/DATABASE_DESIGN.md) - MongoDB 数据模型和API设计
 
 ## 开发
@@ -63,7 +65,11 @@ npm run docker:stop
 
 - **前端**: React + Modern.js + TypeScript
 - **后端**: Modern.js BFF (Hono)
-- **AI模型**: Ollama (DeepSeek-R1)
+- **AI模型**: 
+  - 本地模型：Ollama (DeepSeek-R1)
+  - 在线模型：火山引擎豆包大模型
+- **搜索**: Tavily API
+- **数据库**: MongoDB
 - **部署**: Docker + Jenkins
 - **样式**: CSS Modules
 - **Markdown**: react-markdown + highlight.js

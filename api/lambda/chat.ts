@@ -13,6 +13,7 @@ import { MessageService } from '../services/messageService.js';
 import { UserService } from '../services/userService.js';
 import { errorResponse } from './_utils/response.js';
 import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/tavilySearch.js';
+import { volcengineService, type VolcengineMessage } from '../services/volcengineService.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -113,6 +114,26 @@ async function callLocalModel(messages: ChatMessage[]) {
 }
 
 /**
+ * 调用火山引擎豆包大模型
+ */
+async function callVolcengineModel(messages: ChatMessage[]) {
+  // 转换消息格式（保持兼容）
+  const volcengineMessages: VolcengineMessage[] = messages.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+  }));
+
+  console.log('🔥 调用火山引擎豆包模型...');
+  const stream = await volcengineService.chat(volcengineMessages, {
+    temperature: 0.7,
+    maxTokens: 4000,
+    topP: 0.95,
+  });
+
+  return stream;
+}
+
+/**
  * 提取工具调用（处理 <tool_call> 标签）
  */
 function extractToolCall(text: string): { toolCall: any; remainingText: string } | null {
@@ -196,6 +217,201 @@ function extractThinkingAndContent(text: string) {
   }
 
   return { thinking, content };
+}
+
+/**
+ * 处理火山引擎流式响应并转换为 SSE 格式
+ */
+async function streamVolcengineToSSEResponse(
+  stream: any,
+  conversationId: string,
+  userId: string,
+  modelType: 'local' | 'volcano',
+  messages: ChatMessage[]
+) {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+
+  let buffer = '';
+  let accumulatedText = '';
+  let lastSentContent = '';
+  let lastSentThinking = '';
+
+  // 异步处理流
+  (async () => {
+    try {
+      // 首先发送 conversationId（用于前端同步）
+      const initData = JSON.stringify({
+        conversationId: conversationId,
+        type: 'init'
+      });
+      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+
+      for await (const chunk of stream) {
+        const chunkStr = chunk.toString();
+        buffer += chunkStr;
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim()) {
+            // 使用火山引擎服务的解析器
+            const content = volcengineService.parseStreamLine(line);
+            
+            if (content) {
+              accumulatedText += content;
+              const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+
+              if (mainContent !== lastSentContent || thinking !== lastSentThinking) {
+                const sseData = JSON.stringify({
+                  content: mainContent,
+                  thinking: thinking || undefined,
+                });
+                
+                await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                lastSentContent = mainContent;
+                lastSentThinking = thinking;
+              }
+            }
+
+            // 检查是否完成
+            if (line.includes('[DONE]')) {
+              // 检测是否有工具调用
+              const toolCallResult = extractToolCall(accumulatedText);
+              
+              if (toolCallResult) {
+                console.log('🔧 检测到工具调用:', toolCallResult.toolCall);
+                
+                // 发送工具调用通知
+                const toolCallNotice = JSON.stringify({
+                  content: '正在搜索...',
+                  toolCall: toolCallResult.toolCall,
+                });
+                await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
+                
+                // 执行工具调用
+                const toolResult = await executeToolCall(toolCallResult.toolCall);
+                
+                // 将工具结果添加到消息历史
+                messages.push(
+                  { role: 'assistant', content: accumulatedText },
+                  { role: 'user', content: toolResult }
+                );
+                
+                // 重新调用模型，继续生成
+                console.log('🔄 基于搜索结果继续生成回答...');
+                const newStream = await callVolcengineModel(messages);
+                
+                // 重置累积文本
+                accumulatedText = '';
+                lastSentContent = '';
+                lastSentThinking = '';
+                buffer = '';
+                
+                // 继续处理新的流
+                for await (const chunk of newStream) {
+                  const chunkStr = chunk.toString();
+                  buffer += chunkStr;
+                  
+                  const lines = buffer.split('\n');
+                  buffer = lines.pop() || '';
+
+                  for (const line of lines) {
+                    if (line.trim()) {
+                      const content = volcengineService.parseStreamLine(line);
+                      
+                      if (content) {
+                        accumulatedText += content;
+                        const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+
+                        if (mainContent !== lastSentContent || thinking !== lastSentThinking) {
+                          const sseData = JSON.stringify({
+                            content: mainContent,
+                            thinking: thinking || undefined,
+                          });
+                          
+                          await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                          lastSentContent = mainContent;
+                          lastSentThinking = thinking;
+                        }
+                      }
+
+                      if (line.includes('[DONE]')) {
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // 最终处理和保存
+              if (accumulatedText) {
+                const { thinking, content } = extractThinkingAndContent(accumulatedText);
+                const sseData = JSON.stringify({
+                  content: content || accumulatedText,
+                  thinking: thinking || undefined,
+                });
+                await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                
+                // 保存 AI 回复到数据库
+                try {
+                  await MessageService.addMessage(
+                    conversationId,
+                    userId,
+                    'assistant',
+                    content || accumulatedText,
+                    thinking || undefined,
+                    modelType
+                  );
+                  await ConversationService.incrementMessageCount(conversationId, userId);
+                  console.log('✅ AI message saved to database');
+                } catch (dbError) {
+                  console.error('❌ Failed to save AI message:', dbError);
+                }
+              }
+              
+              await writer.write(encoder.encode('data: [DONE]\n\n'));
+              await writer.close();
+              return;
+            }
+          }
+        }
+      }
+
+      // 处理缓冲区剩余数据
+      if (buffer.trim()) {
+        const content = volcengineService.parseStreamLine(buffer);
+        if (content) {
+          accumulatedText += content;
+          const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+          
+          const sseData = JSON.stringify({
+            content: mainContent || accumulatedText,
+            thinking: thinking || undefined,
+          });
+          await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+        }
+      }
+      
+      await writer.write(encoder.encode('data: [DONE]\n\n'));
+      await writer.close();
+    } catch (error: any) {
+      console.error('流处理错误:', error);
+      const errorData = JSON.stringify({ error: error.message });
+      await writer.write(encoder.encode(`data: ${errorData}\n\n`));
+      await writer.close();
+    }
+  })();
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }
 
 /**
@@ -479,7 +695,23 @@ export async function post({
       // 将流式响应转换为 SSE 格式并返回
       return streamToSSEResponse(stream, conversationId, userId, modelType, messages);
     } else if (modelType === 'volcano') {
-      return errorResponse('火山云模型接入功能待实现');
+      console.log('开始调用火山引擎豆包模型...');
+      
+      // 检查配置
+      if (!volcengineService.isConfigured()) {
+        return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
+      }
+
+      // 构建消息历史
+      const messages: ChatMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: message },
+      ];
+      
+      const stream = await callVolcengineModel(messages);
+      
+      // 将流式响应转换为 SSE 格式并返回
+      return streamVolcengineToSSEResponse(stream, conversationId, userId, modelType, messages);
     } else {
       return errorResponse('不支持的模型类型');
     }
