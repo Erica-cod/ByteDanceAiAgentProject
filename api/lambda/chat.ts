@@ -7,12 +7,20 @@
 
 // 加载环境变量
 import '../config/env.js';
-import type { RequestOption } from '@modern-js/runtime/server';
 import { connectToDatabase } from '../db/connection.js';
 import { ConversationService } from '../services/conversationService.js';
 import { MessageService } from '../services/messageService.js';
 import { UserService } from '../services/userService.js';
 import { errorResponse } from './_utils/response.js';
+import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/tavilySearch.js';
+
+// 请求选项类型
+interface RequestOption<Q = any, D = any> {
+  query?: Q;
+  data?: D;
+  params?: Record<string, string>;
+  headers?: Record<string, string>;
+}
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -35,16 +43,49 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 3. 分享相关的资源和学习路径
 4. 鼓励用户坚持并享受兴趣带来的乐趣
 
-**重要**：在回答之前，请先在 <think></think> 标签内展示你的思考过程，然后再给出最终回答。
+## 工具使用
+
+你可以使用以下工具来获取实时信息：
+
+### search_web - 联网搜索工具
+当你需要查找最新信息、资源、教程或数据时，使用此工具。
+
+使用方法：在回答中使用以下格式：
+<tool_call>
+{
+  "tool": "search_web",
+  "query": "你的搜索查询",
+  "options": {
+    "maxResults": 5
+  }
+}
+</tool_call>
+
+例如：
+- 用户问："最近有什么好的摄影教程？"
+- 你可以这样回答："<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>"
+
+**重要**：
+1. 在回答之前，请先在 <think></think> 标签内展示你的思考过程
+2. 如果需要搜索，在思考后直接使用 <tool_call> 标签
+3. 收到搜索结果后，基于搜索结果给出最终回答
 
 请用友好、鼓励的语气与用户交流，用简洁明了的语言回答问题。`;
 
 // ============= 工具函数 =============
 
 /**
+ * 消息历史接口
+ */
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/**
  * 调用本地 Ollama 模型
  */
-async function callLocalModel(message: string) {
+async function callLocalModel(messages: ChatMessage[]) {
   const fetch = (await import('node-fetch')).default;
   const modelName = process.env.OLLAMA_MODEL || 'deepseek-r1:7b';
   const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
@@ -54,10 +95,7 @@ async function callLocalModel(message: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: modelName,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: message },
-      ],
+      messages,
       stream: true,
       keep_alive: '30m', // 保持模型在内存中 30 分钟，避免频繁重新加载
       // 强制使用 GPU - 所有层都加载到 GPU
@@ -72,6 +110,55 @@ async function callLocalModel(message: string) {
   }
 
   return response.body;
+}
+
+/**
+ * 提取工具调用（处理 <tool_call> 标签）
+ */
+function extractToolCall(text: string): { toolCall: any; remainingText: string } | null {
+  const toolCallRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
+  const match = text.match(toolCallRegex);
+  
+  if (match) {
+    try {
+      const toolCallJson = match[1].trim();
+      const toolCall = JSON.parse(toolCallJson);
+      const remainingText = text.replace(match[0], '').trim();
+      return { toolCall, remainingText };
+    } catch (error) {
+      console.error('解析工具调用失败:', error);
+      return null;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * 执行工具调用
+ */
+async function executeToolCall(toolCall: any): Promise<string> {
+  const { tool, query, options } = toolCall;
+  
+  if (tool === 'search_web') {
+    console.log(`🔍 执行搜索: "${query}"`);
+    try {
+      const searchOptions: SearchOptions = {
+        maxResults: options?.maxResults || 5,
+        searchDepth: options?.searchDepth || 'basic',
+      };
+      
+      const { results } = await searchWeb(query, searchOptions);
+      const formattedResults = formatSearchResultsForAI(results);
+      
+      return `<search_results>\n${formattedResults}\n</search_results>`;
+    } catch (error: any) {
+      console.error('❌ 搜索执行失败:', error);
+      return `<search_error>搜索失败: ${error.message}</search_error>`;
+    }
+  }
+  
+  return `<tool_error>未知的工具: ${tool}</tool_error>`;
 }
 
 /**
@@ -118,7 +205,8 @@ async function streamToSSEResponse(
   stream: any, 
   conversationId: string, 
   userId: string, 
-  modelType: 'local' | 'volcano'
+  modelType: 'local' | 'volcano',
+  messages: ChatMessage[]
 ) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -168,6 +256,79 @@ async function streamToSSEResponse(
               }
 
               if (jsonData.done) {
+                // 检测是否有工具调用
+                const toolCallResult = extractToolCall(accumulatedText);
+                
+                if (toolCallResult) {
+                  console.log('🔧 检测到工具调用:', toolCallResult.toolCall);
+                  
+                  // 发送工具调用通知
+                  const toolCallNotice = JSON.stringify({
+                    content: '正在搜索...',
+                    toolCall: toolCallResult.toolCall,
+                  });
+                  await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
+                  
+                  // 执行工具调用
+                  const toolResult = await executeToolCall(toolCallResult.toolCall);
+                  
+                  // 将工具结果添加到消息历史
+                  messages.push(
+                    { role: 'assistant', content: accumulatedText },
+                    { role: 'user', content: toolResult }
+                  );
+                  
+                  // 重新调用模型，继续生成
+                  console.log('🔄 基于搜索结果继续生成回答...');
+                  const newStream = await callLocalModel(messages);
+                  
+                  // 重置累积文本
+                  accumulatedText = '';
+                  lastSentContent = '';
+                  lastSentThinking = '';
+                  buffer = '';
+                  
+                  // 继续处理新的流
+                  for await (const chunk of newStream) {
+                    const chunkStr = chunk.toString();
+                    buffer += chunkStr;
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                      if (line.trim()) {
+                        try {
+                          const jsonData = JSON.parse(line);
+
+                          if (jsonData.message && jsonData.message.content !== undefined) {
+                            accumulatedText += jsonData.message.content;
+                            const { thinking, content } = extractThinkingAndContent(accumulatedText);
+
+                            if (content !== lastSentContent || thinking !== lastSentThinking) {
+                              const sseData = JSON.stringify({
+                                content: content,
+                                thinking: thinking || undefined,
+                              });
+                              
+                              await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                              lastSentContent = content;
+                              lastSentThinking = thinking;
+                            }
+                          }
+
+                          if (jsonData.done) {
+                            break;
+                          }
+                        } catch (error) {
+                          console.error('解析流数据失败:', error);
+                        }
+                      }
+                    }
+                  }
+                }
+                
+                // 最终处理和保存
                 if (accumulatedText) {
                   const { thinking, content } = extractThinkingAndContent(accumulatedText);
                   const sseData = JSON.stringify({
@@ -306,10 +467,17 @@ export async function post({
     // 调用模型
     if (modelType === 'local') {
       console.log('开始调用本地模型...');
-      const stream = await callLocalModel(message);
+      
+      // 构建消息历史
+      const messages: ChatMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: message },
+      ];
+      
+      const stream = await callLocalModel(messages);
       
       // 将流式响应转换为 SSE 格式并返回
-      return streamToSSEResponse(stream, conversationId, userId, modelType);
+      return streamToSSEResponse(stream, conversationId, userId, modelType, messages);
     } else if (modelType === 'volcano') {
       return errorResponse('火山云模型接入功能待实现');
     } else {
