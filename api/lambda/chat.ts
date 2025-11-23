@@ -325,12 +325,16 @@ async function streamVolcengineToSSEResponse(
                 
                 // 执行工具调用
                 const toolResult = await executeToolCall(toolCallResult.toolCall);
+                console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
                 
                 // 将工具结果添加到消息历史
                 messages.push(
                   { role: 'assistant', content: accumulatedText },
                   { role: 'user', content: toolResult }
                 );
+                
+                console.log('📨 消息历史长度:', messages.length);
+                console.log('📨 最后一条消息（工具结果）前100字符:', messages[messages.length - 1].content.substring(0, 100));
                 
                 // 重新调用模型，继续生成
                 console.log('🔄 基于搜索结果继续生成回答...');
