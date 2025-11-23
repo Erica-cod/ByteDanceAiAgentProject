@@ -1012,6 +1012,432 @@ try {
 
 ---
 
+## 主流 AI Agent 工具调用方案对比
+
+### 方案对比总览
+
+目前主流的 AI Agent 工具调用实现主要有两种方案：
+
+| 方案 | 代表 | 调用次数 | 优点 | 缺点 | 我们的方案 |
+|------|------|---------|------|------|-----------|
+| **原生 Function Calling** | OpenAI GPT-4<br>Anthropic Claude<br>Google Gemini | **1次** | 高效、准确<br>官方支持 | 需要支持的模型<br>格式固定 | ❌ 不支持 |
+| **Prompt-based 工具调用** | 开源模型<br>自定义方案 | **2次** | 兼容性强<br>灵活可控 | 效率较低<br>依赖 Prompt | ✅ 当前方案 |
+
+---
+
+### 方案 1：原生 Function Calling（主流大厂方案）
+
+#### 工作原理
+
+现代 AI 模型（GPT-4、Claude 3.5、Gemini 等）内置了 Function Calling 能力，**只需调用一次**：
+
+```typescript
+// OpenAI 原生 Function Calling
+const response = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [
+    { role: "user", content: "今天北京的天气怎么样？" }
+  ],
+  tools: [
+    {
+      type: "function",
+      function: {
+        name: "search_web",
+        description: "搜索网络获取最新信息",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "搜索关键词"
+            }
+          },
+          required: ["query"]
+        }
+      }
+    }
+  ],
+  tool_choice: "auto"  // 模型自动决定是否调用工具
+});
+
+// 模型返回
+if (response.choices[0].message.tool_calls) {
+  // ✅ 模型决定调用工具
+  const toolCall = response.choices[0].message.tool_calls[0];
+  // { name: "search_web", arguments: '{"query": "今天北京天气"}' }
+  
+  // 执行工具
+  const result = await searchWeb(JSON.parse(toolCall.function.arguments).query);
+  
+  // 将结果传回（第二次调用）
+  const finalResponse = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      ...previousMessages,
+      response.choices[0].message,
+      {
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result)
+      }
+    ]
+  });
+}
+```
+
+#### 流程图
+
+```
+用户提问："今天北京天气？"
+   ↓
+调用模型（1次），传入 tools 定义
+   ↓
+模型内部判断 → 需要工具
+   ↓
+返回：tool_calls: [{ function: "search_web", arguments: {...} }]
+   ↓
+后端执行工具（搜索）
+   ↓
+调用模型（2次），传入工具结果 + role: "tool"
+   ↓
+模型生成最终回答
+```
+
+**优点**：
+- ✅ **模型理解更准确**：原生支持，不依赖 Prompt 工程
+- ✅ **格式标准化**：JSON Schema 定义，类型安全
+- ✅ **支持并行调用**：一次可以调用多个工具
+- ✅ **更高的成功率**：模型训练时就包含了工具调用能力
+
+**缺点**：
+- ❌ **模型限制**：只有新版本的商业模型支持
+- ❌ **成本较高**：需要使用 GPT-4 等高级模型
+- ❌ **灵活性受限**：工具格式必须符合规范
+
+#### 代表性实现
+
+**OpenAI GPT-4 Turbo / GPT-4o**
+```typescript
+tools: [{
+  type: "function",
+  function: {
+    name: "search_web",
+    description: "Search the web for current information",
+    parameters: { ... }
+  }
+}]
+```
+
+**Anthropic Claude 3.5 Sonnet**
+```typescript
+tools: [{
+  name: "search_web",
+  description: "Search the web for current information",
+  input_schema: {
+    type: "object",
+    properties: { ... }
+  }
+}]
+```
+
+**Google Gemini 1.5 Pro**
+```typescript
+tools: [{
+  function_declarations: [{
+    name: "search_web",
+    description: "Search the web",
+    parameters: { ... }
+  }]
+}]
+```
+
+---
+
+### 方案 2：Prompt-based 工具调用（我们的方案）
+
+#### 工作原理
+
+通过 **System Prompt 教会模型**如何使用工具，模型在文本中输出工具调用指令：
+
+```typescript
+// 我们的实现方式
+const SYSTEM_PROMPT = `
+你可以使用工具：
+<tool_call>{"tool": "search_web", "query": "关键词"}</tool_call>
+`;
+
+// 第一次调用
+const response = await model.chat([
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: "今天北京天气？" }
+]);
+
+// 模型输出文本：
+// "<tool_call>{"tool": "search_web", "query": "今天北京天气"}</tool_call>"
+
+// 后端解析文本，提取工具调用
+const toolCall = extractToolCall(response.content);
+
+// 执行工具
+const result = await searchWeb(toolCall.query);
+
+// 第二次调用，传入搜索结果
+const finalResponse = await model.chat([
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: "今天北京天气？" },
+  { role: "assistant", content: response.content },
+  { role: "user", content: `搜索结果：${result}` }
+]);
+```
+
+#### 流程图
+
+```
+用户提问："今天北京天气？"
+   ↓
+调用模型（1次），System Prompt 包含工具说明
+   ↓
+模型输出文本：<tool_call>{"tool": "search_web", ...}</tool_call>
+   ↓
+后端正则匹配提取工具调用
+   ↓
+后端执行工具（搜索）
+   ↓
+调用模型（2次），将搜索结果作为 user 消息传入
+   ↓
+模型生成最终回答
+```
+
+**优点**：
+- ✅ **兼容性强**：任何模型都可以用（包括开源模型）
+- ✅ **成本可控**：可以使用便宜的本地模型
+- ✅ **高度灵活**：可以自定义任何格式
+- ✅ **易于调试**：所有内容都是文本，易于查看
+
+**缺点**：
+- ❌ **依赖 Prompt**：需要精心设计 System Prompt
+- ❌ **成功率较低**：模型可能不遵循格式
+- ❌ **需要解析**：需要正则或 JSON 解析
+- ❌ **效率较低**：需要调用两次模型
+
+---
+
+### 实际案例对比
+
+#### 案例：用户问"今天北京天气？"
+
+**OpenAI GPT-4（原生 Function Calling）**
+
+```
+调用次数：2次
+总耗时：~3-4秒
+成功率：~95%+
+成本：~$0.03-0.06/次
+
+第1次调用（1秒）：
+  输入：messages + tools 定义
+  输出：tool_calls: [{ function: "search_web", arguments: {...} }]
+  
+执行工具（1-2秒）：
+  调用 Tavily API
+  
+第2次调用（1秒）：
+  输入：messages + tool_calls + tool 结果
+  输出：最终回答
+```
+
+**我们的方案（Prompt-based）**
+
+```
+调用次数：2次
+总耗时：~3-5秒（本地模型）/ ~4-6秒（火山引擎）
+成功率：~80-90%（取决于 Prompt 质量）
+成本：~$0.01-0.02/次（火山引擎）/ $0（本地模型）
+
+第1次调用（1-2秒）：
+  输入：System Prompt + 用户消息
+  输出：<tool_call>{"tool": "search_web", ...}</tool_call>
+  
+后端解析（<0.1秒）：
+  正则匹配提取 JSON
+  
+执行工具（1-2秒）：
+  调用 Tavily API
+  
+第2次调用（1-2秒）：
+  输入：原消息 + 工具调用 + 搜索结果
+  输出：最终回答
+```
+
+---
+
+### 主流 AI Agent 框架的选择
+
+#### LangChain（最流行的 AI Agent 框架）
+
+**支持两种方式**：
+
+1. **原生 Function Calling**（推荐）
+```typescript
+import { ChatOpenAI } from "langchain/chat_models/openai";
+import { TavilySearchResults } from "langchain/tools";
+
+const model = new ChatOpenAI({ model: "gpt-4" });
+const tools = [new TavilySearchResults()];
+
+// LangChain 自动处理工具调用
+const agent = createReactAgent({ llm: model, tools });
+```
+
+2. **Prompt-based**（兼容方案）
+```typescript
+const model = new ChatOpenAI({ model: "gpt-3.5-turbo" });
+// 使用 ReAct Prompt 模板
+```
+
+#### AutoGPT / BabyAGI
+
+使用 **原生 Function Calling**，因为它们主要基于 GPT-4。
+
+#### Open Interpreter
+
+混合使用：
+- GPT-4：原生 Function Calling
+- 开源模型：Prompt-based
+
+---
+
+### 未来趋势
+
+#### 1. **原生 Function Calling 成为标准**
+
+越来越多的模型支持：
+- ✅ OpenAI GPT-4 系列
+- ✅ Anthropic Claude 3 系列
+- ✅ Google Gemini 系列
+- ✅ Mistral Large
+- 🔄 开源模型逐步支持（如 Llama 3+、Qwen 2.5+）
+
+#### 2. **工具调用变得更智能**
+
+- **并行工具调用**：一次调用多个工具
+  ```json
+  tool_calls: [
+    { function: "search_web", ... },
+    { function: "get_weather", ... },
+    { function: "query_db", ... }
+  ]
+  ```
+
+- **工具链（Tool Chaining）**：模型自动规划多步骤
+  ```
+  搜索 → 分析 → 再次搜索 → 总结
+  ```
+
+- **条件工具调用**：根据结果决定是否继续
+  ```typescript
+  if (result.confidence < 0.8) {
+    call("search_web_deep");
+  }
+  ```
+
+#### 3. **流式工具调用**
+
+新的 API 支持在流式输出中调用工具：
+```typescript
+for await (const chunk of stream) {
+  if (chunk.tool_calls) {
+    // 边生成边调用工具
+  }
+}
+```
+
+---
+
+### 我们方案的优化方向
+
+基于主流实践，我们可以考虑以下优化：
+
+#### 优化 1：支持原生 Function Calling
+
+当使用支持的模型时，自动切换到原生模式：
+
+```typescript
+async function callModel(messages, tools) {
+  if (supportsNativeFunctionCalling(modelType)) {
+    // 使用原生 Function Calling
+    return await callWithFunctionCalling(messages, tools);
+  } else {
+    // 使用 Prompt-based（当前方案）
+    return await callWithPromptBased(messages, tools);
+  }
+}
+```
+
+#### 优化 2：统一工具定义格式
+
+采用类似 OpenAI 的标准格式：
+
+```typescript
+const tools = [
+  {
+    name: "search_web",
+    description: "搜索网络获取最新信息",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "搜索关键词" }
+      },
+      required: ["query"]
+    }
+  }
+];
+```
+
+#### 优化 3：减少调用次数
+
+对于简单查询，尝试在第一次调用时就包含搜索结果：
+
+```typescript
+// 预搜索 + 一次调用（实验性）
+const preSearchResults = await quickPreSearch(userQuery);
+const response = await model.chat([
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: `${userQuery}\n\n参考信息：${preSearchResults}` }
+]);
+```
+
+---
+
+### 结论
+
+**当前业界主流**：
+1. **商业闭源模型**：几乎都使用 **原生 Function Calling**（仍需 2 次调用）
+2. **开源模型/自定义方案**：大多使用 **Prompt-based**（我们的方案）
+
+**关键发现**：
+- ✅ **即使是原生 Function Calling，也需要 2 次模型调用**
+  - 第 1 次：判断是否需要工具 + 生成工具调用
+  - 第 2 次：基于工具结果生成最终回答
+  
+- ✅ **我们的方案是合理的**，与主流开源方案一致
+  - LangChain、LlamaIndex 对不支持原生 Function Calling 的模型也是这样做的
+  
+- ✅ **效率对比**：
+  - 原生 Function Calling：~3-4 秒（GPT-4）
+  - 我们的方案：~3-5 秒（相差不大）
+  
+- ✅ **成功率对比**：
+  - 原生 Function Calling：~95%+
+  - 优化的 Prompt-based：~85-90%（可以通过改进 Prompt 提升）
+
+**建议**：
+1. **短期**：继续优化 Prompt，提高成功率到 90%+
+2. **中期**：添加原生 Function Calling 支持（当使用 GPT-4 等模型时）
+3. **长期**：实现混合模式，根据模型能力自动选择最优方案
+
+---
+
 ## 未来优化方向
 
 ### 1. 支持更多工具
