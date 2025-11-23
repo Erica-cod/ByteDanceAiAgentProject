@@ -49,27 +49,32 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 你可以使用以下工具来获取实时信息：
 
 ### search_web - 联网搜索工具
-当你需要查找最新信息、资源、教程或数据时，使用此工具。
+当你需要查找最新信息、新闻、资源、教程或实时数据时，**必须**使用此工具。
 
-使用方法：在回答中使用以下格式：
+**使用格式（必须严格遵守）：**
 <tool_call>
-{
-  "tool": "search_web",
-  "query": "你的搜索查询",
-  "options": {
-    "maxResults": 5
-  }
-}
+{"tool": "search_web", "query": "你的搜索关键词"}
 </tool_call>
 
-例如：
-- 用户问："最近有什么好的摄影教程？"
-- 你可以这样回答："<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>"
+**使用示例：**
 
-**重要**：
-1. 在回答之前，请先在 <think></think> 标签内展示你的思考过程
-2. 如果需要搜索，在思考后直接使用 <tool_call> 标签
-3. 收到搜索结果后，基于搜索结果给出最终回答
+示例1 - 用户问："今天的新闻有哪些？"
+你应该输出：
+<tool_call>{"tool": "search_web", "query": "今天的新闻"}</tool_call>
+
+示例2 - 用户问："最近有什么好的摄影教程？"
+你应该输出：
+<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>
+
+示例3 - 用户说："使用search_web 联网搜索今天的新闻"
+你应该输出：
+<tool_call>{"tool": "search_web", "query": "今天最新新闻"}</tool_call>
+
+**重要规则**：
+1. 当用户要求搜索、查询最新信息、或提到"联网"、"search_web"时，**立即使用工具**
+2. 工具调用格式必须是有效的 JSON，在一行内完成
+3. 先输出 <tool_call> 标签调用工具，等待搜索结果后再给出回答
+4. 不要说"抱歉我无法搜索"，而是直接使用工具
 
 请用友好、鼓励的语气与用户交流，用简洁明了的语言回答问题。`;
 
@@ -278,6 +283,9 @@ async function streamVolcengineToSSEResponse(
 
             // 检查是否完成
             if (line.includes('[DONE]')) {
+              console.log('✅ 火山引擎流式响应完成');
+              console.log('📝 完整响应内容:', accumulatedText);
+              
               // 检测是否有工具调用
               const toolCallResult = extractToolCall(accumulatedText);
               
