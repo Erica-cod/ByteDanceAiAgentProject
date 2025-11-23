@@ -148,19 +148,19 @@ export async function get(
     
     // 从 query 中获取参数（支持多种获取方式）
     let userId: string | undefined;
-    let limit: string = '50';
+    let limit: string = '500';  // 增加默认限制到 500 条消息
     let skip: string = '0';
     
     // 尝试不同的方式获取 userId
     if (typeof query === 'function') {
       // Hono 风格：query 是函数
       userId = query('userId');
-      limit = query('limit') || '50';
+      limit = query('limit') || '500';
       skip = query('skip') || '0';
     } else if (typeof query === 'object') {
       // 对象风格：query 是对象
       userId = query.userId;
-      limit = query.limit || '50';
+      limit = query.limit || '500';
       skip = query.skip || '0';
     }
     
@@ -210,6 +210,9 @@ export async function get(
     );
     
     console.log('✅ Found messages:', messagesResult.messages.length);
+    console.log('🔗 API 返回前检查 - 有 sources 的消息:', 
+      messagesResult.messages.filter(m => m.sources && m.sources.length > 0).length
+    );
 
     return successResponse({
       conversation,

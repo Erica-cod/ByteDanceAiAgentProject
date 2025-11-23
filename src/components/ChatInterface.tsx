@@ -17,8 +17,44 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string; // thinking 内容
+  sources?: Array<{title: string; url: string}>; // 搜索来源链接
   timestamp: number;
 }
+
+// 来源链接组件
+const SourceLinks: React.FC<{ sources: Array<{title: string; url: string}> }> = ({ sources }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="source-links-container">
+      <button 
+        className="source-links-toggle" 
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className="source-icon">🔗</span>
+        <span className="source-text">来源链接 ({sources.length})</span>
+        <span className={`source-arrow ${isExpanded ? 'expanded' : ''}`}>▼</span>
+      </button>
+      {isExpanded && (
+        <div className="source-links-list">
+          {sources.map((source, index) => (
+            <a
+              key={index}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="source-link-item"
+            >
+              <span className="source-number">{index + 1}</span>
+              <span className="source-title">{source.title}</span>
+              <span className="source-external">↗</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,10 +127,20 @@ const ChatInterface: React.FC = () => {
         role: msg.role,
         content: msg.content,
         thinking: msg.thinking,
+        sources: msg.sources,  // 保留搜索来源链接
         timestamp: new Date(msg.timestamp).getTime(),
       }));
       
       console.log('✅ 格式化后的消息:', formattedMessages);
+      console.log('🔗 有 sources 的消息数量:', formattedMessages.filter(m => m.sources && m.sources.length > 0).length);
+      
+      // 打印每条有 sources 的消息
+      formattedMessages.forEach((msg, index) => {
+        if (msg.sources && msg.sources.length > 0) {
+          console.log(`📎 前端消息 ${index + 1} 有 sources:`, msg.sources);
+        }
+      });
+      
       setMessages(formattedMessages);
     } catch (error) {
       console.error('❌ 加载消息失败:', error);
@@ -251,7 +297,7 @@ const ChatInterface: React.FC = () => {
                 continue;
               }
               
-              // 处理 thinking 和 content
+              // 处理 thinking、content 和 sources
               if (parsed.thinking !== undefined && parsed.thinking !== null) {
                 currentThinking = parsed.thinking;
                 console.log('更新 thinking:', currentThinking.substring(0, 50));
@@ -259,6 +305,12 @@ const ChatInterface: React.FC = () => {
               if (parsed.content !== undefined && parsed.content !== null) {
                 currentContent = parsed.content;
                 console.log('更新 content:', currentContent.substring(0, 50));
+              }
+              
+              // 如果有 sources，也需要保存
+              let currentSources = parsed.sources;
+              if (currentSources) {
+                console.log('收到搜索来源:', currentSources.length, '条');
               }
 
               // 实时更新消息（打字机效果）
@@ -269,6 +321,7 @@ const ChatInterface: React.FC = () => {
                         ...msg,
                         content: currentContent,
                         thinking: currentThinking || undefined,
+                        sources: currentSources || msg.sources, // 保留或更新 sources
                       }
                     : msg
                 )
@@ -419,6 +472,9 @@ const ChatInterface: React.FC = () => {
                   message.role === 'assistant' && !message.thinking ? '正在思考...' : null
                 )}
               </div>
+              {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+                <SourceLinks sources={message.sources} />
+              )}
             </div>
           </div>
         ))}

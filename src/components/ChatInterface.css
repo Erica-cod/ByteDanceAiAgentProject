@@ -192,6 +192,110 @@
   white-space: pre-wrap;
 }
 
+/* 来源链接样式 */
+.source-links-container {
+  margin-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 8px;
+}
+
+.source-links-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  color: #555;
+}
+
+.source-links-toggle:hover {
+  background: #f0f0f0;
+  border-color: #d0d0d0;
+}
+
+.source-icon {
+  font-size: 14px;
+}
+
+.source-text {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+}
+
+.source-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: #888;
+}
+
+.source-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.source-links-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.source-link-item:hover {
+  background: #f5f9ff;
+  border-color: #4a90e2;
+  transform: translateX(2px);
+}
+
+.source-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: #4a90e2;
+  color: white;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.source-title {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.source-external {
+  font-size: 12px;
+  color: #888;
+  flex-shrink: 0;
+}
+
 .typing-indicator {
   display: flex;
   gap: 4px;

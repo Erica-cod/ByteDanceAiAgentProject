@@ -31,6 +31,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;        // AI thinking process (for assistant only)
+  sources?: Array<{title: string; url: string}>;  // 搜索来源链接 (for assistant only)
   modelType?: 'local' | 'volcano';
   timestamp: Date;
   metadata?: {
