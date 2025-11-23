@@ -134,7 +134,7 @@ async function callVolcengineModel(messages: ChatMessage[]) {
 }
 
 /**
- * 提取工具调用（处理 <tool_call> 标签）
+ * 提取工具调用（处理 <tool_call> 标签或纯 JSON）
  */
 function extractToolCall(text: string): { toolCall: any; remainingText: string } | null {
   // 优先匹配完整的闭合标签
@@ -166,6 +166,27 @@ function extractToolCall(text: string): { toolCall: any; remainingText: string }
       return { toolCall, remainingText };
     } catch (error) {
       console.error('❌ 解析开放标签失败:', error);
+    }
+  }
+  
+  // 如果没有标签，尝试直接匹配 JSON 格式（适配不同模型的输出）
+  // 匹配形如：{"tool": "search_web", "query": "..."}
+  const jsonRegex = /\{[\s\S]*?"tool"[\s\S]*?:[\s\S]*?"search_web"[\s\S]*?,[\s\S]*?"query"[\s\S]*?:[\s\S]*?"[^"]*"[\s\S]*?\}/;
+  const jsonMatch = text.match(jsonRegex);
+  
+  if (jsonMatch) {
+    try {
+      const toolCallJson = jsonMatch[0].trim();
+      console.log('🔧 发现纯 JSON 格式的工具调用:', toolCallJson);
+      const toolCall = JSON.parse(toolCallJson);
+      
+      // 验证是否是有效的工具调用
+      if (toolCall.tool === 'search_web' && toolCall.query) {
+        const remainingText = text.replace(jsonMatch[0], '').trim();
+        return { toolCall, remainingText };
+      }
+    } catch (error) {
+      console.error('❌ 解析纯 JSON 失败:', error);
     }
   }
   
