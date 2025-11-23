@@ -183,8 +183,9 @@ async function executeToolCall(toolCall: any): Promise<string> {
     console.log(`🔍 执行搜索，查询: "${query}"`);
     try {
       const searchOptions: SearchOptions = {
-        maxResults: options?.maxResults || 5,
-        searchDepth: options?.searchDepth || 'basic',
+        maxResults: options?.maxResults || 10,
+        searchDepth: options?.searchDepth || 'advanced',
+        includeAnswer: true, // 包含 AI 生成的答案摘要
       };
       
       console.log('🔍 搜索选项:', searchOptions);
@@ -199,7 +200,14 @@ async function executeToolCall(toolCall: any): Promise<string> {
       const formattedResults = formatSearchResultsForAI(searchResult.results);
       console.log('📝 格式化后的搜索结果长度:', formattedResults.length);
       
-      return `<search_results>\n${formattedResults}\n</search_results>`;
+      // 如果有 AI 摘要，也包含进去
+      let resultText = formattedResults;
+      if (searchResult.answer) {
+        console.log('📝 Tavily AI 摘要:', searchResult.answer.substring(0, 100) + '...');
+        resultText = `AI 摘要：\n${searchResult.answer}\n\n${formattedResults}`;
+      }
+      
+      return `<search_results>\n${resultText}\n</search_results>`;
     } catch (error: any) {
       console.error('❌ 搜索执行失败:', error);
       console.error('❌ 错误详情:', error.stack);

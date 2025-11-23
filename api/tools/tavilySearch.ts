@@ -130,12 +130,12 @@ export async function deepSearch(query: string): Promise<{
  * 格式化搜索结果为文本（供 AI 使用）
  * 
  * @param results - 搜索结果
- * @param maxLength - 最大长度（字符数），默认 2000
+ * @param maxLength - 最大长度（字符数），默认 8000
  * @returns 格式化的文本
  */
 export function formatSearchResultsForAI(
   results: SearchResult[],
-  maxLength: number = 2000
+  maxLength: number = 8000
 ): string {
   let formatted = '搜索结果：\n\n';
   let currentLength = formatted.length;
