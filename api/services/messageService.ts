@@ -12,7 +12,8 @@ export class MessageService {
     role: 'user' | 'assistant',
     content: string,
     thinking?: string,
-    modelType?: 'local' | 'volcano'
+    modelType?: 'local' | 'volcano',
+    sources?: Array<{title: string; url: string}>
   ): Promise<Message> {
     const db = await getDatabase();
     const collection = db.collection<Message>('messages');
@@ -24,11 +25,22 @@ export class MessageService {
       role,
       content,
       thinking,
+      sources,
       modelType,
       timestamp: new Date()
     };
 
+    console.log('💾 MessageService.addMessage - 保存消息:', {
+      role,
+      hasSources: !!sources,
+      sourcesCount: sources?.length || 0,
+      sources: sources
+    });
+
     await collection.insertOne(message);
+    
+    console.log('✅ MessageService.addMessage - 消息已保存到数据库');
+    
     return message;
   }
 
@@ -38,7 +50,7 @@ export class MessageService {
   static async getConversationMessages(
     conversationId: string,
     userId: string,
-    limit: number = 50,
+    limit: number = 500,  // 增加默认限制到 500 条消息
     skip: number = 0
   ): Promise<{ messages: Message[]; total: number }> {
     const db = await getDatabase();
@@ -52,6 +64,18 @@ export class MessageService {
       .toArray();
 
     const total = await collection.countDocuments({ conversationId, userId });
+
+    console.log('📖 MessageService.getConversationMessages - 读取消息:', {
+      count: messages.length,
+      messagesWithSources: messages.filter(m => m.sources && m.sources.length > 0).length
+    });
+    
+    // 打印每条有 sources 的消息
+    messages.forEach((msg, index) => {
+      if (msg.sources && msg.sources.length > 0) {
+        console.log(`📎 消息 ${index + 1} 有 sources:`, msg.sources.length, '条');
+      }
+    });
 
     return { messages, total };
   }

@@ -195,8 +195,9 @@ function extractToolCall(text: string): { toolCall: any; remainingText: string }
 
 /**
  * 执行工具调用
+ * 返回格式化的结果文本和来源链接
  */
-async function executeToolCall(toolCall: any): Promise<string> {
+async function executeToolCall(toolCall: any): Promise<{ resultText: string; sources?: Array<{title: string; url: string}> }> {
   console.log('🔧 开始执行工具调用:', JSON.stringify(toolCall, null, 2));
   const { tool, query, options } = toolCall;
   
@@ -215,7 +216,10 @@ async function executeToolCall(toolCall: any): Promise<string> {
       
       if (searchResult.results.length === 0) {
         console.warn('⚠️ 搜索返回了 0 条结果');
-        return `<search_results>\n没有找到相关结果。请尝试不同的搜索词。\n</search_results>`;
+        return { 
+          resultText: `<search_results>\n没有找到相关结果。请尝试不同的搜索词。\n</search_results>`,
+          sources: []
+        };
       }
       
       const formattedResults = formatSearchResultsForAI(searchResult.results);
@@ -228,16 +232,32 @@ async function executeToolCall(toolCall: any): Promise<string> {
         resultText = `AI 摘要：\n${searchResult.answer}\n\n${formattedResults}`;
       }
       
-      return `<search_results>\n${resultText}\n</search_results>`;
+      // 提取来源链接
+      const sources = searchResult.results.map(result => ({
+        title: result.title,
+        url: result.url
+      }));
+      console.log('🔗 来源链接数量:', sources.length);
+      
+      return {
+        resultText: `<search_results>\n${resultText}\n</search_results>`,
+        sources
+      };
     } catch (error: any) {
       console.error('❌ 搜索执行失败:', error);
       console.error('❌ 错误详情:', error.stack);
-      return `<search_error>搜索失败: ${error.message}</search_error>`;
+      return { 
+        resultText: `<search_error>搜索失败: ${error.message}</search_error>`,
+        sources: []
+      };
     }
   }
   
   console.warn('⚠️ 未知的工具:', tool);
-  return `<tool_error>未知的工具: ${tool}</tool_error>`;
+  return { 
+    resultText: `<tool_error>未知的工具: ${tool}</tool_error>`,
+    sources: []
+  };
 }
 
 /**
@@ -295,6 +315,9 @@ async function streamVolcengineToSSEResponse(
   let accumulatedText = '';
   let lastSentContent = '';
   let lastSentThinking = '';
+  
+  // 存储搜索来源链接
+  let searchSources: Array<{title: string; url: string}> | undefined;
 
   // 异步处理流
   (async () => {
@@ -353,8 +376,12 @@ async function streamVolcengineToSSEResponse(
                 await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
                 
                 // 执行工具调用
-                const toolResult = await executeToolCall(toolCallResult.toolCall);
+                const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall);
                 console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
+                console.log('🔗 来源链接:', sources?.length || 0, '条');
+                
+                // 保存 sources，稍后随最终答案一起发送
+                searchSources = sources;
                 
                 // 将工具结果添加到消息历史，并明确指示这是搜索结果
                 messages.push(
@@ -416,21 +443,24 @@ async function streamVolcengineToSSEResponse(
                 const sseData = JSON.stringify({
                   content: content || accumulatedText,
                   thinking: thinking || undefined,
+                  sources: searchSources || undefined,
                 });
                 await writer.write(encoder.encode(`data: ${sseData}\n\n`));
                 
                 // 保存 AI 回复到数据库
                 try {
+                  console.log('💾 准备保存消息到数据库，searchSources:', searchSources);
                   await MessageService.addMessage(
                     conversationId,
                     userId,
                     'assistant',
                     content || accumulatedText,
                     thinking || undefined,
-                    modelType
+                    modelType,
+                    searchSources || undefined  // 保存搜索来源链接
                   );
                   await ConversationService.incrementMessageCount(conversationId, userId);
-                  console.log('✅ AI message saved to database');
+                  console.log('✅ AI message saved to database with sources:', searchSources?.length || 0);
                 } catch (dbError) {
                   console.error('❌ Failed to save AI message:', dbError);
                 }
@@ -496,6 +526,9 @@ async function streamToSSEResponse(
   let accumulatedText = '';
   let lastSentContent = '';
   let lastSentThinking = '';
+  
+  // 存储搜索来源链接
+  let searchSources: Array<{title: string; url: string}> | undefined;
 
   // 异步处理流
   (async () => {
@@ -553,7 +586,12 @@ async function streamToSSEResponse(
                   await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
                   
                   // 执行工具调用
-                  const toolResult = await executeToolCall(toolCallResult.toolCall);
+                  const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall);
+                  console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
+                  console.log('🔗 来源链接:', sources?.length || 0, '条');
+                  
+                  // 保存 sources，稍后随最终答案一起发送
+                  searchSources = sources;
                   
                   // 将工具结果添加到消息历史，并明确指示这是搜索结果
                   messages.push(
@@ -617,21 +655,24 @@ async function streamToSSEResponse(
                   const sseData = JSON.stringify({
                     content: content || accumulatedText,
                     thinking: thinking || undefined,
+                    sources: searchSources || undefined,
                   });
                   await writer.write(encoder.encode(`data: ${sseData}\n\n`));
                   
                   // 保存 AI 回复到数据库
                   try {
+                    console.log('💾 准备保存消息到数据库，searchSources:', searchSources);
                     await MessageService.addMessage(
                       conversationId,
                       userId,
                       'assistant',
                       content || accumulatedText,
                       thinking || undefined,
-                      modelType
+                      modelType,
+                      searchSources || undefined  // 保存搜索来源链接
                     );
                     await ConversationService.incrementMessageCount(conversationId, userId);
-                    console.log('✅ AI message saved to database');
+                    console.log('✅ AI message saved to database with sources:', searchSources?.length || 0);
                   } catch (dbError) {
                     console.error('❌ Failed to save AI message:', dbError);
                   }

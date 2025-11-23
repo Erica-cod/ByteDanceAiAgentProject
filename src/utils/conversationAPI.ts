@@ -19,6 +19,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
+  sources?: Array<{title: string; url: string}>;  // 搜索来源链接
   modelType?: 'local' | 'volcano';
   timestamp: string;
 }
