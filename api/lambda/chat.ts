@@ -264,16 +264,16 @@ async function streamVolcengineToSSEResponse(
               accumulatedText += content;
               const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
 
-              if (mainContent !== lastSentContent || thinking !== lastSentThinking) {
-                const sseData = JSON.stringify({
-                  content: mainContent,
-                  thinking: thinking || undefined,
-                });
-                
-                await writer.write(encoder.encode(`data: ${sseData}\n\n`));
-                lastSentContent = mainContent;
-                lastSentThinking = thinking;
-              }
+              // 立即发送每次更新，确保流式效果
+              const sseData = JSON.stringify({
+                content: mainContent,
+                thinking: thinking || undefined,
+              });
+              
+              console.log('📤 发送到前端:', mainContent.substring(0, 50) + (mainContent.length > 50 ? '...' : ''));
+              await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+              lastSentContent = mainContent;
+              lastSentThinking = thinking;
             }
 
             // 检查是否完成
@@ -326,16 +326,15 @@ async function streamVolcengineToSSEResponse(
                         accumulatedText += content;
                         const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
 
-                        if (mainContent !== lastSentContent || thinking !== lastSentThinking) {
-                          const sseData = JSON.stringify({
-                            content: mainContent,
-                            thinking: thinking || undefined,
-                          });
-                          
-                          await writer.write(encoder.encode(`data: ${sseData}\n\n`));
-                          lastSentContent = mainContent;
-                          lastSentThinking = thinking;
-                        }
+                        // 立即发送每次更新，确保流式效果
+                        const sseData = JSON.stringify({
+                          content: mainContent,
+                          thinking: thinking || undefined,
+                        });
+                        
+                        await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                        lastSentContent = mainContent;
+                        lastSentThinking = thinking;
                       }
 
                       if (line.includes('[DONE]')) {
