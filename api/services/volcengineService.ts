@@ -158,7 +158,9 @@ export class VolcengineService {
         if (data.choices && data.choices.length > 0) {
           const choice = data.choices[0];
           if (choice.delta && choice.delta.content) {
-            return choice.delta.content;
+            const content = choice.delta.content;
+            console.log('📨 火山引擎增量内容:', content);
+            return content;
           }
         }
       } catch (error) {
