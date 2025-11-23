@@ -327,10 +327,10 @@ async function streamVolcengineToSSEResponse(
                 const toolResult = await executeToolCall(toolCallResult.toolCall);
                 console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
                 
-                // 将工具结果添加到消息历史
+                // 将工具结果添加到消息历史，并明确指示这是搜索结果
                 messages.push(
                   { role: 'assistant', content: accumulatedText },
-                  { role: 'user', content: toolResult }
+                  { role: 'user', content: `以下是搜索结果，请基于这些搜索结果回答用户的问题：\n\n${toolResult}\n\n请现在根据上述搜索结果，详细回答用户的问题。` }
                 );
                 
                 console.log('📨 消息历史长度:', messages.length);
@@ -523,10 +523,10 @@ async function streamToSSEResponse(
                   // 执行工具调用
                   const toolResult = await executeToolCall(toolCallResult.toolCall);
                   
-                  // 将工具结果添加到消息历史
+                  // 将工具结果添加到消息历史，并明确指示这是搜索结果
                   messages.push(
                     { role: 'assistant', content: accumulatedText },
-                    { role: 'user', content: toolResult }
+                    { role: 'user', content: `以下是搜索结果，请基于这些搜索结果回答用户的问题：\n\n${toolResult}\n\n请现在根据上述搜索结果，详细回答用户的问题。` }
                   );
                   
                   // 重新调用模型，继续生成
