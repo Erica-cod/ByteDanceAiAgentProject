@@ -51,24 +51,19 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 ### search_web - 联网搜索工具
 当你需要查找最新信息、新闻、资源、教程或实时数据时，**必须**使用此工具。
 
-**使用格式（必须严格遵守）：**
-<tool_call>
-{"tool": "search_web", "query": "你的搜索关键词"}
-</tool_call>
+**使用格式（必须严格遵守，包含开始和结束标签）：**
+<tool_call>{"tool": "search_web", "query": "你的搜索关键词"}</tool_call>
 
-**使用示例：**
+**使用示例（必须在一行内包含完整的开始和结束标签）：**
 
 示例1 - 用户问："今天的新闻有哪些？"
-你应该输出：
-<tool_call>{"tool": "search_web", "query": "今天的新闻"}</tool_call>
+你的输出：<tool_call>{"tool": "search_web", "query": "今天的新闻"}</tool_call>
 
 示例2 - 用户问："最近有什么好的摄影教程？"
-你应该输出：
-<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>
+你的输出：<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>
 
 示例3 - 用户说："使用search_web 联网搜索今天的新闻"
-你应该输出：
-<tool_call>{"tool": "search_web", "query": "今天最新新闻"}</tool_call>
+你的输出：<tool_call>{"tool": "search_web", "query": "今天最新新闻"}</tool_call>
 
 **重要规则**：
 1. 当用户要求搜索、查询最新信息、或提到"联网"、"search_web"时，**立即使用工具**
@@ -142,18 +137,35 @@ async function callVolcengineModel(messages: ChatMessage[]) {
  * 提取工具调用（处理 <tool_call> 标签）
  */
 function extractToolCall(text: string): { toolCall: any; remainingText: string } | null {
-  const toolCallRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
-  const match = text.match(toolCallRegex);
+  // 优先匹配完整的闭合标签
+  const closedTagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
+  const closedMatch = text.match(closedTagRegex);
   
-  if (match) {
+  if (closedMatch) {
     try {
-      const toolCallJson = match[1].trim();
+      const toolCallJson = closedMatch[1].trim();
+      console.log('🔧 发现完整的工具调用标签:', toolCallJson);
       const toolCall = JSON.parse(toolCallJson);
-      const remainingText = text.replace(match[0], '').trim();
+      const remainingText = text.replace(closedMatch[0], '').trim();
       return { toolCall, remainingText };
     } catch (error) {
-      console.error('解析工具调用失败:', error);
-      return null;
+      console.error('❌ 解析完整标签失败:', error);
+    }
+  }
+  
+  // 如果没有闭合标签，尝试匹配开放标签
+  const openTagRegex = /<tool_call>([\s\S]*?)(?:<\/tool_call>|$)/;
+  const openMatch = text.match(openTagRegex);
+  
+  if (openMatch) {
+    try {
+      const toolCallJson = openMatch[1].trim();
+      console.log('🔧 发现开放的工具调用标签:', toolCallJson);
+      const toolCall = JSON.parse(toolCallJson);
+      const remainingText = text.replace(openMatch[0], '').trim();
+      return { toolCall, remainingText };
+    } catch (error) {
+      console.error('❌ 解析开放标签失败:', error);
     }
   }
   
@@ -164,26 +176,38 @@ function extractToolCall(text: string): { toolCall: any; remainingText: string }
  * 执行工具调用
  */
 async function executeToolCall(toolCall: any): Promise<string> {
+  console.log('🔧 开始执行工具调用:', JSON.stringify(toolCall, null, 2));
   const { tool, query, options } = toolCall;
   
   if (tool === 'search_web') {
-    console.log(`🔍 执行搜索: "${query}"`);
+    console.log(`🔍 执行搜索，查询: "${query}"`);
     try {
       const searchOptions: SearchOptions = {
         maxResults: options?.maxResults || 5,
         searchDepth: options?.searchDepth || 'basic',
       };
       
-      const { results } = await searchWeb(query, searchOptions);
-      const formattedResults = formatSearchResultsForAI(results);
+      console.log('🔍 搜索选项:', searchOptions);
+      const searchResult = await searchWeb(query, searchOptions);
+      console.log('✅ 搜索完成，结果数量:', searchResult.results.length);
+      
+      if (searchResult.results.length === 0) {
+        console.warn('⚠️ 搜索返回了 0 条结果');
+        return `<search_results>\n没有找到相关结果。请尝试不同的搜索词。\n</search_results>`;
+      }
+      
+      const formattedResults = formatSearchResultsForAI(searchResult.results);
+      console.log('📝 格式化后的搜索结果长度:', formattedResults.length);
       
       return `<search_results>\n${formattedResults}\n</search_results>`;
     } catch (error: any) {
       console.error('❌ 搜索执行失败:', error);
+      console.error('❌ 错误详情:', error.stack);
       return `<search_error>搜索失败: ${error.message}</search_error>`;
     }
   }
   
+  console.warn('⚠️ 未知的工具:', tool);
   return `<tool_error>未知的工具: ${tool}</tool_error>`;
 }
 
