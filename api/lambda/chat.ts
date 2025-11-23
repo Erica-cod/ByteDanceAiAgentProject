@@ -515,11 +515,14 @@ async function streamToSSEResponse(
               }
 
               if (jsonData.done) {
+                console.log('✅ 本地模型流式响应完成');
+                console.log('📝 完整响应内容:', accumulatedText);
+                
                 // 检测是否有工具调用
                 const toolCallResult = extractToolCall(accumulatedText);
                 
                 if (toolCallResult) {
-                  console.log('🔧 检测到工具调用:', toolCallResult.toolCall);
+                  console.log('🔧 [本地模型] 检测到工具调用:', toolCallResult.toolCall);
                   
                   // 发送工具调用通知
                   const toolCallNotice = JSON.stringify({
