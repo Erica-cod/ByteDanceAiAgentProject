@@ -31,10 +31,12 @@
     "test:volcengine": "node test-volcengine.js"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.0",
     "@modern-js/runtime": "^2.68.0",
     "@tavily/core": "^0.5.13",
     "dotenv": "^17.2.3",
     "highlight.js": "^11.11.1",
+    "langchain": "^1.1.1",
     "mongodb": "^7.0.0",
     "node-fetch": "^2.7.0",
     "react": "^18.2.0",

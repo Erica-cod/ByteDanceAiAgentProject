@@ -47,6 +47,10 @@ ENV NODE_ENV=production
 ENV OLLAMA_API_URL=http://host.docker.internal:11434
 ENV OLLAMA_MODEL=deepseek-r1:7b
 ENV MONGODB_URI=mongodb://mongodb-global:27017/ai-agent
+ENV TAVILY_API_KEY=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
+ENV ARK_API_KEY=9a75dc8d-4bde-4094-90f0-19e13071f275
+ENV ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
+ENV ARK_MODEL=doubao-1-5-thinking-pro-250415
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
