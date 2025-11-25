@@ -14,6 +14,8 @@ import { UserService } from '../services/userService.js';
 import { errorResponse } from './_utils/response.js';
 import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/tavilySearch.js';
 import { volcengineService, type VolcengineMessage } from '../services/volcengineService.js';
+import { ConversationMemoryService } from '../services/conversationMemoryService.js';
+import { getRecommendedConfig } from '../config/memoryConfig.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -788,15 +790,40 @@ export async function post({
       // 继续处理，不阻止 AI 回复
     }
 
+    // ==========================================
+    // 📌 阶段 1: 使用滑动窗口记忆管理
+    // ==========================================
+    
+    // 初始化记忆服务（使用推荐配置）
+    const memoryConfig = getRecommendedConfig(modelType);
+    const memoryService = new ConversationMemoryService(memoryConfig);
+    
+    console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
+
     // 调用模型
     if (modelType === 'local') {
       console.log('开始调用本地模型...');
       
-      // 构建消息历史
+      // ==========================================
+      // 📌 阶段 1: 构建消息历史（带上下文记忆）
+      // ==========================================
+      /* 
+      // ❌ 旧代码（阶段 0 - 无记忆）：
       const messages: ChatMessage[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: message },
       ];
+      */
+      
+      // ✅ 新代码（阶段 1 - 滑动窗口记忆）：
+      const messages = await memoryService.getConversationContext(
+        conversationId,
+        userId,
+        message,
+        SYSTEM_PROMPT
+      );
+      
+      console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       
       const stream = await callLocalModel(messages);
       
@@ -816,13 +843,28 @@ export async function post({
         return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
       }
 
-      // 构建消息历史
+      // ==========================================
+      // 📌 阶段 1: 构建消息历史（带上下文记忆）
+      // ==========================================
+      /* 
+      // ❌ 旧代码（阶段 0 - 无记忆）：
       const messages: ChatMessage[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: message },
       ];
+      */
       
+      // ✅ 新代码（阶段 1 - 滑动窗口记忆）：
+      const messages = await memoryService.getConversationContext(
+        conversationId,
+        userId,
+        message,
+        SYSTEM_PROMPT
+      );
+      
+      console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       console.log('📨 准备发送消息到火山引擎，消息数量:', messages.length);
+      
       const stream = await callVolcengineModel(messages);
       console.log('✅ 已收到火山引擎的流式响应');
       
