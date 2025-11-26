@@ -56,6 +56,11 @@ async function createIndexes() {
     await db.collection('messages').createIndex({ conversationId: 1, timestamp: 1 });
     await db.collection('messages').createIndex({ userId: 1 });
 
+    // Plans collection indexes
+    await db.collection('plans').createIndex({ planId: 1 }, { unique: true });
+    await db.collection('plans').createIndex({ userId: 1, updatedAt: -1 });
+    await db.collection('plans').createIndex({ userId: 1, isActive: 1 });
+
     console.log('✅ Database indexes created');
   } catch (error) {
     console.error('❌ Failed to create indexes:', error);

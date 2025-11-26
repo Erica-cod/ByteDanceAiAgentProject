@@ -66,3 +66,60 @@ export interface MessageListResponse {
   conversation: Conversation;
 }
 
+// ==================== 计划管理相关类型 ====================
+
+/**
+ * 任务结构
+ */
+export interface Task {
+  title: string;            // 任务标题
+  estimated_hours: number;  // 预估工时
+  deadline: string;         // 截止日期 (ISO 8601 格式)
+  tags: string[];          // 标签数组
+  status?: 'pending' | 'in_progress' | 'completed';  // 任务状态
+}
+
+/**
+ * 计划数据模型
+ */
+export interface Plan {
+  _id?: string;
+  planId: string;          // UUID
+  userId: string;          // 所属用户ID
+  title: string;           // 计划标题
+  goal: string;            // 总目标描述
+  tasks: Task[];           // 任务数组
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;       // 是否激活
+}
+
+/**
+ * 创建计划请求
+ */
+export interface CreatePlanRequest {
+  userId: string;
+  title: string;
+  goal: string;
+  tasks: Task[];
+}
+
+/**
+ * 更新计划请求
+ */
+export interface UpdatePlanRequest {
+  planId: string;
+  userId: string;
+  title?: string;
+  goal?: string;
+  tasks?: Task[];
+}
+
+/**
+ * 计划列表响应
+ */
+export interface PlanListResponse {
+  plans: Plan[];
+  total: number;
+}
+
