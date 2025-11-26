@@ -28,10 +28,13 @@
     "db:logs": "docker logs -f mongodb-global",
     "db:shell": "docker exec -it mongodb-global mongosh ai-agent",
     "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
-    "test:volcengine": "node test-volcengine.js"
+    "test:volcengine": "node test-volcengine.js",
+    "test:planning": "node test-planning-tools.js",
+    "test:all": "node test-volcengine.js && node test-planning-tools.js"
   },
   "dependencies": {
     "@langchain/core": "^1.1.0",
+    "@langchain/langgraph": "^1.0.2",
     "@modern-js/runtime": "^2.68.0",
     "@tavily/core": "^0.5.13",
     "dotenv": "^17.2.3",
@@ -55,6 +58,7 @@
     "@types/react-dom": "^18.2.0",
     "@types/uuid": "^11.0.0",
     "cross-env": "^10.1.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.0.0"
   }
 }
