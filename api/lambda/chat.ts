@@ -16,6 +16,8 @@ import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tool
 import { volcengineService, type VolcengineMessage } from '../services/volcengineService.js';
 import { ConversationMemoryService } from '../services/conversationMemoryService.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
+import { validateToolCall, generateToolPrompt } from '../tools/toolValidator.js';
+import { routePlanningTool } from '../tools/planningTools.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -39,7 +41,14 @@ interface ChatRequestData {
 
 // ============= System Prompt =============
 
-const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
+/**
+ * 生成 System Prompt
+ * 动态包含工具定义,防止工具幻觉
+ */
+function buildSystemPrompt(): string {
+  const toolPrompt = generateToolPrompt(); // 从 toolValidator 获取标准化的工具定义
+  
+  return `你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
 
 1. 通过提问了解用户的兴趣倾向和个性特点
 2. 提供个性化的兴趣建议和培养方案
@@ -48,32 +57,33 @@ const SYSTEM_PROMPT = `你是一位专业的兴趣教练，擅长帮助用户发
 
 ## 工具使用
 
-你可以使用以下工具来获取实时信息：
+${toolPrompt}
 
-### search_web - 联网搜索工具
-当你需要查找最新信息、新闻、资源、教程或实时数据时，**必须**使用此工具。
+## 错误示例 ❌ (不要这样做)
 
-**使用格式（必须严格遵守，包含开始和结束标签）：**
-<tool_call>{"tool": "search_web", "query": "你的搜索关键词"}</tool_call>
+❌ 错误1: 编造不存在的工具
+用户: "帮我计算 123 + 456"
+❌ 错误输出: <tool_call>{"tool": "calculator", "expression": "123+456"}</tool_call>
+原因: calculator 工具不存在
+✅ 正确做法: <tool_call>{"tool": "search_web", "query": "123+456计算结果"}</tool_call>
 
-**使用示例（必须在一行内包含完整的开始和结束标签）：**
+❌ 错误2: 参数名错误
+用户: "搜索AI新闻"
+❌ 错误输出: <tool_call>{"tool": "search_web", "keyword": "AI新闻"}</tool_call>
+原因: 参数名应该是 query 不是 keyword
+✅ 正确做法: <tool_call>{"tool": "search_web", "query": "AI新闻"}</tool_call>
 
-示例1 - 用户问："今天的新闻有哪些？"
-你的输出：<tool_call>{"tool": "search_web", "query": "今天的新闻"}</tool_call>
-
-示例2 - 用户问："最近有什么好的摄影教程？"
-你的输出：<tool_call>{"tool": "search_web", "query": "2024年最新摄影教程推荐"}</tool_call>
-
-示例3 - 用户说："使用search_web 联网搜索今天的新闻"
-你的输出：<tool_call>{"tool": "search_web", "query": "今天最新新闻"}</tool_call>
-
-**重要规则**：
-1. 当用户要求搜索、查询最新信息、或提到"联网"、"search_web"时，**立即使用工具**
-2. 工具调用格式必须是有效的 JSON，在一行内完成
-3. 先输出 <tool_call> 标签调用工具，等待搜索结果后再给出回答
-4. 不要说"抱歉我无法搜索"，而是直接使用工具
+❌ 错误3: JSON 格式错误
+用户: "搜索天气"
+❌ 错误输出: <tool_call>{'tool': 'search_web', 'query': '天气'}</tool_call>
+原因: JSON 必须使用双引号
+✅ 正确做法: <tool_call>{"tool": "search_web", "query": "天气"}</tool_call>
 
 请用友好、鼓励的语气与用户交流，用简洁明了的语言回答问题。`;
+}
+
+// 缓存生成的 System Prompt
+const SYSTEM_PROMPT = buildSystemPrompt();
 
 // ============= 工具函数 =============
 
@@ -199,9 +209,25 @@ function extractToolCall(text: string): { toolCall: any; remainingText: string }
  * 执行工具调用
  * 返回格式化的结果文本和来源链接
  */
-async function executeToolCall(toolCall: any): Promise<{ resultText: string; sources?: Array<{title: string; url: string}> }> {
+async function executeToolCall(toolCall: any, userId: string): Promise<{ resultText: string; sources?: Array<{title: string; url: string}> }> {
   console.log('🔧 开始执行工具调用:', JSON.stringify(toolCall, null, 2));
-  const { tool, query, options } = toolCall;
+  
+  // ✅ 新增: 验证工具调用
+  const validation = validateToolCall(toolCall);
+  if (!validation.valid) {
+    console.error('❌ 工具调用验证失败:', validation.error);
+    const errorMsg = validation.suggestion 
+      ? `${validation.error}\n提示: ${validation.suggestion}`
+      : validation.error;
+    return {
+      resultText: `<tool_error>工具调用错误: ${errorMsg}</tool_error>`,
+      sources: []
+    };
+  }
+  
+  // 使用标准化后的工具调用
+  const normalizedToolCall = validation.normalizedToolCall!;
+  const { tool, query, options } = normalizedToolCall;
   
   if (tool === 'search_web') {
     console.log(`🔍 执行搜索，查询: "${query}"`);
@@ -250,6 +276,34 @@ async function executeToolCall(toolCall: any): Promise<{ resultText: string; sou
       console.error('❌ 错误详情:', error.stack);
       return { 
         resultText: `<search_error>搜索失败: ${error.message}</search_error>`,
+        sources: []
+      };
+    }
+  }
+  
+  // ==================== 计划管理工具 ====================
+  if (tool === 'create_plan' || tool === 'update_plan' || tool === 'get_plan' || tool === 'list_plans') {
+    console.log(`📋 执行计划工具: "${tool}"`);
+    try {
+      const result = await routePlanningTool(tool, userId, normalizedToolCall);
+      
+      if (result.success) {
+        console.log('✅ 计划工具执行成功:', result.message);
+        return {
+          resultText: `<tool_result>\n${result.message}\n\n详细数据:\n${JSON.stringify(result.data, null, 2)}\n</tool_result>`,
+          sources: []
+        };
+      } else {
+        console.error('❌ 计划工具执行失败:', result.error);
+        return {
+          resultText: `<tool_error>计划工具执行失败: ${result.error}</tool_error>`,
+          sources: []
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ 计划工具执行异常:', error);
+      return {
+        resultText: `<tool_error>计划工具执行异常: ${error.message}</tool_error>`,
         sources: []
       };
     }
@@ -378,7 +432,7 @@ async function streamVolcengineToSSEResponse(
                 await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
                 
                 // 执行工具调用
-                const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall);
+                const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall, userId);
                 console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
                 console.log('🔗 来源链接:', sources?.length || 0, '条');
                 
@@ -588,7 +642,7 @@ async function streamToSSEResponse(
                   await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
                   
                   // 执行工具调用
-                  const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall);
+                  const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall, userId);
                   console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
                   console.log('🔗 来源链接:', sources?.length || 0, '条');
                   
