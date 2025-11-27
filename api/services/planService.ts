@@ -2,8 +2,8 @@
  * 计划服务 - 处理计划的 CRUD 操作
  */
 
-import { getDatabase } from '../db/connection';
-import { Plan, Task, CreatePlanRequest, UpdatePlanRequest, PlanListResponse } from '../db/models';
+import { getDatabase } from '../db/connection.js';
+import { Plan, Task, CreatePlanRequest, UpdatePlanRequest, PlanListResponse } from '../db/models.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const COLLECTION_NAME = 'plans';
@@ -28,7 +28,7 @@ export async function createPlan(request: CreatePlanRequest): Promise<Plan> {
     isActive: true,
   };
 
-  await db.collection(COLLECTION_NAME).insertOne(plan);
+  await db.collection(COLLECTION_NAME).insertOne(plan as any);
   
   console.log(`✅ 计划已创建: ${plan.planId} - "${plan.title}"`);
   
@@ -74,7 +74,7 @@ export async function updatePlan(request: UpdatePlanRequest): Promise<Plan | nul
 
   console.log(`✅ 计划已更新: ${request.planId}`);
   
-  return result as Plan;
+  return result as unknown as Plan;
 }
 
 /**
@@ -94,7 +94,7 @@ export async function getPlan(planId: string, userId: string): Promise<Plan | nu
     return null;
   }
 
-  return plan as Plan;
+  return plan as unknown as Plan;
 }
 
 /**
@@ -122,7 +122,7 @@ export async function listPlans(
   });
 
   return {
-    plans: plans as Plan[],
+    plans: plans as unknown as Plan[],
     total,
   };
 }

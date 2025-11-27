@@ -17,21 +17,22 @@ import { routePlanningTool } from '../tools/planningTools.js';
  * Agent 状态定义 - 使用 Annotation
  */
 const AgentStateAnnotation = Annotation.Root({
-  // 消息历史
+  // 消息历史 (用于 AI 模型)
   messages: Annotation<BaseMessage[]>({
     reducer: (left, right) => left.concat(right),
     default: () => [],
   }),
   
-  // 当前工具调用
-  currentToolCall: Annotation<any>({
+  // 最后一次 AI 回复的完整文本
+  lastAIResponse: Annotation<string>({
     reducer: (_, right) => right,
-    default: () => undefined,
+    default: () => '',
   }),
   
   // 工具执行结果
   toolResults: Annotation<Array<{
     tool: string;
+    params: any;
     result: any;
     timestamp: Date;
   }>>({
@@ -51,10 +52,16 @@ const AgentStateAnnotation = Annotation.Root({
     default: () => '',
   }),
   
-  // 最终回复
-  finalResponse: Annotation<string | undefined>({
+  // 模型类型
+  modelType: Annotation<'local' | 'volcano'>({
     reducer: (_, right) => right,
-    default: () => undefined,
+    default: () => 'volcano',
+  }),
+  
+  // 是否需要继续
+  needsContinue: Annotation<boolean>({
+    reducer: (_, right) => right,
+    default: () => true,
   }),
   
   // 错误信息
@@ -67,29 +74,110 @@ const AgentStateAnnotation = Annotation.Root({
 export type AgentState = typeof AgentStateAnnotation.State;
 
 /**
+ * 提取工具调用的辅助函数
+ */
+function extractToolCallFromText(text: string): any | null {
+  try {
+    // 1. 尝试匹配 <tool_call> 标签
+    const tagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
+    const tagMatch = text.match(tagRegex);
+    
+    if (tagMatch) {
+      const jsonStr = tagMatch[1].trim();
+      return JSON.parse(jsonStr);
+    }
+    
+    // 2. 尝试直接提取 JSON（包含 "tool" 字段）
+    const startIndex = text.indexOf('{');
+    if (startIndex !== -1 && text.includes('"tool"')) {
+      let braceCount = 0;
+      let jsonEndIndex = -1;
+      let inString = false;
+      let escapeNext = false;
+      
+      for (let i = startIndex; i < text.length; i++) {
+        const char = text[i];
+        
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        if (!inString) {
+          if (char === '{') braceCount++;
+          if (char === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              jsonEndIndex = i + 1;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (jsonEndIndex !== -1) {
+        let jsonStr = text.substring(startIndex, jsonEndIndex);
+        // 移除注释
+        jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        return JSON.parse(jsonStr);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ [ExtractTool] 解析失败:', error);
+    return null;
+  }
+}
+
+/**
  * 工具执行节点
  * 
- * 接收 AI 的工具调用，执行工具，返回结果
+ * 从 lastAIResponse 中提取工具调用并执行
  */
 async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>> {
-  console.log('🔧 [ToolExecutor] 开始执行工具...');
+  console.log(`\n🔧 [ToolExecutor] 开始执行，迭代: ${state.iterations + 1}`);
   
-  const { currentToolCall, userId, toolResults } = state;
+  const { lastAIResponse, userId, iterations } = state;
   
-  if (!currentToolCall) {
-    console.log('⚠️  [ToolExecutor] 没有待执行的工具调用');
-    return {};
+  if (!lastAIResponse) {
+    console.log('⚠️  [ToolExecutor] 没有 AI 回复');
+    return {
+      needsContinue: false,
+    };
   }
+  
+  // 提取工具调用
+  const toolCall = extractToolCallFromText(lastAIResponse);
+  
+  if (!toolCall) {
+    console.log('✅ [ToolExecutor] 没有检测到工具调用，结束工作流');
+    return {
+      needsContinue: false,
+    };
+  }
+  
+  console.log('🔍 [ToolExecutor] 检测到工具调用:', toolCall.tool);
   
   try {
     // 验证工具调用
-    const validation = validateToolCall(currentToolCall);
+    const validation = validateToolCall(toolCall);
     
     if (!validation.valid) {
       console.error('❌ [ToolExecutor] 工具验证失败:', validation.error);
       return {
         error: `工具验证失败: ${validation.error}`,
-        currentToolCall: undefined,
+        needsContinue: false,
       };
     }
     
@@ -108,9 +196,18 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
         includeAnswer: true,
       });
       
+      // 格式化搜索结果
+      const formattedResults = searchResult.results
+        .map((r, i) => `${i + 1}. ${r.title}\n   ${r.content}\n   来源: ${r.url}`)
+        .join('\n\n');
+      
       result = {
         success: true,
-        data: searchResult,
+        data: {
+          answer: searchResult.answer,
+          results: formattedResults,
+          count: searchResult.results.length,
+        },
         message: `找到 ${searchResult.results.length} 条搜索结果`,
       };
     } 
@@ -127,27 +224,29 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
       };
     }
     
-    // 记录工具执行结果
-    const newToolResults = [
-      ...toolResults,
-      {
-        tool,
-        result,
-        timestamp: new Date(),
-      },
-    ];
-    
     console.log(`✅ [ToolExecutor] 工具 ${tool} 执行完成`);
     
-    // 将工具结果添加到消息历史
-    const resultMessage = new HumanMessage({
-      content: `工具 "${tool}" 执行结果:\n${JSON.stringify(result, null, 2)}`,
-    });
+    // 将工具结果格式化为消息
+    const resultContent = result.success
+      ? `工具 "${tool}" 执行成功:\n${JSON.stringify(result.data || result, null, 2)}`
+      : `工具 "${tool}" 执行失败: ${result.error}`;
+    
+    const resultMessage = new HumanMessage({ content: resultContent });
     
     return {
-      messages: [...state.messages, resultMessage],
-      toolResults: newToolResults,
-      currentToolCall: undefined,
+      messages: [
+        new AIMessage({ content: lastAIResponse }),  // 保存 AI 的工具调用
+        resultMessage,  // 工具执行结果
+      ],
+      toolResults: [{
+        tool,
+        params: normalizedToolCall,
+        result,
+        timestamp: new Date(),
+      }],
+      iterations: iterations + 1,
+      lastAIResponse: '',  // 清空，等待下一次 AI 回复
+      needsContinue: result.success,  // 成功则可能继续
     };
     
   } catch (error: any) {
@@ -155,7 +254,7 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
     
     return {
       error: `工具执行失败: ${error.message}`,
-      currentToolCall: undefined,
+      needsContinue: false,
     };
   }
 }
@@ -163,10 +262,10 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
 /**
  * AI 决策节点
  * 
- * 决定是否继续调用工具，还是给出最终回复
+ * 决定是否继续工作流
  */
 function shouldContinue(state: AgentState): '__end__' | 'toolExecutor' {
-  const { iterations, error, messages } = state;
+  const { iterations, error, needsContinue } = state;
   
   console.log(`🤔 [Decision] 当前迭代: ${iterations}/5`);
   
@@ -182,21 +281,14 @@ function shouldContinue(state: AgentState): '__end__' | 'toolExecutor' {
     return '__end__';
   }
   
-  // 检查最后一条消息是否包含工具调用
-  const lastMessage = messages[messages.length - 1];
-  
-  if (lastMessage && lastMessage.content) {
-    const content = lastMessage.content.toString();
-    
-    // 简单检测是否包含 tool_call 或 "tool": 
-    if (content.includes('<tool_call>') || (content.includes('"tool"') && content.includes('{'))) {
-      console.log('🔧 [Decision] 检测到工具调用，继续执行');
-      return 'toolExecutor';
-    }
+  // 检查是否需要继续（由 toolExecutor 设置）
+  if (!needsContinue) {
+    console.log('✅ [Decision] 无需继续，结束工作流');
+    return '__end__';
   }
   
-  console.log('✅ [Decision] 没有更多工具调用，结束工作流');
-  return '__end__';
+  console.log('🔄 [Decision] 继续执行工作流');
+  return 'toolExecutor';
 }
 
 /**
@@ -259,7 +351,7 @@ export async function runAgentWorkflow(
   for await (const output of stream) {
     // output 是一个对象，key 是节点名，value 是该节点的输出
     const nodeName = Object.keys(output)[0];
-    const nodeOutput = output[nodeName];
+    const nodeOutput = (output as any)[nodeName];
     
     console.log(`📍 [Workflow] 节点 "${nodeName}" 输出:`, nodeOutput);
     

@@ -18,6 +18,7 @@ import { ConversationMemoryService } from '../services/conversationMemoryService
 import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { validateToolCall, generateToolPrompt } from '../tools/toolValidator.js';
 import { routePlanningTool } from '../tools/planningTools.js';
+import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -48,36 +49,127 @@ interface ChatRequestData {
 function buildSystemPrompt(): string {
   const toolPrompt = generateToolPrompt(); // 从 toolValidator 获取标准化的工具定义
   
-  return `你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
+  return `⚠️ **重要规则：当需要创建计划、搜索信息等操作时，你必须使用 <tool_call></tool_call> 标签！**
+
+## 🔄 多工具调用能力说明
+
+你现在拥有**多轮工具调用能力**：
+- ✅ 可以连续调用多个工具来完成复杂任务
+- ✅ 每次调用一个工具后，系统会将结果反馈给你，你可以根据结果决定是否调用下一个工具
+- ✅ 最多支持 5 轮工具调用（足够完成大多数任务）
+- ✅ 如果工具调用出错，你会收到详细的错误提示，可以修正后重试
+
+例如：用户说"搜索 IELTS 备考方法，然后制定学习计划"
+- 第1轮：调用 search_web 搜索
+- 等待搜索结果
+- 第2轮：根据搜索结果调用 create_plan
+- 完成任务！
+
+---
+
+你是一位专业的兴趣教练，擅长帮助用户发现、培养和深化他们的兴趣爱好。你的目标是：
 
 1. 通过提问了解用户的兴趣倾向和个性特点
 2. 提供个性化的兴趣建议和培养方案
 3. 分享相关的资源和学习路径
 4. 鼓励用户坚持并享受兴趣带来的乐趣
+5. 使用工具来搜索信息、创建和管理学习计划
 
-## 工具使用
+## 🔧 工具调用规则 - 必须遵守！
+
+**当需要使用工具时，你必须：**
+
+1. ✅ **必须使用 <tool_call> 和 </tool_call> 标签包裹 JSON**
+2. ✅ **JSON 可以格式化，但必须是合法的 JSON 格式**
+3. ✅ **立即输出工具调用，不要先说明**
+
+**✅ 正确示例（必须这样做）：**
+
+用户："帮我制定IELTS备考计划"
+
+你的回复：
+<tool_call>{"tool": "create_plan", "title": "3个月IELTS备考", "goal": "达到7分", "tasks": [{"title": "模考", "estimated_hours": 3, "deadline": "2025-01-05", "tags": ["mock"]}]}</tool_call>
+
+（等待工具执行后再说明）
+
+**错误示例（不要这样做）：**
+
+❌ 错误1: 没有使用 <tool_call> 标签
+我会帮您制定计划：
+{
+  "tool": "create_plan",
+  ...
+}
+
+❌ 错误2: 先说明后调用
+我会帮您创建计划。
+<tool_call>...</tool_call>
+
+❌ 错误3: 只有开始标签没有结束标签
+<tool_call>{"tool": "create_plan", ...}
+
+## 🔄 多步骤工具调用 - 非常重要！
+
+**当用户的请求需要多个步骤时，你必须逐步完成所有步骤：**
+
+**场景1: 搜索 + 创建计划**
+用户："搜索......，然后帮我制定......计划"
+
+正确流程：
+1️⃣ 第一步：调用 search_web 搜索
+   <tool_call>{"tool": "search_web", "query": "IELTS 备考方法"}</tool_call>
+   
+2️⃣ 第二步：等待搜索结果返回后，系统会将结果反馈给你
+   
+3️⃣ 第三步：基于搜索结果，立即调用 create_plan 创建计划
+   <tool_call>{"tool": "create_plan", "title": "...", "goal": "...", "tasks": [...]}</tool_call>
+   
+4️⃣ 第四步：计划创建成功后，再向用户总结
+
+❌ 错误做法：搜索完成后直接总结给用户，忘记创建计划！
+
+**场景2: 列出计划 + 更新计划**
+用户："列出我的计划，然后更新第一个计划的目标"
+
+正确流程：
+1️⃣ 调用 list_plans 获取计划列表
+2️⃣ 等待列表返回
+3️⃣ 调用 update_plan 更新第一个计划
+4️⃣ 确认更新成功后再回复用户
+
+**记住：如果用户要求"先...再..."、"然后"、"接着"等多步骤操作，你必须完成所有步骤！**
+
+## ⚠️ 工具结果展示规则 - 极其重要！
+
+**关于 list_plans 工具的重要说明：**
+- ✅ list_plans 返回的数据**已经包含每个计划的完整 tasks 数组**
+- ✅ 每个计划的 tasks 数组包含所有任务的详细信息（标题、工时、截止日期、标签等）
+- ✅ **不需要再调用 get_plan 来获取任务详情**
+- ✅ 直接将 list_plans 返回的完整数据展示给用户即可
+
+**当你收到工具执行结果（特别是 list_plans）时：**
+
+1. ✅ **直接使用工具返回的完整 JSON 数据**
+2. ✅ **保留所有字段，特别是 tasks 数组**
+3. ❌ **不要删除或简化任何字段**
+4. ❌ **不要自己重新构造 JSON**
+5. ❌ **不要认为需要再调用 get_plan 获取详情**
+
+## 可用工具
 
 ${toolPrompt}
 
-## 错误示例 ❌ (不要这样做)
+## 其他错误示例
 
-❌ 错误1: 编造不存在的工具
-用户: "帮我计算 123 + 456"
-❌ 错误输出: <tool_call>{"tool": "calculator", "expression": "123+456"}</tool_call>
+❌ 错误4: 编造不存在的工具
+<tool_call>{"tool": "calculator", "expression": "123+456"}</tool_call>
 原因: calculator 工具不存在
-✅ 正确做法: <tool_call>{"tool": "search_web", "query": "123+456计算结果"}</tool_call>
 
-❌ 错误2: 参数名错误
-用户: "搜索AI新闻"
-❌ 错误输出: <tool_call>{"tool": "search_web", "keyword": "AI新闻"}</tool_call>
+❌ 错误5: 参数名错误
+<tool_call>{"tool": "search_web", "keyword": "AI新闻"}</tool_call>
 原因: 参数名应该是 query 不是 keyword
-✅ 正确做法: <tool_call>{"tool": "search_web", "query": "AI新闻"}</tool_call>
 
-❌ 错误3: JSON 格式错误
-用户: "搜索天气"
-❌ 错误输出: <tool_call>{'tool': 'search_web', 'query': '天气'}</tool_call>
-原因: JSON 必须使用双引号
-✅ 正确做法: <tool_call>{"tool": "search_web", "query": "天气"}</tool_call>
+## 记住：工具调用必须在第一时间！先调用工具，再说明！
 
 请用友好、鼓励的语气与用户交流，用简洁明了的语言回答问题。`;
 }
@@ -182,20 +274,61 @@ function extractToolCall(text: string): { toolCall: any; remainingText: string }
   }
   
   // 如果没有标签，尝试直接匹配 JSON 格式（适配不同模型的输出）
-  // 匹配形如：{"tool": "search_web", "query": "..."}
-  const jsonRegex = /\{[\s\S]*?"tool"[\s\S]*?:[\s\S]*?"search_web"[\s\S]*?,[\s\S]*?"query"[\s\S]*?:[\s\S]*?"[^"]*"[\s\S]*?\}/;
-  const jsonMatch = text.match(jsonRegex);
-  
-  if (jsonMatch) {
+  // 尝试提取完整的 JSON 对象（包含 "tool" 字段）
+  const startIndex = text.indexOf('{');
+  if (startIndex !== -1 && text.includes('"tool"')) {
     try {
-      const toolCallJson = jsonMatch[0].trim();
-      console.log('🔧 发现纯 JSON 格式的工具调用:', toolCallJson);
-      const toolCall = JSON.parse(toolCallJson);
+      // 找到完整的 JSON
+      let braceCount = 0;
+      let jsonEndIndex = -1;
+      let inString = false;
+      let escapeNext = false;
       
-      // 验证是否是有效的工具调用
-      if (toolCall.tool === 'search_web' && toolCall.query) {
-        const remainingText = text.replace(jsonMatch[0], '').trim();
-        return { toolCall, remainingText };
+      for (let i = startIndex; i < text.length; i++) {
+        const char = text[i];
+        
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        if (!inString) {
+          if (char === '{') braceCount++;
+          if (char === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              jsonEndIndex = i + 1;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (jsonEndIndex !== -1) {
+        let toolCallJson = text.substring(startIndex, jsonEndIndex);
+        
+        // 移除 JSON 注释
+        toolCallJson = toolCallJson.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        console.log('🔧 发现纯 JSON 格式的工具调用（前100字符）:', toolCallJson.substring(0, 100) + '...');
+        const toolCall = JSON.parse(toolCallJson);
+        
+        // 验证是否是有效的工具调用（检查是否有 tool 字段）
+        if (toolCall.tool) {
+          const remainingText = text.substring(0, startIndex) + text.substring(jsonEndIndex);
+          console.log(`✅ 成功提取工具调用: ${toolCall.tool}`);
+          return { toolCall, remainingText: remainingText.trim() };
+        }
       }
     } catch (error) {
       console.error('❌ 解析纯 JSON 失败:', error);
@@ -418,47 +551,104 @@ async function streamVolcengineToSSEResponse(
               console.log('✅ 火山引擎流式响应完成');
               console.log('📝 完整响应内容:', accumulatedText);
               
-              // 检测是否有工具调用
-              const toolCallResult = extractToolCall(accumulatedText);
+              // ==================== 多工具调用工作流 ====================
+              const workflowManager = new MultiToolCallManager(5);  // 最多5轮
+              let currentResponse = accumulatedText;
+              let continueLoop = true;
               
-              if (toolCallResult) {
-                console.log('🔧 检测到工具调用:', toolCallResult.toolCall);
+              // 获取用户的原始问题（用于在工具结果反馈中提醒 AI）
+              const originalUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
+              
+              while (continueLoop) {
+                // 处理当前 AI 回复，检测并执行工具
+                const workflowResult = await workflowManager.processAIResponse(currentResponse, userId);
                 
-                // 发送工具调用通知
+                if (!workflowResult.hasToolCall) {
+                  console.log('✅ [Workflow] 没有工具调用，结束循环');
+                  break;
+                }
+                
+                console.log(`🔧 [Workflow] 第 ${workflowManager.getHistory().length} 轮工具调用: ${workflowResult.toolCall?.tool}`);
+                
+                // 发送工具调用通知到前端
                 const toolCallNotice = JSON.stringify({
-                  content: '正在搜索...',
-                  toolCall: toolCallResult.toolCall,
+                  content: `正在执行工具: ${workflowResult.toolCall?.tool}...`,
+                  toolCall: workflowResult.toolCall,
                 });
                 await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
                 
-                // 执行工具调用
-                const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall, userId);
-                console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
-                console.log('🔗 来源链接:', sources?.length || 0, '条');
+                // 保存搜索来源
+                if (workflowResult.toolResult?.sources) {
+                  searchSources = workflowResult.toolResult.sources;
+                }
                 
-                // 保存 sources，稍后随最终答案一起发送
-                searchSources = sources;
+                // 构建工具结果反馈消息
+                let feedbackMessage = '';
                 
-                // 将工具结果添加到消息历史，并明确指示这是搜索结果
+                // 区分错误和成功的反馈
+                if (workflowResult.error) {
+                  console.warn(`⚠️  [Workflow] 工具执行出错: ${workflowResult.error}`);
+                  
+                  // 错误反馈 - 鼓励重试
+                  feedbackMessage = `${workflowResult.toolResult?.resultText}\n\n---\n\n`;
+                  feedbackMessage += `**用户的原始请求**："${originalUserMessage}"\n\n`;
+                  feedbackMessage += `⚠️ 刚才的工具调用有误，请仔细检查错误提示，立即重新生成正确的工具调用。\n`;
+                  feedbackMessage += `不要向用户解释错误，而是直接修正并重试。`;
+                  
+                } else {
+                  // 成功反馈 - 根据工具类型指引下一步
+                  feedbackMessage = `## 工具执行结果\n\n${workflowResult.toolResult?.resultText}\n\n---\n\n`;
+                  
+                  // 根据工具类型给出更明确的指引
+                  if (workflowResult.toolCall?.tool === 'search_web') {
+                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `你已经完成了搜索，现在请继续分析：\n`;
+                    feedbackMessage += `1. 如果用户要求制定计划，请立即调用 create_plan 工具\n`;
+                    feedbackMessage += `2. 如果用户要求更新计划，请调用 update_plan 工具\n`;
+                    feedbackMessage += `3. 如果用户只是要求搜索，现在可以总结并回复\n\n`;
+                    feedbackMessage += `请根据用户的原始需求，决定下一步操作。`;
+                  } else if (workflowResult.toolCall?.tool === 'list_plans') {
+                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `**⚠️ 重要：工具返回的数据包含完整的 tasks 数组，请在回复时保留它们！**\n\n`;
+                    feedbackMessage += `你已经获取了计划列表，现在请继续：\n`;
+                    feedbackMessage += `1. 如果用户要求更新某个计划，请调用 update_plan 工具\n`;
+                    feedbackMessage += `2. 如果用户要求查看某个计划详情，请调用 get_plan 工具（通常不需要，list_plans 已包含完整信息）\n`;
+                    feedbackMessage += `3. 如果用户只是要求列表，请**直接输出完整的工具结果JSON**（包含 tasks 数组），不要删除任何字段\n\n`;
+                    feedbackMessage += `请根据用户的原始需求，决定下一步操作。`;
+                  } else {
+                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `请检查是否还有其他工具需要调用来完成用户的请求。如果所有必要的步骤都已完成，请总结并回复用户。`;
+                  }
+                }
+                
+                // 将工具结果反馈给 AI
                 messages.push(
-                  { role: 'assistant', content: accumulatedText },
-                  { role: 'user', content: `以下是搜索结果，请基于这些搜索结果回答用户的问题：\n\n${toolResult}\n\n请现在根据上述搜索结果，详细回答用户的问题。` }
+                  { role: 'assistant', content: currentResponse },
+                  { role: 'user', content: feedbackMessage }
                 );
                 
-                console.log('📨 消息历史长度:', messages.length);
-                console.log('📨 最后一条消息（工具结果）前100字符:', messages[messages.length - 1].content.substring(0, 100));
+                console.log(`📨 [Workflow] 消息历史长度: ${messages.length}, 准备重新调用 AI`);
                 
-                // 重新调用模型，继续生成
-                console.log('🔄 基于搜索结果继续生成回答...');
+                // 检查是否应该继续
+                if (!workflowResult.shouldContinue) {
+                  console.log('⚠️  [Workflow] 工作流指示不继续');
+                  break;
+                }
+                
+                // 重新调用 AI 模型
+                console.log('🔄 [Workflow] 重新调用 AI 模型...');
                 const newStream = await callVolcengineModel(messages);
                 
                 // 重置累积文本
+                currentResponse = '';  // 重置当前回复用于下一轮
                 accumulatedText = '';
                 lastSentContent = '';
                 lastSentThinking = '';
                 buffer = '';
                 
                 // 继续处理新的流
+                let newStreamDone = false;
+                
                 for await (const chunk of newStream) {
                   const chunkStr = chunk.toString();
                   buffer += chunkStr;
@@ -472,6 +662,7 @@ async function streamVolcengineToSSEResponse(
                       
                       if (content) {
                         accumulatedText += content;
+                        currentResponse += content;  // 累积用于下一轮工具检测
                         const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
 
                         // 立即发送每次更新，确保流式效果
@@ -486,12 +677,28 @@ async function streamVolcengineToSSEResponse(
                       }
 
                       if (line.includes('[DONE]')) {
+                        newStreamDone = true;
+                        console.log('✅ [Workflow] 新流完成');
                         break;
                       }
                     }
                   }
+                  
+                  if (newStreamDone) break;
+                }
+                
+                // 检查新回复中是否还有工具调用，如果有则继续循环
+                if (newStreamDone && currentResponse) {
+                  console.log('🔍 [Workflow] 检查新回复中是否有更多工具调用...');
+                  // 循环会自动继续检测
+                } else {
+                  // 没有更多工具调用，退出循环
+                  continueLoop = false;
                 }
               }
+              
+              // 打印工具调用历史
+              console.log(`📊 [Workflow] 工具调用历史: ${workflowManager.getHistorySummary()}`);
               
               // 最终处理和保存
               if (accumulatedText) {

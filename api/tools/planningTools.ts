@@ -7,8 +7,8 @@ import {
   updatePlan,
   getPlan,
   listPlans,
-} from '../services/planService';
-import { Task } from '../db/models';
+} from '../services/planService.js';
+import { Task } from '../db/models.js';
 
 /**
  * 工具调用结果接口
@@ -224,11 +224,12 @@ export async function handleListPlans(
       };
     }
 
-    // 简化计划信息用于列表展示
+    // 简化计划信息用于列表展示（包含完整的任务数据）
     const simplifiedPlans = result.plans.map(plan => ({
       plan_id: plan.planId,
       title: plan.title,
       goal: plan.goal,
+      tasks: plan.tasks, // 包含完整的任务数组
       tasks_count: plan.tasks.length,
       created_at: plan.createdAt,
       updated_at: plan.updatedAt,

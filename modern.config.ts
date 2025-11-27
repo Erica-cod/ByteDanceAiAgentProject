@@ -9,5 +9,9 @@ export default defineConfig({
   server: {
     port: 8080,
   },
+  bff: {
+    // 只扫描 api/lambda 目录作为 API 路由
+    prefix: '/api',
+  },
 });
 
