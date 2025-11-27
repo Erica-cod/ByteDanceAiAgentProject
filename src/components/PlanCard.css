@@ -1,0 +1,610 @@
+/* 计划卡片容器 */
+.plan-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 16px 0;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+  color: white;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 卡片头部 */
+.plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.plan-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.plan-id {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.plan-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.plan-tasks-count,
+.plan-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.meta-icon {
+  font-size: 16px;
+}
+
+/* 目标区域 */
+.plan-goal {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.goal-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.goal-content {
+  font-size: 16px;
+  line-height: 1.6;
+  color: white;
+}
+
+/* 任务列表 */
+.plan-tasks {
+  margin-top: 20px;
+}
+
+.tasks-label {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: white;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 单个任务 */
+.task-item {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  color: #2d3748;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.task-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.task-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.task-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  flex: 1;
+  min-width: 200px;
+}
+
+.task-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-progress {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* 任务详情 */
+.task-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  font-size: 14px;
+  color: #64748b;
+  padding-left: 40px;
+}
+
+.task-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-icon {
+  font-size: 14px;
+}
+
+/* 任务标签 */
+.task-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-tag {
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 卡片底部 */
+.plan-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: right;
+}
+
+.update-time {
+  font-style: italic;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .plan-card {
+    padding: 16px;
+  }
+
+  .plan-title {
+    font-size: 20px;
+  }
+
+  .plan-card-header {
+    flex-direction: column;
+  }
+
+  .plan-meta {
+    flex-wrap: wrap;
+  }
+
+  .task-details {
+    padding-left: 0;
+    margin-top: 8px;
+  }
+
+  .task-title {
+    min-width: 100%;
+  }
+}
+
+/* 暗色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .task-item {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .task-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .task-title {
+    color: white;
+  }
+
+  .task-details {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* ==================== 计划卡片精简模式样式 ==================== */
+
+.plan-card-compact {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  color: #2d3748;
+  margin-bottom: 12px;
+}
+
+.plan-card-compact:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 精简模式序号 */
+.plan-compact-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* 精简模式内容区 */
+.plan-compact-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-compact-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-compact-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+  min-width: 200px;
+}
+
+.plan-compact-id {
+  font-size: 12px;
+  color: #64748b;
+  font-family: 'Courier New', monospace;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.plan-compact-goal {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-left: 3px solid #6366f1;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.plan-compact-goal .goal-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 精简模式的任务列表 */
+.plan-compact-tasks {
+  margin-bottom: 12px;
+}
+
+.compact-tasks-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.compact-tasks-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compact-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.compact-task-item:hover {
+  background: #f1f5f9;
+}
+
+.compact-task-number {
+  color: #6366f1;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.compact-task-title {
+  flex: 1;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.compact-task-deadline {
+  font-size: 12px;
+  color: #64748b;
+  background: #e0e7ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* 精简模式元数据 */
+.plan-compact-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.plan-compact-meta .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 6px 12px;
+  border-radius: 16px;
+}
+
+.plan-compact-meta .meta-icon {
+  font-size: 14px;
+}
+
+/* 暗色模式 - 精简模式 */
+@media (prefers-color-scheme: dark) {
+  .plan-card-compact {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .plan-card-compact:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .plan-compact-title {
+    color: white;
+  }
+
+  .plan-compact-id {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .plan-compact-goal {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: #818cf8;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .plan-compact-meta .meta-item {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  /* 暗色模式 - 精简任务列表 */
+  .compact-tasks-label {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .compact-task-item {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .compact-task-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .compact-task-title {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .compact-task-deadline {
+    background: rgba(129, 140, 248, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* ==================== 计划列表卡片样式 ==================== */
+
+.plan-list-card {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 16px 0;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
+  color: white;
+  animation: slideIn 0.3s ease-out;
+}
+
+.plan-list-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.plan-list-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-count-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 计划列表项容器 */
+.plan-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* 使用 PlanCard compact 模式，它自己有 margin-bottom */
+}
+
+/* 空列表提示 */
+.plan-list-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.plan-list-empty p {
+  margin: 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 列表底部信息 */
+.plan-list-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: center;
+}
+
+.more-info {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+/* 响应式设计 - 列表 */
+@media (max-width: 768px) {
+  .plan-list-card {
+    padding: 16px;
+  }
+
+  .plan-list-title {
+    font-size: 18px;
+  }
+
+  /* 精简模式在移动端的适配 */
+  .plan-card-compact {
+    padding: 16px;
+    flex-direction: column;
+  }
+
+  .plan-compact-index {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .plan-compact-title {
+    font-size: 16px;
+    min-width: 100%;
+  }
+
+  .plan-compact-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

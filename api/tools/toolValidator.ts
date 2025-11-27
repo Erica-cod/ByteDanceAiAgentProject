@@ -134,7 +134,7 @@ export const TOOL_REGISTRY = new Map<string, ToolDefinition>([
     'get_plan',
     {
       name: 'get_plan',
-      description: '获取指定计划的详细信息',
+      description: '获取指定计划的详细信息（当你已经知道 plan_id 时使用）。注意：list_plans 已经返回完整的任务详情，通常不需要再调用此工具。',
       requiredParams: ['plan_id'],
       optionalParams: [],
       paramTypes: {
@@ -142,7 +142,7 @@ export const TOOL_REGISTRY = new Map<string, ToolDefinition>([
       },
       examples: [
         {
-          input: '查看我的IELTS备考计划',
+          input: '查看 plan_123 这个计划的详情',
           toolCall: {
             tool: 'get_plan',
             plan_id: 'plan_123',
@@ -155,7 +155,32 @@ export const TOOL_REGISTRY = new Map<string, ToolDefinition>([
     'list_plans',
     {
       name: 'list_plans',
-      description: '列出所有计划或最近的N个计划',
+      description: `列出所有计划，包含每个计划的完整任务详情。
+
+返回的数据结构：
+{
+  "plans": [
+    {
+      "plan_id": "xxx",
+      "title": "计划标题",
+      "goal": "目标描述",
+      "tasks": [
+        {
+          "title": "任务标题",
+          "estimated_hours": 2,
+          "deadline": "2025-12-31",
+          "tags": ["标签1", "标签2"]
+        }
+      ],
+      "tasks_count": 1,
+      "created_at": "2025-11-26",
+      "updated_at": "2025-11-26"
+    }
+  ],
+  "total": 1
+}
+
+重要：返回的每个计划都包含完整的 tasks 数组，可以直接展示给用户，不需要再调用 get_plan 获取任务详情。`,
       requiredParams: [],
       optionalParams: ['limit'],
       paramTypes: {
@@ -167,6 +192,13 @@ export const TOOL_REGISTRY = new Map<string, ToolDefinition>([
           toolCall: {
             tool: 'list_plans',
             limit: 10,
+          },
+        },
+        {
+          input: '列出最近的5个计划',
+          toolCall: {
+            tool: 'list_plans',
+            limit: 5,
           },
         },
       ],
@@ -403,11 +435,13 @@ export function generateToolPrompt(toolNames?: string[]): string {
   });
 
   prompt += `## 重要规则\n`;
-  prompt += `1. **只能使用上述 ${tools.length} 个工具**,不要编造其他工具\n`;
-  prompt += `2. **严格按照调用格式**,参数名必须完全匹配\n`;
-  prompt += `3. **JSON 格式必须合法**,使用双引号,在一行内完成\n`;
-  prompt += `4. **每次只调用一个工具**\n`;
-  prompt += `5. **如果不确定使用哪个工具**,优先选择 search_web\n`;
+  prompt += `1. **只能使用上述 ${tools.length} 个工具**，不要编造其他工具\n`;
+  prompt += `2. **严格按照调用格式**，参数名必须完全匹配\n`;
+  prompt += `3. **JSON 格式必须合法**，使用双引号\n`;
+  prompt += `4. **支持多轮工具调用**：你可以先调用一个工具（如 search_web），等待结果返回后，再调用另一个工具（如 create_plan）。系统会自动管理多轮调用流程。\n`;
+  prompt += `5. **每次只输出一个工具调用**，等待工具执行完成后，根据结果决定是否需要调用下一个工具\n`;
+  prompt += `6. **如果不确定使用哪个工具**，优先选择 search_web\n`;
+  prompt += `7. **工具调用错误时会收到反馈**，请根据错误提示立即修正并重试\n`;
 
   return prompt;
 }
