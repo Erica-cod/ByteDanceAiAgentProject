@@ -242,7 +242,7 @@ export class ReporterAgent extends BaseAgent {
     }
 
     // 参与的Agent
-    const participating_agents = Array.from(
+    const participating_agents: string[] = Array.from(
       new Set(discussionHistory.map((h: any) => h.agent_id))
     );
 
