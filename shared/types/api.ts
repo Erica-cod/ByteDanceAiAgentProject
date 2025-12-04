@@ -34,6 +34,7 @@ export interface ChatRequest {
   modelType: 'local' | 'volcano';
   conversationId?: string;
   userId: string;
+  mode?: 'single' | 'multi_agent';  // 新增：聊天模式
 }
 
 export interface ConversationsListResponse {

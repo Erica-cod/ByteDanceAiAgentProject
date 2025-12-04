@@ -38,18 +38,130 @@ export interface WorkflowResult {
  */
 function extractToolCall(text: string): any | null {
   try {
+    console.log(`🔍 [extractToolCall] 开始提取工具调用...`);
+    console.log(`📝 [extractToolCall] 文本长度: ${text.length} 字符`);
+    
     // 1. 匹配 <tool_call> 标签
     const tagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
     const tagMatch = text.match(tagRegex);
     
     if (tagMatch) {
-      const jsonStr = tagMatch[1].trim();
-      return JSON.parse(jsonStr);
+      console.log(`✅ [extractToolCall] 找到 <tool_call> 标签`);
+      let jsonStr = tagMatch[1].trim();
+      console.log(`📝 [extractToolCall] 原始内容长度: ${jsonStr.length} 字符`);
+      console.log(`📝 [extractToolCall] JSON 内容（前200字符）: ${jsonStr.substring(0, 200)}...`);
+      console.log(`📝 [extractToolCall] JSON 内容（后200字符）: ...${jsonStr.substring(Math.max(0, jsonStr.length - 200))}`);
+      
+      // 🔧 新增：先尝试提取第一个完整的JSON对象，忽略后面可能的垃圾字符
+      const firstBraceIndex = jsonStr.indexOf('{');
+      if (firstBraceIndex !== -1) {
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        let jsonEndIndex = -1;
+        
+        for (let i = firstBraceIndex; i < jsonStr.length; i++) {
+          const char = jsonStr[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"' && !inString) {
+            inString = true;
+            continue;
+          } else if (char === '"' && inString) {
+            inString = false;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') braceCount++;
+            if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                jsonEndIndex = i + 1;
+                console.log(`🔍 [extractToolCall] 找到JSON结束位置: ${jsonEndIndex}/${jsonStr.length}`);
+                break;
+              }
+            }
+          }
+        }
+        
+        if (jsonEndIndex !== -1 && jsonEndIndex < jsonStr.length) {
+          const cleanJsonStr = jsonStr.substring(firstBraceIndex, jsonEndIndex);
+          const garbage = jsonStr.substring(jsonEndIndex);
+          if (garbage.trim()) {
+            console.warn(`⚠️  [extractToolCall] 检测到JSON后有垃圾字符: "${garbage}"`);
+            console.log(`🔧 [extractToolCall] 已自动移除垃圾，使用干净的JSON`);
+          }
+          jsonStr = cleanJsonStr;
+        }
+      }
+      
+      try {
+        const parsed = JSON.parse(jsonStr);
+        console.log(`✅ [extractToolCall] JSON 解析成功，工具: ${parsed.tool}`);
+        return parsed;
+      } catch (parseError: any) {
+        console.error(`❌ [extractToolCall] 第一次 JSON 解析失败:`, parseError.message);
+        
+        // 尝试修复常见的 JSON 错误
+        console.log(`🔧 [extractToolCall] 尝试修复 JSON...`);
+        
+        // 1. 移除尾部的逗号（常见错误）
+        jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+        
+        // 2. 确保字符串中的引号正确转义
+        // 3. 移除可能的注释
+        jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        // 4. 检查是否缺少结束括号
+        const openBraces = (jsonStr.match(/{/g) || []).length;
+        const closeBraces = (jsonStr.match(/}/g) || []).length;
+        const openBrackets = (jsonStr.match(/\[/g) || []).length;
+        const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+        
+        console.log(`🔍 [extractToolCall] 括号统计: { ${openBraces} vs } ${closeBraces}, [ ${openBrackets} vs ] ${closeBrackets}`);
+        
+        // 如果缺少结束括号，尝试补全
+        if (openBrackets > closeBrackets) {
+          const missing = openBrackets - closeBrackets;
+          console.log(`🔧 [extractToolCall] 补全 ${missing} 个 ]`);
+          jsonStr += ']'.repeat(missing);
+        }
+        if (openBraces > closeBraces) {
+          const missing = openBraces - closeBraces;
+          console.log(`🔧 [extractToolCall] 补全 ${missing} 个 }`);
+          jsonStr += '}'.repeat(missing);
+        }
+        
+        try {
+          const parsed = JSON.parse(jsonStr);
+          console.log(`✅ [extractToolCall] 修复后 JSON 解析成功，工具: ${parsed.tool}`);
+          return parsed;
+        } catch (secondError: any) {
+          console.error(`❌ [extractToolCall] 修复后仍然解析失败:`, secondError.message);
+          console.error(`📝 [extractToolCall] 修复后的 JSON（前1000字符）:\n${jsonStr.substring(0, 1000)}`);
+          console.error(`📝 [extractToolCall] 修复后的 JSON（后500字符）:\n...${jsonStr.substring(Math.max(0, jsonStr.length - 500))}`);
+          return null;
+        }
+      }
     }
+    
+    console.log(`⚠️  [extractToolCall] 未找到 <tool_call> 标签，尝试提取纯 JSON...`);
     
     // 2. 匹配纯 JSON
     const startIndex = text.indexOf('{');
     if (startIndex !== -1 && text.includes('"tool"')) {
+      console.log(`🔍 [extractToolCall] 找到 JSON 起始位置: ${startIndex}`);
+      
       let braceCount = 0;
       let jsonEndIndex = -1;
       let inString = false;
@@ -86,14 +198,32 @@ function extractToolCall(text: string): any | null {
       }
       
       if (jsonEndIndex !== -1) {
+        console.log(`✅ [extractToolCall] 找到 JSON 结束位置: ${jsonEndIndex}`);
         let jsonStr = text.substring(startIndex, jsonEndIndex);
         jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-        return JSON.parse(jsonStr);
+        console.log(`📝 [extractToolCall] 提取的 JSON（前200字符）: ${jsonStr.substring(0, 200)}...`);
+        
+        try {
+          const parsed = JSON.parse(jsonStr);
+          console.log(`✅ [extractToolCall] JSON 解析成功，工具: ${parsed.tool}`);
+          return parsed;
+        } catch (parseError: any) {
+          console.error(`❌ [extractToolCall] JSON 解析失败:`, parseError.message);
+          console.error(`📝 [extractToolCall] 完整 JSON:\n${jsonStr}`);
+          return null;
+        }
+      } else {
+        console.warn(`⚠️  [extractToolCall] 未找到 JSON 结束位置，braceCount: ${braceCount}`);
       }
+    } else {
+      console.warn(`⚠️  [extractToolCall] 未找到 JSON 起始标记或 "tool" 字段`);
     }
     
+    console.log(`❌ [extractToolCall] 未能提取工具调用`);
     return null;
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`❌ [extractToolCall] 异常:`, error.message);
+    console.error(`📝 [extractToolCall] 文本内容（前500字符）:\n${text.substring(0, 500)}`);
     return null;
   }
 }
@@ -124,10 +254,20 @@ export async function processSingleToolCall(
   }
   
   // 提取工具调用
+  console.log(`📝 [Workflow] AI回复长度: ${aiResponse.length} 字符`);
+  console.log(`📝 [Workflow] AI回复开头（前300字符）:\n${aiResponse.substring(0, 300)}`);
+  
   const toolCall = extractToolCall(aiResponse);
   
   if (!toolCall) {
-    console.log('✅ [Workflow] 没有检测到工具调用');
+    console.warn('⚠️  [Workflow] 没有检测到工具调用');
+    console.warn(`📝 [Workflow] AI完整回复:\n${aiResponse}`);
+    
+    // 额外检查：是否包含 tool_call 标签但解析失败
+    if (aiResponse.includes('<tool_call>')) {
+      console.error('❌ [Workflow] 检测到 <tool_call> 标签，但提取失败！可能是 JSON 格式问题');
+    }
+    
     return {
       hasToolCall: false,
       shouldContinue: false,
