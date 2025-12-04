@@ -19,6 +19,9 @@ import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { validateToolCall, generateToolPrompt } from '../tools/toolValidator.js';
 import { routePlanningTool } from '../tools/planningTools.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
+import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/multiAgentOrchestrator.js';
+import type { AgentOutput } from '../agents/baseAgent.js';
+import type { HostDecision } from '../agents/hostAgent.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -38,6 +41,7 @@ interface ChatRequestData {
   modelType: 'local' | 'volcano';
   conversationId?: string;
   userId: string;
+  mode?: 'single' | 'multi_agent';  // 聊天模式：单agent或多agent
 }
 
 // ============= System Prompt =============
@@ -555,16 +559,26 @@ async function streamVolcengineToSSEResponse(
               const workflowManager = new MultiToolCallManager(5);  // 最多5轮
               let currentResponse = accumulatedText;
               let continueLoop = true;
+              let loopIteration = 0;
+              const MAX_LOOP_ITERATIONS = 10;  // 额外的安全保护
               
               // 获取用户的原始问题（用于在工具结果反馈中提醒 AI）
               const originalUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
               
-              while (continueLoop) {
+              console.log(`🔄 [Workflow] 开始多工具调用循环，最多 ${MAX_LOOP_ITERATIONS} 次迭代`);
+              
+              while (continueLoop && loopIteration < MAX_LOOP_ITERATIONS) {
+                loopIteration++;
+                console.log(`\n🔁 [Workflow] === 循环迭代 ${loopIteration}/${MAX_LOOP_ITERATIONS} ===`);
+                console.log(`📝 [Workflow] 当前AI回复内容（前500字符）:\n${currentResponse.substring(0, 500)}...`);
+                
                 // 处理当前 AI 回复，检测并执行工具
                 const workflowResult = await workflowManager.processAIResponse(currentResponse, userId);
                 
                 if (!workflowResult.hasToolCall) {
-                  console.log('✅ [Workflow] 没有工具调用，结束循环');
+                  console.log('⚠️  [Workflow] 本轮没有检测到工具调用');
+                  console.log(`📝 [Workflow] AI完整回复:\n${currentResponse}`);
+                  console.log('✅ [Workflow] 结束工具调用循环');
                   break;
                 }
                 
@@ -599,25 +613,62 @@ async function streamVolcengineToSSEResponse(
                   // 成功反馈 - 根据工具类型指引下一步
                   feedbackMessage = `## 工具执行结果\n\n${workflowResult.toolResult?.resultText}\n\n---\n\n`;
                   
+                  // 检测用户请求中的多步骤关键词
+                  const hasMultiStepKeywords = /然后|接着|再|之后|并且|同时|最后/.test(originalUserMessage);
+                  const hasUpdateKeyword = /修改|更新|改|调整|变更/.test(originalUserMessage);
+                  const hasCreateKeyword = /制定|创建|新建|建立/.test(originalUserMessage);
+                  const hasSearchKeyword = /搜索|查找|查询|找/.test(originalUserMessage);
+                  
+                  const toolHistory = workflowManager.getHistory();
+                  const completedTools = toolHistory.map(h => h.tool).join(' → ');
+                  
                   // 根据工具类型给出更明确的指引
                   if (workflowResult.toolCall?.tool === 'search_web') {
-                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
-                    feedbackMessage += `你已经完成了搜索，现在请继续分析：\n`;
-                    feedbackMessage += `1. 如果用户要求制定计划，请立即调用 create_plan 工具\n`;
-                    feedbackMessage += `2. 如果用户要求更新计划，请调用 update_plan 工具\n`;
-                    feedbackMessage += `3. 如果用户只是要求搜索，现在可以总结并回复\n\n`;
-                    feedbackMessage += `请根据用户的原始需求，决定下一步操作。`;
+                    feedbackMessage += `**📌 用户的原始请求**："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `**✅ 已完成步骤**: ${completedTools}\n\n`;
+                    
+                    if (hasMultiStepKeywords) {
+                      feedbackMessage += `⚠️ **重要**：用户的请求包含多个步骤（"然后"、"再"等关键词），你必须完成所有步骤！\n\n`;
+                    }
+                    
+                    feedbackMessage += `🔍 搜索已完成，现在分析下一步：\n`;
+                    
+                    if (hasCreateKeyword) {
+                      feedbackMessage += `✋ **你必须立即调用 create_plan 工具**创建计划，不要直接回复用户！\n`;
+                    } else if (hasUpdateKeyword) {
+                      feedbackMessage += `✋ **你必须立即调用 update_plan 工具**更新计划，不要直接回复用户！\n`;
+                    } else {
+                      feedbackMessage += `如果用户只要求搜索，现在可以总结。否则请继续调用相应工具。\n`;
+                    }
+                    
                   } else if (workflowResult.toolCall?.tool === 'list_plans') {
-                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
-                    feedbackMessage += `**⚠️ 重要：工具返回的数据包含完整的 tasks 数组，请在回复时保留它们！**\n\n`;
-                    feedbackMessage += `你已经获取了计划列表，现在请继续：\n`;
-                    feedbackMessage += `1. 如果用户要求更新某个计划，请调用 update_plan 工具\n`;
-                    feedbackMessage += `2. 如果用户要求查看某个计划详情，请调用 get_plan 工具（通常不需要，list_plans 已包含完整信息）\n`;
-                    feedbackMessage += `3. 如果用户只是要求列表，请**直接输出完整的工具结果JSON**（包含 tasks 数组），不要删除任何字段\n\n`;
-                    feedbackMessage += `请根据用户的原始需求，决定下一步操作。`;
+                    feedbackMessage += `**📌 用户的原始请求**："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `**✅ 已完成步骤**: ${completedTools}\n\n`;
+                    feedbackMessage += `**⚠️ 重要：工具返回的数据已包含完整的 tasks 数组！**\n\n`;
+                    
+                    if (hasMultiStepKeywords) {
+                      feedbackMessage += `⚠️ **警告**：用户使用了"然后"等词，说明有多个步骤要完成！\n\n`;
+                    }
+                    
+                    feedbackMessage += `📋 计划列表已获取，现在分析下一步：\n`;
+                    
+                    if (hasSearchKeyword && !toolHistory.some(h => h.tool === 'search_web')) {
+                      feedbackMessage += `✋ **你必须立即调用 search_web 工具**进行搜索，不要直接回复！\n`;
+                    } else if (hasUpdateKeyword) {
+                      feedbackMessage += `✋ **你必须立即调用 update_plan 工具**（使用上面返回的plan_id），不要直接回复用户！\n`;
+                    } else {
+                      feedbackMessage += `如果没有其他操作，请直接输出完整JSON（保留tasks数组）。\n`;
+                    }
+                    
                   } else {
-                    feedbackMessage += `**提醒**: 用户的原始请求是："${originalUserMessage}"\n\n`;
-                    feedbackMessage += `请检查是否还有其他工具需要调用来完成用户的请求。如果所有必要的步骤都已完成，请总结并回复用户。`;
+                    feedbackMessage += `**📌 用户的原始请求**："${originalUserMessage}"\n\n`;
+                    feedbackMessage += `**✅ 已完成步骤**: ${completedTools}\n\n`;
+                    
+                    if (hasMultiStepKeywords) {
+                      feedbackMessage += `⚠️ 请仔细检查：用户的请求包含多步骤关键词，确认是否还有未完成的操作！\n\n`;
+                    }
+                    
+                    feedbackMessage += `请检查用户的原始请求，如果还有工具需要调用，请立即调用。否则可以总结回复。`;
                   }
                 }
                 
@@ -630,10 +681,15 @@ async function streamVolcengineToSSEResponse(
                 console.log(`📨 [Workflow] 消息历史长度: ${messages.length}, 准备重新调用 AI`);
                 
                 // 检查是否应该继续
+                console.log(`🔍 [Workflow] 检查是否继续: shouldContinue=${workflowResult.shouldContinue}`);
                 if (!workflowResult.shouldContinue) {
-                  console.log('⚠️  [Workflow] 工作流指示不继续');
+                  console.log('⚠️  [Workflow] 工作流指示不继续，退出循环');
+                  console.log(`⚠️  [Workflow] 退出原因: ${workflowResult.error || '未知'}`);
+                  continueLoop = false;
                   break;
                 }
+                
+                console.log('✅ [Workflow] 工具执行成功，准备继续下一轮...');
                 
                 // 重新调用 AI 模型
                 console.log('🔄 [Workflow] 重新调用 AI 模型...');
@@ -688,17 +744,28 @@ async function streamVolcengineToSSEResponse(
                 }
                 
                 // 检查新回复中是否还有工具调用，如果有则继续循环
-                if (newStreamDone && currentResponse) {
-                  console.log('🔍 [Workflow] 检查新回复中是否有更多工具调用...');
-                  // 循环会自动继续检测
+                if (newStreamDone) {
+                  if (currentResponse && currentResponse.trim()) {
+                    console.log('🔍 [Workflow] 新流完成，检查是否有更多工具调用...');
+                    console.log(`📝 [Workflow] 当前回复长度: ${currentResponse.length} 字符`);
+                    // 循环会在下一次迭代时自动检测 tool_call
+                    // continueLoop 保持 true，让循环继续
+                  } else {
+                    console.log('✅ [Workflow] 新流完成，但没有新内容，结束循环');
+                    continueLoop = false;
+                  }
                 } else {
-                  // 没有更多工具调用，退出循环
-                  continueLoop = false;
+                  console.warn('⚠️  [Workflow] 新流未正常完成，但保持循环继续');
+                  // 不要退出循环，给一次重试机会
+                  // continueLoop 保持 true
                 }
               }
               
-              // 打印工具调用历史
+              // 打印工具调用历史和退出原因
+              console.log(`\n📊 [Workflow] ============ 工作流结束 ============`);
               console.log(`📊 [Workflow] 工具调用历史: ${workflowManager.getHistorySummary()}`);
+              console.log(`📊 [Workflow] 总迭代次数: ${loopIteration}`);
+              console.log(`📊 [Workflow] 退出原因: ${!continueLoop ? '不需要继续' : '达到最大迭代次数'}`);
               
               // 最终处理和保存
               if (accumulatedText) {
@@ -989,6 +1056,153 @@ async function streamToSSEResponse(
   });
 }
 
+/**
+ * 处理多Agent协作并转换为SSE流式响应
+ */
+async function handleMultiAgentMode(
+  userQuery: string,
+  userId: string,
+  conversationId: string
+) {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+
+  // 异步处理多Agent协作
+  (async () => {
+    try {
+      // 首先发送 conversationId
+      const initData = JSON.stringify({
+        conversationId: conversationId,
+        type: 'init',
+        mode: 'multi_agent',
+      });
+      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+
+      // 创建编排器
+      const orchestrator = new MultiAgentOrchestrator(
+        {
+          maxRounds: 5,
+          userId,
+          conversationId,
+        },
+        {
+          // Agent输出回调
+          onAgentOutput: async (output: AgentOutput) => {
+            console.log(`📤 [SSE] 发送Agent输出: ${output.agent_id}`);
+            
+            const sseData = JSON.stringify({
+              type: 'agent_output',
+              agent: output.agent_id,
+              round: output.round,
+              output_type: output.output_type,
+              content: output.content,
+              metadata: output.metadata,
+              timestamp: output.timestamp,
+            });
+            
+            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+          },
+
+          // Host决策回调
+          onHostDecision: async (decision: HostDecision, analysis: any) => {
+            console.log(`📤 [SSE] 发送Host决策: ${decision.action}`);
+            
+            const sseData = JSON.stringify({
+              type: 'host_decision',
+              action: decision.action,
+              reason: decision.reason,
+              next_agents: decision.next_agents,
+              consensus_level: analysis.consensus_level,
+              timestamp: new Date().toISOString(),
+            });
+            
+            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+          },
+
+          // 轮次完成回调
+          onRoundComplete: async (round: number) => {
+            console.log(`📤 [SSE] 第 ${round} 轮完成`);
+            
+            const sseData = JSON.stringify({
+              type: 'round_complete',
+              round,
+              timestamp: new Date().toISOString(),
+            });
+            
+            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+          },
+
+          // 会话完成回调
+          onSessionComplete: async (session: MultiAgentSession) => {
+            console.log(`📤 [SSE] 多Agent会话完成`);
+            
+            // 保存最终报告到数据库
+            try {
+              const reporterOutput = session.agents.reporter.last_output;
+              if (reporterOutput) {
+                await MessageService.addMessage(
+                  conversationId,
+                  userId,
+                  'assistant',
+                  reporterOutput.content,
+                  undefined,
+                  'volcano',
+                  undefined
+                );
+                await ConversationService.incrementMessageCount(conversationId, userId);
+                console.log('✅ 多Agent最终报告已保存到数据库');
+              }
+            } catch (dbError) {
+              console.error('❌ 保存多Agent报告失败:', dbError);
+            }
+
+            const sseData = JSON.stringify({
+              type: 'session_complete',
+              status: session.status,
+              rounds: session.current_round,
+              consensus_trend: session.consensus_trend,
+              timestamp: new Date().toISOString(),
+            });
+            
+            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+          },
+        }
+      );
+
+      // 运行多Agent协作
+      console.log('🚀 [MultiAgent] 开始运行多Agent协作...');
+      await orchestrator.run(userQuery);
+
+      // 发送完成信号
+      await writer.write(encoder.encode('data: [DONE]\n\n'));
+      await writer.close();
+      
+      console.log('✅ [MultiAgent] 多Agent协作完成，SSE流关闭');
+    } catch (error: any) {
+      console.error('❌ [MultiAgent] 多Agent协作失败:', error);
+      
+      const errorData = JSON.stringify({
+        type: 'error',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+      
+      await writer.write(encoder.encode(`data: ${errorData}\n\n`));
+      await writer.write(encoder.encode('data: [DONE]\n\n'));
+      await writer.close();
+    }
+  })();
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+}
+
 // ============= API 函数 =============
 
 /**
@@ -1003,12 +1217,13 @@ export async function post({
   try {
     console.log('=== 收到聊天请求 ===');
     
-    const { message, modelType, conversationId: reqConversationId, userId } = data;
+    const { message, modelType, conversationId: reqConversationId, userId, mode } = data;
 
     console.log('解析后的 message:', message);
     console.log('解析后的 modelType:', modelType);
     console.log('解析后的 conversationId:', reqConversationId);
     console.log('解析后的 userId:', userId);
+    console.log('解析后的 mode:', mode || 'single');
 
     // 参数验证
     if (!message || !message.trim()) {
@@ -1052,7 +1267,15 @@ export async function post({
     }
 
     // ==========================================
-    // 📌 阶段 1: 使用滑动窗口记忆管理
+    // 📌 多Agent模式处理
+    // ==========================================
+    if (mode === 'multi_agent') {
+      console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
+      return handleMultiAgentMode(message, userId, conversationId);
+    }
+
+    // ==========================================
+    // 📌 阶段 1: 使用滑动窗口记忆管理（单Agent模式）
     // ==========================================
     
     // 初始化记忆服务（使用推荐配置）

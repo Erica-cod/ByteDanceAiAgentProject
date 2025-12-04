@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
 import ConversationList from './ConversationList';
+import MultiAgentDisplay, { type RoundData, type AgentOutput as MAAgentOutput, type HostDecision as MAHostDecision } from './MultiAgentDisplay';
 import { getUserId, initializeUser } from '../utils/userManager';
 import {
   getConversations,
@@ -19,6 +20,11 @@ interface Message {
   thinking?: string; // thinking 内容
   sources?: Array<{title: string; url: string}>; // 搜索来源链接
   timestamp: number;
+  multiAgentData?: {  // 新增：多agent数据
+    rounds: RoundData[];
+    status: 'in_progress' | 'converged' | 'terminated';
+    consensusTrend: number[];
+  };
 }
 
 // 来源链接组件
@@ -61,6 +67,7 @@ const ChatInterface: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [modelType, setModelType] = useState<'local' | 'volcano'>('local');
+  const [chatMode, setChatMode] = useState<'single' | 'multi_agent'>('single'); // 新增：聊天模式
   const [userId] = useState<string>(getUserId()); // 获取或生成 userId
   const [conversationId, setConversationId] = useState<string | null>(null); // 当前对话 ID
   const [conversations, setConversations] = useState<Conversation[]>([]); // 对话列表
@@ -245,6 +252,7 @@ const ChatInterface: React.FC = () => {
           modelType: modelType,
           userId: userId,
           conversationId: conversationId,
+          mode: chatMode, // 新增：传递聊天模式
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -259,6 +267,12 @@ const ChatInterface: React.FC = () => {
       let currentContent = '';
       let currentThinking = '';
       let isDone = false;
+
+      // 多agent模式的状态
+      let multiAgentRounds: RoundData[] = [];
+      let multiAgentStatus: 'in_progress' | 'converged' | 'terminated' = 'in_progress';
+      let multiAgentConsensusTrend: number[] = [];
+      let currentRound: RoundData | null = null;
 
       if (!reader) {
         throw new Error('无法读取响应流');
@@ -294,9 +308,151 @@ const ChatInterface: React.FC = () => {
                   // 重新加载对话列表
                   loadConversations();
                 }
+                
+                // 如果是多agent模式，初始化多agent数据
+                if (parsed.mode === 'multi_agent') {
+                  console.log('🤖 多Agent模式初始化');
+                  multiAgentStatus = 'in_progress';
+                }
                 continue;
               }
               
+              // ========== 多Agent模式事件处理 ==========
+              if (chatMode === 'multi_agent') {
+                // Agent输出事件
+                if (parsed.type === 'agent_output') {
+                  console.log(`📤 收到Agent输出: ${parsed.agent} (第${parsed.round}轮)`);
+                  
+                  // 如果是新的一轮，创建新的round
+                  if (!currentRound || currentRound.round !== parsed.round) {
+                    if (currentRound) {
+                      multiAgentRounds.push(currentRound);
+                    }
+                    currentRound = {
+                      round: parsed.round,
+                      outputs: [],
+                    };
+                  }
+                  
+                  // 添加agent输出
+                  const agentOutput: MAAgentOutput = {
+                    agent: parsed.agent,
+                    round: parsed.round,
+                    output_type: parsed.output_type,
+                    content: parsed.content,
+                    metadata: parsed.metadata,
+                    timestamp: parsed.timestamp,
+                  };
+                  currentRound.outputs.push(agentOutput);
+                  
+                  // 如果是Reporter的输出，更新最终内容
+                  if (parsed.agent === 'reporter') {
+                    currentContent = parsed.content;
+                  }
+                  
+                  // 实时更新多agent数据
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: currentContent || '多Agent协作中...',
+                            multiAgentData: {
+                              rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                              status: multiAgentStatus,
+                              consensusTrend: multiAgentConsensusTrend,
+                            },
+                          }
+                        : msg
+                    )
+                  );
+                  continue;
+                }
+                
+                // Host决策事件
+                if (parsed.type === 'host_decision') {
+                  console.log(`🎯 收到Host决策: ${parsed.action}`);
+                  
+                  if (currentRound) {
+                    const hostDecision: MAHostDecision = {
+                      action: parsed.action,
+                      reason: parsed.reason,
+                      next_agents: parsed.next_agents,
+                      consensus_level: parsed.consensus_level,
+                      timestamp: parsed.timestamp,
+                    };
+                    currentRound.hostDecision = hostDecision;
+                    
+                    // 更新共识趋势
+                    if (parsed.consensus_level !== undefined) {
+                      multiAgentConsensusTrend.push(parsed.consensus_level);
+                    }
+                    
+                    // 实时更新
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              multiAgentData: {
+                                rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                                status: multiAgentStatus,
+                                consensusTrend: multiAgentConsensusTrend,
+                              },
+                            }
+                          : msg
+                      )
+                    );
+                  }
+                  continue;
+                }
+                
+                // 轮次完成事件
+                if (parsed.type === 'round_complete') {
+                  console.log(`✅ 第 ${parsed.round} 轮完成`);
+                  continue;
+                }
+                
+                // 会话完成事件
+                if (parsed.type === 'session_complete') {
+                  console.log(`🎉 多Agent会话完成，状态: ${parsed.status}`);
+                  multiAgentStatus = parsed.status;
+                  
+                  // 保存最后一轮
+                  if (currentRound) {
+                    multiAgentRounds.push(currentRound);
+                    currentRound = null;
+                  }
+                  
+                  // 最终更新
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: currentContent || '多Agent协作完成',
+                            multiAgentData: {
+                              rounds: multiAgentRounds,
+                              status: multiAgentStatus,
+                              consensusTrend: multiAgentConsensusTrend,
+                            },
+                          }
+                        : msg
+                    )
+                  );
+                  continue;
+                }
+                
+                // 错误事件
+                if (parsed.type === 'error') {
+                  console.error('❌ 多Agent错误:', parsed.error);
+                  currentContent = `多Agent协作失败: ${parsed.error}`;
+                  multiAgentStatus = 'terminated';
+                  continue;
+                }
+              }
+              
+              // ========== 单Agent模式事件处理 ==========
               // 处理 thinking、content 和 sources
               if (parsed.thinking !== undefined && parsed.thinking !== null) {
                 currentThinking = parsed.thinking;
@@ -313,19 +469,21 @@ const ChatInterface: React.FC = () => {
                 console.log('收到搜索来源:', currentSources.length, '条');
               }
 
-              // 实时更新消息（打字机效果）
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? {
-                        ...msg,
-                        content: currentContent,
-                        thinking: currentThinking || undefined,
-                        sources: currentSources || msg.sources, // 保留或更新 sources
-                      }
-                    : msg
-                )
-              );
+              // 实时更新消息（打字机效果）- 仅单Agent模式
+              if (chatMode === 'single') {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? {
+                          ...msg,
+                          content: currentContent,
+                          thinking: currentThinking || undefined,
+                          sources: currentSources || msg.sources, // 保留或更新 sources
+                        }
+                      : msg
+                  )
+                );
+              }
             } catch (error) {
               console.error('解析 SSE 数据失败:', error, '数据:', data);
             }
@@ -434,6 +592,25 @@ const ChatInterface: React.FC = () => {
               <option value="volcano">火山云模型</option>
             </select>
           </label>
+          <label className="mode-switch">
+            <span>模式：</span>
+            <button
+              className={`mode-btn ${chatMode === 'single' ? 'active' : ''}`}
+              onClick={() => setChatMode('single')}
+              disabled={isLoading}
+              title="单Agent模式：快速响应"
+            >
+              普通
+            </button>
+            <button
+              className={`mode-btn ${chatMode === 'multi_agent' ? 'active' : ''}`}
+              onClick={() => setChatMode('multi_agent')}
+              disabled={isLoading}
+              title="多Agent协作模式：深度规划和分析"
+            >
+              🧠 Smart AI
+            </button>
+          </label>
           <button onClick={clearHistory} className="clear-btn">
             清空历史
           </button>
@@ -452,7 +629,17 @@ const ChatInterface: React.FC = () => {
             className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
           >
             <div className="message-content">
-              {message.role === 'assistant' && message.thinking && (
+              {/* 多Agent模式展示 */}
+              {message.role === 'assistant' && message.multiAgentData && (
+                <MultiAgentDisplay
+                  rounds={message.multiAgentData.rounds}
+                  status={message.multiAgentData.status}
+                  consensusTrend={message.multiAgentData.consensusTrend}
+                />
+              )}
+              
+              {/* 单Agent模式展示 */}
+              {message.role === 'assistant' && !message.multiAgentData && message.thinking && (
                 <div className="thinking-content">
                   <div className="thinking-label">思考过程：</div>
                   <div className="thinking-text">
@@ -469,7 +656,7 @@ const ChatInterface: React.FC = () => {
                     message.content
                   )
                 ) : (
-                  message.role === 'assistant' && !message.thinking ? '正在思考...' : null
+                  message.role === 'assistant' && !message.thinking && !message.multiAgentData ? '正在思考...' : null
                 )}
               </div>
               {message.role === 'assistant' && message.sources && message.sources.length > 0 && (

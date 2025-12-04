@@ -285,12 +285,38 @@ export const extractPlanData = (text: string): PlanData | null => {
       }
     }
 
-    // 2. 尝试匹配包含 "tool": "create_plan" 的完整 JSON
+    // 2. 尝试从 Markdown 代码块中提取（如 ```json { ... } ```）
+    const codeBlockMatch = text.match(/```(?:json)?\s*\n?(\{[\s\S]*?\})\s*\n?```/);
+    if (codeBlockMatch) {
+      try {
+        let jsonStr = codeBlockMatch[1].trim();
+        jsonStr = removeJSONComments(jsonStr);
+        const planData = JSON.parse(jsonStr);
+        
+        // 检查是否是有效的计划数据（带或不带tool字段）
+        const hasValidStructure = planData.plan_id && planData.title && planData.goal;
+        if (hasValidStructure) {
+          console.log('✅ 从Markdown代码块中提取计划数据:', {
+            source: 'code block',
+            tool: planData.tool || 'no tool field',
+            plan_id: planData.plan_id,
+            title: planData.title,
+            hasTasks: !!planData.tasks
+          });
+          return planData;
+        }
+      } catch (e) {
+        console.warn('⚠️ 从代码块提取失败:', e);
+      }
+    }
+    
+    // 3. 尝试匹配包含 tool 字段的完整 JSON
     // 找到从第一个 { 开始到最后一个 } 的完整 JSON
     const startIndex = text.indexOf('{');
     if (startIndex !== -1) {
-      // 检查是否包含 create_plan 标识
-      if (text.includes('"tool"') && text.includes('create_plan')) {
+      // ✅ 检查是否包含计划相关标识（不再限制只有create_plan）
+      const hasPlanIndicators = text.includes('"tool"') || text.includes('plan_id') || text.includes('"title"');
+      if (hasPlanIndicators) {
         // 找到完整的 JSON 字符串
         let braceCount = 0;
         let jsonEndIndex = -1;
@@ -337,10 +363,25 @@ export const extractPlanData = (text: string): PlanData | null => {
               jsonStr = removeJSONComments(jsonStr);
               
               const planData = JSON.parse(jsonStr);
-              if (planData.tool === 'create_plan' && planData.title && planData.goal && planData.tasks) {
+              
+              // ✅ 支持 create_plan, update_plan, get_plan 的结果
+              const isValidTool = ['create_plan', 'update_plan', 'get_plan'].includes(planData.tool);
+              
+              if (isValidTool && planData.title && planData.goal && planData.tasks) {
                 console.log('✅ 成功提取计划数据:', {
+                  tool: planData.tool,
                   title: planData.title,
                   tasksCount: planData.tasks.length
+                });
+                return planData;
+              }
+              
+              // ✅ 新增：也支持没有 tool 字段的纯计划数据（AI直接输出的情况）
+              if (!planData.tool && planData.plan_id && planData.title && planData.goal) {
+                console.log('✅ 成功提取纯计划数据（无tool字段）:', {
+                  plan_id: planData.plan_id,
+                  title: planData.title,
+                  hasCustom: !!planData.tasks
                 });
                 return planData;
               }

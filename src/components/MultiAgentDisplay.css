@@ -1,0 +1,354 @@
+/* 多Agent展示容器 */
+.multi-agent-display {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* 顶部控制栏 */
+.multi-agent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px 8px 0 0;
+  color: white;
+  margin-bottom: 16px;
+}
+
+.header-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.status-badge[data-status='in_progress'] {
+  background: rgba(255, 193, 7, 0.3);
+}
+
+.status-badge[data-status='converged'] {
+  background: rgba(76, 175, 80, 0.3);
+}
+
+.status-badge[data-status='terminated'] {
+  background: rgba(244, 67, 54, 0.3);
+}
+
+.rounds-count {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.control-btn {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 共识趋势图 */
+.consensus-trend {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.trend-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.trend-chart {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  height: 80px;
+  padding: 0 8px;
+}
+
+.trend-bar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.trend-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.trend-bar:hover {
+  opacity: 0.8;
+  transform: scaleY(1.05);
+}
+
+.trend-round-label {
+  font-size: 11px;
+  color: #666;
+}
+
+/* 轮次列表 */
+.rounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 轮次项 */
+.round-item {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.round-item.last-round {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.round-item.expanded {
+  border-color: #667eea;
+}
+
+/* 轮次标题 */
+.round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.round-header:hover {
+  background: #f0f0f0;
+}
+
+.round-item.expanded .round-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.round-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.round-number {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.consensus-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: white;
+  font-weight: 500;
+}
+
+.round-agents {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #e3f2fd;
+  color: #1976d2;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.round-item.expanded .agent-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.expand-icon {
+  font-size: 12px;
+  transition: transform 0.3s;
+  color: #666;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.round-item.expanded .expand-icon {
+  color: white;
+}
+
+/* 轮次内容 */
+.round-content {
+  padding: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Agent输出 */
+.agent-output {
+  border-left: 4px solid #e0e0e0;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-radius: 0 8px 8px 0;
+}
+
+.agent-output.agent-planner {
+  border-left-color: #2196f3;
+  background: #e3f2fd;
+}
+
+.agent-output.agent-critic {
+  border-left-color: #ff9800;
+  background: #fff3e0;
+}
+
+.agent-output.agent-host {
+  border-left-color: #9c27b0;
+  background: #f3e5f5;
+}
+
+.agent-output.agent-reporter {
+  border-left-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.agent-icon {
+  font-size: 20px;
+}
+
+.agent-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.output-type {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 11px;
+  color: #666;
+}
+
+.agent-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Host决策 */
+.host-decision {
+  border: 2px solid #9c27b0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+}
+
+.decision-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.decision-icon {
+  font-size: 20px;
+}
+
+.decision-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #6a1b9a;
+}
+
+.decision-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: #4a148c;
+}
+
+.decision-action,
+.decision-reason,
+.decision-next {
+  line-height: 1.5;
+}
+
+.decision-action strong,
+.decision-reason strong,
+.decision-next strong {
+  color: #6a1b9a;
+  margin-right: 4px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .multi-agent-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .round-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .round-agents {
+    width: 100%;
+  }
+
+  .trend-chart {
+    height: 60px;
+  }
+}
+
