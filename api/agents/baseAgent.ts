@@ -209,21 +209,76 @@ export abstract class BaseAgent {
   }
 
   /**
-   * 从AI回复中提取JSON（通用方法）
+   * 修复常见的JSON格式错误
+   */
+  protected fixCommonJSONErrors(jsonStr: string): string {
+    let fixed = jsonStr;
+    
+    // 1. 移除末尾多余的逗号
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+    
+    // 2. 修复单引号为双引号
+    fixed = fixed.replace(/'/g, '"');
+    
+    // 3. 修复未闭合的字符串（尝试在末尾添加引号）
+    const lines = fixed.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // 简单检查：如果行中有奇数个引号，可能需要补全
+      const quoteCount = (line.match(/"/g) || []).length;
+      if (quoteCount % 2 !== 0 && !line.trim().endsWith(',') && !line.trim().endsWith('}') && !line.trim().endsWith(']')) {
+        lines[i] = line + '"';
+      }
+    }
+    fixed = lines.join('\n');
+    
+    // 4. 尝试补全未闭合的括号
+    const openBraces = (fixed.match(/{/g) || []).length;
+    const closeBraces = (fixed.match(/}/g) || []).length;
+    if (openBraces > closeBraces) {
+      fixed += '}'.repeat(openBraces - closeBraces);
+    }
+    
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+    if (openBrackets > closeBrackets) {
+      fixed += ']'.repeat(openBrackets - closeBrackets);
+    }
+    
+    return fixed;
+  }
+
+  /**
+   * 从AI回复中提取JSON（通用方法，增强容错）
    */
   protected extractJSON(text: string): any | null {
-    try {
-      // 尝试匹配 ```json ... ``` 代码块
-      const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/;
-      const jsonBlockMatch = text.match(jsonBlockRegex);
+    // 尝试多种提取策略
+    const strategies = [
+      // 策略1: 匹配 ```json ... ``` 代码块
+      () => {
+        const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/;
+        const jsonBlockMatch = text.match(jsonBlockRegex);
+        if (jsonBlockMatch) {
+          return jsonBlockMatch[1].trim();
+        }
+        return null;
+      },
       
-      if (jsonBlockMatch) {
-        return JSON.parse(jsonBlockMatch[1].trim());
-      }
-
-      // 尝试直接提取 JSON 对象
-      const startIndex = text.indexOf('{');
-      if (startIndex !== -1) {
+      // 策略2: 匹配 ``` ... ``` 代码块（可能忘记写json）
+      () => {
+        const codeBlockRegex = /```\s*([\s\S]*?)\s*```/;
+        const codeBlockMatch = text.match(codeBlockRegex);
+        if (codeBlockMatch && codeBlockMatch[1].trim().startsWith('{')) {
+          return codeBlockMatch[1].trim();
+        }
+        return null;
+      },
+      
+      // 策略3: 直接提取JSON对象
+      () => {
+        const startIndex = text.indexOf('{');
+        if (startIndex === -1) return null;
+        
         let braceCount = 0;
         let jsonEndIndex = -1;
         let inString = false;
@@ -260,16 +315,41 @@ export abstract class BaseAgent {
         }
 
         if (jsonEndIndex !== -1) {
-          const jsonStr = text.substring(startIndex, jsonEndIndex);
-          return JSON.parse(jsonStr);
+          return text.substring(startIndex, jsonEndIndex);
         }
+        return null;
       }
+    ];
 
-      return null;
-    } catch (error) {
-      console.error(`❌ [${this.agentId}] 提取JSON失败:`, error);
-      return null;
+    // 依次尝试每个策略
+    for (const strategy of strategies) {
+      try {
+        const jsonStr = strategy();
+        if (!jsonStr) continue;
+        
+        // 尝试直接解析
+        try {
+          return JSON.parse(jsonStr);
+        } catch (parseError) {
+          // 如果失败，尝试修复常见错误后再解析
+          console.warn(`⚠️  [${this.agentId}] JSON解析失败，尝试修复...`);
+          const fixedJsonStr = this.fixCommonJSONErrors(jsonStr);
+          try {
+            const result = JSON.parse(fixedJsonStr);
+            console.log(`✅ [${this.agentId}] JSON修复成功`);
+            return result;
+          } catch (fixError) {
+            console.warn(`⚠️  [${this.agentId}] JSON修复失败，继续尝试下一个策略`);
+            continue;
+          }
+        }
+      } catch (error) {
+        continue;
+      }
     }
+
+    console.error(`❌ [${this.agentId}] 所有JSON提取策略失败`);
+    return null;
   }
 }
 

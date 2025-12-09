@@ -196,8 +196,11 @@ export class CriticAgent extends BaseAgent {
 
       // 提取JSON
       const jsonData = this.extractJSON(response);
+      
+      // 如果JSON解析失败或不完整，使用fallback机制
       if (!jsonData || !jsonData.position || !jsonData.critique) {
-        throw new Error('AI回复格式不正确，缺少必要的position或critique字段');
+        console.warn(`⚠️  [Critic] JSON格式不完整，使用fallback提取策略`);
+        return this.createFallbackOutput(response, round, context);
       }
 
       // 构建输出
@@ -245,6 +248,86 @@ export class CriticAgent extends BaseAgent {
       assumptions: ['计划可以优化'],
       confidence: 0.7,
     };
+  }
+
+  /**
+   * 创建fallback输出（当JSON解析失败时）
+   */
+  private createFallbackOutput(response: string, round: number, context: any): AgentOutput {
+    console.log(`🔧 [Critic] 使用fallback机制提取信息...`);
+    
+    // 从原始文本中提取关键信息
+    const lines = response.split('\n').map(l => l.trim()).filter(l => l);
+    
+    // 尝试提取批评的结论
+    let conclusion = '当前计划存在一些问题需要改进';
+    for (const line of lines) {
+      if (line.includes('问题') || line.includes('风险') || line.includes('建议') || line.includes('改进')) {
+        conclusion = line.substring(0, 100);
+        break;
+      }
+    }
+    
+    // 构建简单的位置摘要
+    const position: PositionSummary = {
+      conclusion,
+      key_reasons: [
+        '发现了一些潜在问题',
+        '需要优化和改进',
+        '建议调整计划'
+      ],
+      assumptions: [
+        '计划可以改进',
+        '风险可以规避'
+      ],
+      confidence: 0.65
+    };
+    
+    // 构建简单的批评结构
+    const targetRound = context.planner_output?.round || round;
+    const critique: Critique = {
+      target_agent: 'planner',
+      target_round: targetRound,
+      risks: [
+        {
+          risk: 'AI输出格式问题导致无法详细分析',
+          severity: 'medium',
+          impact: '批评内容可能不够结构化'
+        }
+      ],
+      suggestions: [
+        {
+          issue: '需要更清晰的批评',
+          solution: '在下一轮提供更结构化的批评',
+          priority: 'medium'
+        }
+      ],
+      validity_check: {
+        feasible: true,
+        realistic: true,
+        complete: false
+      }
+    };
+    
+    // 保存位置摘要
+    this.lastPosition = position;
+    
+    const output: AgentOutput = {
+      agent_id: this.agentId,
+      round,
+      output_type: 'critique',
+      content: `# 批评与建议\n\n${response}\n\n---\n\n⚠️  **注意**：由于AI输出格式问题，使用了简化的批评结构。讨论仍将继续。`,
+      metadata: {
+        position,
+        critique,
+        fallback: true,
+        raw_response: response.substring(0, 500)
+      },
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.log(`✅ [Critic] Fallback输出创建成功`);
+    return output;
   }
 
   /**

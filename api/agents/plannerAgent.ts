@@ -163,8 +163,11 @@ export class PlannerAgent extends BaseAgent {
 
       // 提取JSON
       const jsonData = this.extractJSON(response);
+      
+      // 如果JSON解析失败或不完整，使用fallback机制
       if (!jsonData || !jsonData.position || !jsonData.plan) {
-        throw new Error('AI回复格式不正确，缺少必要的position或plan字段');
+        console.warn(`⚠️  [Planner] JSON格式不完整，使用fallback提取策略`);
+        return this.createFallbackOutput(response, round, userQuery);
       }
 
       // 构建输出
@@ -214,6 +217,81 @@ export class PlannerAgent extends BaseAgent {
       assumptions: ['用户有足够时间执行'],
       confidence: 0.7,
     };
+  }
+
+  /**
+   * 创建fallback输出（当JSON解析失败时）
+   */
+  private createFallbackOutput(response: string, round: number, userQuery: string): AgentOutput {
+    console.log(`🔧 [Planner] 使用fallback机制提取信息...`);
+    
+    // 从原始文本中提取关键信息
+    const lines = response.split('\n').map(l => l.trim()).filter(l => l);
+    
+    // 尝试提取结论（通常包含"建议"、"应该"、"计划"等关键词）
+    let conclusion = '根据需求制定了初步计划';
+    for (const line of lines) {
+      if (line.includes('建议') || line.includes('应该') || line.includes('计划') || line.includes('目标')) {
+        conclusion = line.substring(0, 100);
+        break;
+      }
+    }
+    
+    // 构建简单的位置摘要
+    const position: PositionSummary = {
+      conclusion,
+      key_reasons: [
+        '根据用户需求分析',
+        '考虑实际可行性',
+        '结合时间和资源约束'
+      ],
+      assumptions: [
+        '用户有足够的时间投入',
+        '外部环境相对稳定'
+      ],
+      confidence: 0.7
+    };
+    
+    // 构建简单的计划结构
+    const plan: Plan = {
+      title: `${userQuery.substring(0, 30)}计划`,
+      goal: userQuery,
+      phases: [
+        {
+          phase_name: '执行阶段',
+          duration: '待定',
+          tasks: [
+            {
+              title: '详细规划（AI输出格式问题，需要重新生成）',
+              estimated_hours: 0,
+              deadline: '待定',
+              tags: ['规划']
+            }
+          ]
+        }
+      ],
+      total_estimated_hours: 0
+    };
+    
+    // 保存位置摘要
+    this.lastPosition = position;
+    
+    const output: AgentOutput = {
+      agent_id: this.agentId,
+      round,
+      output_type: 'plan',
+      content: `# ${plan.title}\n\n${response}\n\n---\n\n⚠️  **注意**：由于AI输出格式问题，使用了简化的计划结构。讨论仍将继续。`,
+      metadata: {
+        position,
+        plan,
+        fallback: true,
+        raw_response: response.substring(0, 500)
+      },
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.log(`✅ [Planner] Fallback输出创建成功`);
+    return output;
   }
 
   /**
