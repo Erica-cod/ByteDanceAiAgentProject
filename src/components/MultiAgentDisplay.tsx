@@ -165,7 +165,14 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
       {/* 共识趋势图 */}
       {consensusTrend.length > 0 && (
         <div className="consensus-trend">
-          <div className="trend-label">共识趋势</div>
+          <div className="trend-label">
+            共识趋势
+            {consensusTrend.length > 0 && (
+              <span className="trend-summary">
+                {' '}(当前: {(consensusTrend[consensusTrend.length - 1] * 100).toFixed(1)}%)
+              </span>
+            )}
+          </div>
           <div className="trend-chart">
             {consensusTrend.map((level, index) => (
               <div key={index} className="trend-bar-container">
@@ -177,9 +184,13 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                   }}
                   title={`第${index + 1}轮: ${(level * 100).toFixed(1)}%`}
                 />
-                <div className="trend-round-label">{index + 1}</div>
+                <div className="trend-round-label">R{index + 1}</div>
+                <div className="trend-value">{(level * 100).toFixed(0)}%</div>
               </div>
             ))}
+          </div>
+          <div className="trend-note">
+            📊 共识趋势显示有Host决策的轮次（Reporter轮次无共识数据）
           </div>
         </div>
       )}
