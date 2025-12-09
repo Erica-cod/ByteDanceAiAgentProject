@@ -40,9 +40,20 @@ class VolcengineEmbeddingService {
   constructor() {
     this.apiKey = process.env.ARK_API_KEY || '';
     // 火山引擎的embedding endpoint
+    // 注意：这是纯文本embedding，不是multimodal
     this.apiUrl = process.env.ARK_EMBEDDING_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
-    // 使用火山引擎的embedding模型
-    this.model = process.env.ARK_EMBEDDING_MODEL || 'doubao-embedding';
+    // 使用火山引擎的文本embedding模型
+    // 正确的模型名称：doubao-embedding-text-240715
+    // 也可以使用 ep-xxxxx (endpoint模型，需要在火山引擎创建)
+    this.model = process.env.ARK_EMBEDDING_MODEL || 'doubao-embedding-text-240715';
+    
+    if (!this.apiKey) {
+      console.warn('⚠️  [Embedding] ARK_API_KEY 未配置，embedding功能将不可用');
+      console.warn('⚠️  [Embedding] 系统将自动使用简单文本相似度作为fallback');
+    } else {
+      console.log(`✅ [Embedding] 配置完成: ${this.model}`);
+      console.log(`   API URL: ${this.apiUrl}`);
+    }
   }
 
   /**
@@ -94,7 +105,20 @@ class VolcengineEmbeddingService {
     }
 
     try {
-      console.log(`🔍 批量获取 ${texts.length} 个文本的embedding...`);
+      console.log(`🔍 [Embedding] 批量获取 ${texts.length} 个文本的embedding...`);
+      console.log(`   模型: ${this.model}`);
+      console.log(`   端点: ${this.apiUrl}`);
+      
+      const requestBody = {
+        model: this.model,
+        input: texts,
+        encoding_format: 'float', // 明确指定返回浮点数格式
+      };
+      
+      console.log(`   请求体预览: ${JSON.stringify({
+        ...requestBody,
+        input: texts.map(t => t.substring(0, 50) + '...')
+      })}`);
       
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -102,14 +126,30 @@ class VolcengineEmbeddingService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
         },
-        body: JSON.stringify({
-          model: this.model,
-          input: texts,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ [Embedding] API返回错误 (${response.status})`);
+        console.error(`   错误详情: ${errorText}`);
+        
+        // 解析错误信息，提供有用的提示
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.code === 'InvalidEndpointOrModel.NotFound') {
+            throw new Error(
+              `模型 "${this.model}" 不存在或无权限访问。\n` +
+              `请检查：\n` +
+              `1. 在火山引擎控制台确认模型名称\n` +
+              `2. 确保API Key有权限访问embedding模型\n` +
+              `3. 或设置 ARK_EMBEDDING_MODEL 环境变量为正确的模型名`
+            );
+          }
+        } catch (parseError) {
+          // 如果不是JSON，直接抛出原始错误
+        }
+        
         throw new Error(`Embedding API 错误 (${response.status}): ${errorText}`);
       }
 
@@ -118,13 +158,14 @@ class VolcengineEmbeddingService {
       // 火山引擎批量返回格式: { data: [{ embedding: [...] }, { embedding: [...] }] }
       if (data.data && Array.isArray(data.data)) {
         const embeddings = data.data.map((item: any) => item.embedding);
-        console.log(`✅ 成功获取 ${embeddings.length} 个embedding向量`);
+        console.log(`✅ [Embedding] 成功获取 ${embeddings.length} 个向量 (维度: ${embeddings[0]?.length || 'unknown'})`);
         return embeddings;
       }
 
+      console.error(`❌ [Embedding] API返回格式错误:`, JSON.stringify(data).substring(0, 200));
       throw new Error('Embedding API 返回格式错误');
     } catch (error: any) {
-      console.error('❌ 批量获取embedding失败:', error);
+      console.error('❌ [Embedding] 批量获取失败:', error.message);
       throw error;
     }
   }

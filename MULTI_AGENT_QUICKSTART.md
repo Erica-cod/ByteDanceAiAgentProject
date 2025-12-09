@@ -13,9 +13,15 @@ ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
 ARK_MODEL=doubao-1-5-thinking-pro-250415
 
 # Embedding模型配置（用于相似度计算，可选）
+# 如果不配置或配置错误，系统会自动降级到简单文本相似度
 ARK_EMBEDDING_API_URL=https://ark.cn-beijing.volces.com/api/v3/embeddings
-ARK_EMBEDDING_MODEL=doubao-embedding
+ARK_EMBEDDING_MODEL=doubao-embedding-text-240715  # 或使用 ep-xxxxx (endpoint ID)
 ```
+
+**注意**：
+- Embedding配置是**可选的**，如果不配置系统会自动使用简单相似度
+- 关于embedding的详细配置方法，请参考 [Embedding配置指南](./docs/EMBEDDING_SETUP_GUIDE.md)
+- 如果看到 "doubao-embedding does not exist" 错误，说明需要在火山引擎控制台创建endpoint
 
 ### 2. 安装依赖
 
