@@ -165,8 +165,17 @@ export class PlannerAgent extends BaseAgent {
       const jsonData = this.extractJSON(response);
       
       // 如果JSON解析失败或不完整，使用fallback机制
-      if (!jsonData || !jsonData.position || !jsonData.plan) {
-        console.warn(`⚠️  [Planner] JSON格式不完整，使用fallback提取策略`);
+      if (!jsonData) {
+        console.warn(`⚠️  [Planner] JSON提取完全失败，使用fallback提取策略`);
+        console.warn(`   完整响应内容:\n${response.substring(0, 1000)}`);
+        return this.createFallbackOutput(response, round, userQuery);
+      }
+      
+      if (!jsonData.position || !jsonData.plan) {
+        console.warn(`⚠️  [Planner] JSON结构不完整`);
+        console.warn(`   - position存在: ${!!jsonData.position}`);
+        console.warn(`   - plan存在: ${!!jsonData.plan}`);
+        console.warn(`   - JSON keys: ${Object.keys(jsonData).join(', ')}`);
         return this.createFallbackOutput(response, round, userQuery);
       }
 
