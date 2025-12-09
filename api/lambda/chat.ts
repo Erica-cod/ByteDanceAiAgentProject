@@ -1068,6 +1068,29 @@ async function handleMultiAgentMode(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
+  // 添加连接状态标志
+  let isStreamClosed = false;
+  
+  // 安全的写入辅助函数
+  const safeWrite = async (data: string) => {
+    if (isStreamClosed) {
+      console.warn('⚠️  [SSE] 流已关闭，跳过写入');
+      return false;
+    }
+    
+    try {
+      await writer.write(encoder.encode(data));
+      return true;
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.code === 'ABORT_ERR') {
+        console.warn('⚠️  [SSE] 客户端关闭了连接');
+        isStreamClosed = true;
+        return false;
+      }
+      throw error;
+    }
+  };
+
   // 异步处理多Agent协作
   (async () => {
     try {
@@ -1077,7 +1100,7 @@ async function handleMultiAgentMode(
         type: 'init',
         mode: 'multi_agent',
       });
-      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+      await safeWrite(`data: ${initData}\n\n`);
 
       // 创建编排器
       const orchestrator = new MultiAgentOrchestrator(
@@ -1089,6 +1112,8 @@ async function handleMultiAgentMode(
         {
           // Agent输出回调
           onAgentOutput: async (output: AgentOutput) => {
+            if (isStreamClosed) return;
+            
             console.log(`📤 [SSE] 发送Agent输出: ${output.agent_id}`);
             
             const sseData = JSON.stringify({
@@ -1101,11 +1126,13 @@ async function handleMultiAgentMode(
               timestamp: output.timestamp,
             });
             
-            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // Host决策回调
           onHostDecision: async (decision: HostDecision, analysis: any) => {
+            if (isStreamClosed) return;
+            
             console.log(`📤 [SSE] 发送Host决策: ${decision.action}`);
             
             const sseData = JSON.stringify({
@@ -1117,11 +1144,13 @@ async function handleMultiAgentMode(
               timestamp: new Date().toISOString(),
             });
             
-            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // 轮次完成回调
           onRoundComplete: async (round: number) => {
+            if (isStreamClosed) return;
+            
             console.log(`📤 [SSE] 第 ${round} 轮完成`);
             
             const sseData = JSON.stringify({
@@ -1130,11 +1159,13 @@ async function handleMultiAgentMode(
               timestamp: new Date().toISOString(),
             });
             
-            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // 会话完成回调
           onSessionComplete: async (session: MultiAgentSession) => {
+            if (isStreamClosed) return;
+            
             console.log(`📤 [SSE] 多Agent会话完成`);
             
             // 保存最终报告到数据库
@@ -1165,7 +1196,7 @@ async function handleMultiAgentMode(
               timestamp: new Date().toISOString(),
             });
             
-            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+            await safeWrite(`data: ${sseData}\n\n`);
           },
         }
       );
@@ -1175,22 +1206,43 @@ async function handleMultiAgentMode(
       await orchestrator.run(userQuery);
 
       // 发送完成信号
-      await writer.write(encoder.encode('data: [DONE]\n\n'));
-      await writer.close();
-      
-      console.log('✅ [MultiAgent] 多Agent协作完成，SSE流关闭');
+      if (!isStreamClosed) {
+        await safeWrite('data: [DONE]\n\n');
+        await writer.close();
+        console.log('✅ [MultiAgent] 多Agent协作完成，SSE流正常关闭');
+      } else {
+        console.log('⚠️  [MultiAgent] 多Agent协作完成，但客户端已提前关闭连接');
+        try {
+          await writer.close();
+        } catch (e) {
+          // 忽略关闭错误
+        }
+      }
     } catch (error: any) {
       console.error('❌ [MultiAgent] 多Agent协作失败:', error);
       
-      const errorData = JSON.stringify({
-        type: 'error',
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      });
+      // 如果连接还在，发送错误信息
+      if (!isStreamClosed) {
+        try {
+          const errorData = JSON.stringify({
+            type: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          });
+          
+          await safeWrite(`data: ${errorData}\n\n`);
+          await safeWrite('data: [DONE]\n\n');
+        } catch (writeError) {
+          console.error('❌ 发送错误信息失败:', writeError);
+        }
+      }
       
-      await writer.write(encoder.encode(`data: ${errorData}\n\n`));
-      await writer.write(encoder.encode('data: [DONE]\n\n'));
-      await writer.close();
+      // 尝试关闭writer
+      try {
+        await writer.close();
+      } catch (closeError) {
+        // 忽略关闭错误
+      }
     }
   })();
 
