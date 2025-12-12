@@ -30,11 +30,57 @@
 - [火山引擎豆包大模型指南](./docs/VOLCENGINE_DOUBAO_GUIDE.md) - 火山引擎在线大模型集成和使用
 - [数据库设计文档](./docs/DATABASE_DESIGN.md) - MongoDB 数据模型和API设计
 
+## 环境配置
+
+### 1. 配置环境变量
+
+项目需要配置环境变量才能正常运行。请按照以下步骤操作：
+
+```bash
+# 1. 复制环境变量模板文件
+cp .env.example .env.local
+
+# 2. 编辑 .env.local 文件，填入你的真实配置
+# 必须配置的项目：
+#   - TAVILY_API_KEY: 在 https://tavily.com/ 注册获取
+#   - ARK_API_KEY: 在 https://console.volcengine.com/ark 注册获取
+#   - ARK_MODEL: 你的火山引擎模型 Endpoint ID
+#   - MONGODB_URI: MongoDB 连接地址
+```
+
+### 2. 获取 API 密钥
+
+#### Tavily API（联网搜索）
+1. 访问 [Tavily 官网](https://tavily.com/)
+2. 注册账号并登录
+3. 在控制台获取 API Key
+4. 将 API Key 填入 `.env.local` 的 `TAVILY_API_KEY`
+
+#### 火山引擎豆包大模型
+1. 访问 [火山引擎控制台](https://console.volcengine.com/ark)
+2. 注册账号并开通豆包大模型服务
+3. 创建推理接入点，获取 Endpoint ID
+4. 在 API 管理中获取 API Key
+5. 将配置填入 `.env.local` 的 `ARK_API_KEY` 和 `ARK_MODEL`
+
+#### MongoDB
+- 本地开发：确保本地安装了 MongoDB，使用默认配置即可
+- 生产环境：使用 Docker Compose 会自动启动 MongoDB 容器
+
+**⚠️ 重要提示：**
+- 请勿将包含真实 API 密钥的 `.env.local` 或 `.env.production` 文件提交到 Git
+- 这些文件已在 `.gitignore` 中配置忽略
+- 仅提交 `.env.example` 模板文件
+
 ## 开发
 
 ```bash
 # 安装依赖
 npm install
+
+# 配置环境变量（参考上面的"环境配置"章节）
+cp .env.example .env.local
+# 然后编辑 .env.local 填入真实配置
 
 # 开发模式
 npm run dev
