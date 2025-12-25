@@ -115,11 +115,18 @@
 
 .chat-messages {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0; /* 关键：保证 Virtuoso 在 flex 容器里能正确计算高度 */
+  overflow: hidden; /* 避免出现双滚动条（滚动交给 Virtuoso 的 Scroller） */
+}
+
+/* Virtuoso 的滚动容器：负责 padding */
+.chat-messages-scroller {
   padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+}
+
+/* Virtuoso 的空状态：撑满可视区域并居中 */
+.empty-state-virtuoso {
+  height: 100%;
 }
 
 .empty-state {

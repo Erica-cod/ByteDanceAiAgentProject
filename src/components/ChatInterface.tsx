@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import StreamingMarkdown from './StreamingMarkdown';
 import ConversationList from './ConversationList';
 import MultiAgentDisplay, { type RoundData, type AgentOutput as MAAgentOutput, type HostDecision as MAHostDecision } from './MultiAgentDisplay';
@@ -11,15 +12,23 @@ import {
   getConversationDetails,
   Conversation,
 } from '../utils/conversationAPI';
+import {
+  readConversationCache,
+  writeConversationCache,
+  mergeServerMessagesWithCache,
+  type CachedMessage,
+} from '../utils/conversationCache';
 import './ChatInterface.css';
 
 interface Message {
   id: string;
+  clientMessageId?: string; // 服务端回传：用于本地缓存与服务端消息精确对齐
   role: 'user' | 'assistant';
   content: string;
   thinking?: string; // thinking 内容
   sources?: Array<{title: string; url: string}>; // 搜索来源链接
   timestamp: number;
+  pendingSync?: boolean; // 本地临时消息：还未确认已被服务端持久化
   multiAgentData?: {  // 新增：多agent数据
     rounds: RoundData[];
     status: 'in_progress' | 'converged' | 'terminated';
@@ -72,15 +81,10 @@ const ChatInterface: React.FC = () => {
   const [conversationId, setConversationId] = useState<string | null>(null); // 当前对话 ID
   const [conversations, setConversations] = useState<Conversation[]>([]); // 对话列表
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null); // thinking 区域底部锚点
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map()); // 存储每个对话的消息计数 DOM 元素
-
-  // 自动滚动到底部
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   useEffect(() => {
     // 先滚动 thinking 区域（如果存在）
@@ -90,9 +94,8 @@ const ChatInterface: React.FC = () => {
         thinkingContainer.scrollTop = thinkingContainer.scrollHeight;
       }
     }
-    // 然后滚动整个消息区域到底部
-    scrollToBottom();
-  }, [messages]);//注意：这里的思考区域滚动会干扰消息区域的滚动，所以需要分开处理。我们首先滚动 thinking 区域，然后再滚动整个消息区域。
+    // 全局滚动交给 Virtuoso 的 followOutput 处理（只在用户位于底部时自动跟随）
+  }, [messages]);//注意：这里的思考区域滚动会干扰消息区域的滚动，所以需要分开处理。
   //至于thinking区域滚动到最底部，我们使用了一个锚点（.thinking-anchor），它是一个不可见的 div，用于触发滚动操作。
 
   // 初始化用户
@@ -124,6 +127,24 @@ const ChatInterface: React.FC = () => {
   const loadConversationMessages = async (convId: string) => {
     try {
       console.log('🔄 开始加载对话消息:', { userId, convId });
+
+      // 1) 先读本地缓存，做到“秒开”
+      const cached = readConversationCache(convId);
+      if (cached.length > 0) {
+        const cachedMessages: Message[] = cached.map((m) => ({
+          id: m.id,
+          clientMessageId: m.clientMessageId,
+          role: m.role,
+          content: m.content,
+          thinking: m.thinking,
+          sources: m.sources as any,
+          timestamp: m.timestamp,
+          pendingSync: m.pendingSync,
+        }));
+        setMessages(cachedMessages);
+      }
+
+      // 2) 再拉服务端权威数据并对齐回写
       const msgs = await getConversationMessages(userId, convId);
       console.log('📦 收到消息数据:', msgs);
       console.log('📊 消息数量:', msgs.length);
@@ -148,7 +169,32 @@ const ChatInterface: React.FC = () => {
         }
       });
       
-      setMessages(formattedMessages);
+      const serverForCache: CachedMessage[] = msgs.map((msg) => ({
+        id: msg.messageId,
+        clientMessageId: msg.clientMessageId,
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking,
+        sources: msg.sources as any,
+        timestamp: new Date(msg.timestamp).getTime(),
+      }));
+
+      // 合并服务端消息 + 本地待同步消息
+      const merged = mergeServerMessagesWithCache(serverForCache, cached);
+
+      const mergedForUI: Message[] = merged.map((m) => ({
+        id: m.id,
+        clientMessageId: m.clientMessageId,
+        role: m.role,
+        content: m.content,
+        thinking: m.thinking,
+        sources: m.sources as any,
+        timestamp: m.timestamp,
+        pendingSync: m.pendingSync,
+      }));
+
+      setMessages(mergedForUI);
+      writeConversationCache(convId, merged);
     } catch (error) {
       console.error('❌ 加载消息失败:', error);
       setMessages([]);
@@ -163,7 +209,17 @@ const ChatInterface: React.FC = () => {
   // 保存消息到本地存储（向后兼容）
   const saveMessages = (newMessages: Message[]) => {
     if (conversationId) {
-      localStorage.setItem(`chat_${conversationId}`, JSON.stringify(newMessages));
+      const cached: CachedMessage[] = newMessages.map((m) => ({
+        id: m.id,
+        clientMessageId: m.clientMessageId,
+        role: m.role,
+        content: m.content,
+        thinking: m.thinking,
+        sources: m.sources as any,
+        timestamp: m.timestamp,
+        pendingSync: m.pendingSync,
+      }));
+      writeConversationCache(conversationId, cached);
     }
   };
 
@@ -213,10 +269,11 @@ const ChatInterface: React.FC = () => {
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       role: 'user',
       content: inputValue,
       timestamp: Date.now(),
+      pendingSync: true,
     };
 
     const updatedMessages = [...messages, userMessage];
@@ -229,7 +286,7 @@ const ChatInterface: React.FC = () => {
     abortControllerRef.current = new AbortController();
 
     // 创建助手消息占位符
-    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessageId = `client_${Date.now() + 1}_${Math.random().toString(36).slice(2, 8)}`;
 
     try {
       const assistantMessage: Message = {
@@ -237,6 +294,7 @@ const ChatInterface: React.FC = () => {
         role: 'assistant',
         content: '',
         timestamp: Date.now(),
+        pendingSync: true,
       };
 
       setMessages([...updatedMessages, assistantMessage]);
@@ -253,6 +311,8 @@ const ChatInterface: React.FC = () => {
           userId: userId,
           conversationId: conversationId,
           mode: chatMode, // 新增：传递聊天模式
+          clientUserMessageId: userMessage.id,
+          clientAssistantMessageId: assistantMessageId,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -618,65 +678,78 @@ const ChatInterface: React.FC = () => {
       </div>
 
       <div className="chat-messages">
-        {messages.length === 0 && (
-          <div className="empty-state">
-            <p>开始与 AI 兴趣教练对话吧！</p>
-          </div>
-        )}
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
-          >
-            <div className="message-content">
-              {/* 多Agent模式展示 */}
-              {message.role === 'assistant' && message.multiAgentData && (
-                <MultiAgentDisplay
-                  rounds={message.multiAgentData.rounds}
-                  status={message.multiAgentData.status}
-                  consensusTrend={message.multiAgentData.consensusTrend}
-                />
-              )}
-              
-              {/* 单Agent模式展示 */}
-              {message.role === 'assistant' && !message.multiAgentData && message.thinking && (
-                <div className="thinking-content">
-                  <div className="thinking-label">思考过程：</div>
-                  <div className="thinking-text">
-                    {message.thinking}
-                    <div ref={thinkingEndRef} className="thinking-anchor" />
+        <Virtuoso
+          ref={virtuosoRef}
+          style={{ height: '100%' }}
+          data={messages}
+          computeItemKey={(_index: number, item: Message) => item.id}
+          followOutput={(isAtBottom) => (isAtBottom ? 'smooth' : false)}
+          components={{
+            Scroller: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+              function Scroller(props, ref) {
+                return <div {...props} ref={ref} className="chat-messages-scroller" />;
+              }
+            ),
+            EmptyPlaceholder: () => (
+              <div className="empty-state empty-state-virtuoso">
+                <p>开始与 AI 兴趣教练对话吧！</p>
+              </div>
+            ),
+            Footer: () =>
+              isLoading ? (
+                <div className="message assistant-message">
+                  <div className="message-content">
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
                   </div>
                 </div>
-              )}
-              <div className="message-text">
-                {message.content ? (
-                  message.role === 'assistant' ? (
-                    <StreamingMarkdown content={message.content} />
-                  ) : (
-                    message.content
-                  )
-                ) : (
-                  message.role === 'assistant' && !message.thinking && !message.multiAgentData ? '正在思考...' : null
+              ) : null,
+          }}
+          itemContent={(_, message) => (
+            <div
+              className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
+            >
+              <div className="message-content">
+                {/* 多Agent模式展示 */}
+                {message.role === 'assistant' && message.multiAgentData && (
+                  <MultiAgentDisplay
+                    rounds={message.multiAgentData.rounds}
+                    status={message.multiAgentData.status}
+                    consensusTrend={message.multiAgentData.consensusTrend}
+                  />
+                )}
+
+                {/* 单Agent模式展示 */}
+                {message.role === 'assistant' && !message.multiAgentData && message.thinking && (
+                  <div className="thinking-content">
+                    <div className="thinking-label">思考过程：</div>
+                    <div className="thinking-text">
+                      {message.thinking}
+                      <div ref={thinkingEndRef} className="thinking-anchor" />
+                    </div>
+                  </div>
+                )}
+                <div className="message-text">
+                  {message.content ? (
+                    message.role === 'assistant' ? (
+                      <StreamingMarkdown content={message.content} />
+                    ) : (
+                      message.content
+                    )
+                  ) : message.role === 'assistant' && !message.thinking && !message.multiAgentData ? (
+                    '正在思考...'
+                  ) : null}
+                </div>
+                {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+                  <SourceLinks sources={message.sources} />
                 )}
               </div>
-              {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-                <SourceLinks sources={message.sources} />
-              )}
             </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="message assistant-message">
-            <div className="message-content">
-              <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+          )}
+        />
       </div>
 
       <div className="chat-input-container">

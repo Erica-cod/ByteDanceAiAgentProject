@@ -11,6 +11,7 @@ export class MessageService {
     userId: string,
     role: 'user' | 'assistant',
     content: string,
+    clientMessageId?: string,
     thinking?: string,
     modelType?: 'local' | 'volcano',
     sources?: Array<{title: string; url: string}>
@@ -20,6 +21,7 @@ export class MessageService {
 
     const message: Message = {
       messageId: uuidv4(),
+      clientMessageId,
       conversationId,
       userId,
       role,

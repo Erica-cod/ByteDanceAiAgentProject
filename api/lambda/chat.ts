@@ -20,6 +20,7 @@ import { validateToolCall, generateToolPrompt } from '../tools/toolValidator.js'
 import { routePlanningTool } from '../tools/planningTools.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
 import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/multiAgentOrchestrator.js';
+import { acquireSSESlot } from '../services/sseLimiter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
 
@@ -42,6 +43,24 @@ interface ChatRequestData {
   conversationId?: string;
   userId: string;
   mode?: 'single' | 'multi_agent';  // 聊天模式：单agent或多agent
+  /** 前端生成的消息ID：用于和本地缓存对齐（精确去重） */
+  clientUserMessageId?: string;
+  /** 前端生成的 assistant 占位消息ID：用于和本地缓存对齐（精确去重） */
+  clientAssistantMessageId?: string;
+}
+
+/**
+ * 统一返回 429（用于限流/并发限制）
+ * 注意：前端目前只判断 response.ok，不会专门解析错误体，所以这里给简洁信息即可。
+ */
+function tooManyRequests(message: string, retryAfterSec: number) {
+  return new Response(JSON.stringify({ success: false, error: message }), {
+    status: 429,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Retry-After': String(retryAfterSec),
+    },
+  });
 }
 
 // ============= System Prompt =============
@@ -498,7 +517,9 @@ async function streamVolcengineToSSEResponse(
   conversationId: string,
   userId: string,
   modelType: 'local' | 'volcano',
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  clientAssistantMessageId?: string,
+  onFinally?: () => void
 ) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -785,6 +806,7 @@ async function streamVolcengineToSSEResponse(
                     userId,
                     'assistant',
                     content || accumulatedText,
+                    clientAssistantMessageId,
                     thinking || undefined,
                     modelType,
                     searchSources || undefined  // 保存搜索来源链接
@@ -826,6 +848,13 @@ async function streamVolcengineToSSEResponse(
       const errorData = JSON.stringify({ error: error.message });
       await writer.write(encoder.encode(`data: ${errorData}\n\n`));
       await writer.close();
+    } finally {
+      // ✅ 确保释放并发名额
+      try {
+        onFinally?.();
+      } catch (e) {
+        // 忽略释放时的异常，避免影响主流程
+      }
     }
   })();
 
@@ -846,7 +875,9 @@ async function streamToSSEResponse(
   conversationId: string, 
   userId: string, 
   modelType: 'local' | 'volcano',
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  clientAssistantMessageId?: string,
+  onFinally?: () => void
 ) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -997,6 +1028,7 @@ async function streamToSSEResponse(
                       userId,
                       'assistant',
                       content || accumulatedText,
+                      clientAssistantMessageId,
                       thinking || undefined,
                       modelType,
                       searchSources || undefined  // 保存搜索来源链接
@@ -1044,6 +1076,13 @@ async function streamToSSEResponse(
       const errorData = JSON.stringify({ error: error.message });
       await writer.write(encoder.encode(`data: ${errorData}\n\n`));
       await writer.close();
+    } finally {
+      // ✅ 确保释放并发名额
+      try {
+        onFinally?.();
+      } catch (e) {
+        // 忽略释放时的异常，避免影响主流程
+      }
     }
   })();
 
@@ -1062,7 +1101,9 @@ async function streamToSSEResponse(
 async function handleMultiAgentMode(
   userQuery: string,
   userId: string,
-  conversationId: string
+  conversationId: string,
+  clientAssistantMessageId?: string,
+  onFinally?: () => void
 ) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -1177,6 +1218,7 @@ async function handleMultiAgentMode(
                   userId,
                   'assistant',
                   reporterOutput.content,
+                  clientAssistantMessageId,
                   undefined,
                   'volcano',
                   undefined
@@ -1243,6 +1285,13 @@ async function handleMultiAgentMode(
       } catch (closeError) {
         // 忽略关闭错误
       }
+    } finally {
+      // ✅ 确保释放并发名额
+      try {
+        onFinally?.();
+      } catch (e) {
+        // 忽略释放时的异常，避免影响主流程
+      }
     }
   })();
 
@@ -1269,7 +1318,15 @@ export async function post({
   try {
     console.log('=== 收到聊天请求 ===');
     
-    const { message, modelType, conversationId: reqConversationId, userId, mode } = data;
+    const {
+      message,
+      modelType,
+      conversationId: reqConversationId,
+      userId,
+      mode,
+      clientUserMessageId,
+      clientAssistantMessageId,
+    } = data;
 
     console.log('解析后的 message:', message);
     console.log('解析后的 modelType:', modelType);
@@ -1287,19 +1344,34 @@ export async function post({
       return errorResponse('userId is required');
     }
 
-    // 确保用户存在
-    await UserService.getOrCreateUser(userId);
+    // ==========================================
+    // 📌 入口并发限制：全局 + 单用户（SSE长连接占位）
+    // ==========================================
+    const slot = acquireSSESlot(userId);
+    // 用显式比较，确保 TS 能正确做联合类型收窄
+    if (slot.ok === false) {
+      console.warn('⚠️  SSE 并发限制触发:', slot);
+      return tooManyRequests(slot.reason, slot.retryAfterSec);
+    }
+
+    // 是否已把 release“交接”给流式处理（交接后由流式 finally 释放）
+    let handoffToStream = false;
+
+    try {
+
+      // 确保用户存在
+      await UserService.getOrCreateUser(userId);
 
     // 如果没有 conversationId，创建新对话
     let conversationId = reqConversationId;
-    if (!conversationId) {
-      const conversation = await ConversationService.createConversation(
-        userId,
-        message.slice(0, 50) + (message.length > 50 ? '...' : '') // 使用前50个字符作为标题
-      );
-      conversationId = conversation.conversationId;
-      console.log('✅ Created new conversation:', conversationId);
-    }
+      if (!conversationId) {
+        const conversation = await ConversationService.createConversation(
+          userId,
+          message.slice(0, 50) + (message.length > 50 ? '...' : '') // 使用前50个字符作为标题
+        );
+        conversationId = conversation.conversationId;
+        console.log('✅ Created new conversation:', conversationId);
+      }
 
     // 保存用户消息到数据库
     try {
@@ -1308,6 +1380,7 @@ export async function post({
         userId,
         'user',
         message,
+        clientUserMessageId,
         undefined,
         modelType
       );
@@ -1321,10 +1394,11 @@ export async function post({
     // ==========================================
     // 📌 多Agent模式处理
     // ==========================================
-    if (mode === 'multi_agent') {
-      console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
-      return handleMultiAgentMode(message, userId, conversationId);
-    }
+      if (mode === 'multi_agent') {
+        console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
+        handoffToStream = true;
+      return handleMultiAgentMode(message, userId, conversationId, clientAssistantMessageId, slot.release);
+      }
 
     // ==========================================
     // 📌 阶段 1: 使用滑动窗口记忆管理（单Agent模式）
@@ -1337,7 +1411,7 @@ export async function post({
     console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
 
     // 调用模型
-    if (modelType === 'local') {
+      if (modelType === 'local') {
       console.log('开始调用本地模型...');
       
       // ==========================================
@@ -1361,11 +1435,12 @@ export async function post({
       
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       
-      const stream = await callLocalModel(messages);
+        const stream = await callLocalModel(messages);
       
       // 将流式响应转换为 SSE 格式并返回
-      return streamToSSEResponse(stream, conversationId, userId, modelType, messages);
-    } else if (modelType === 'volcano') {
+        handoffToStream = true;
+      return streamToSSEResponse(stream, conversationId, userId, modelType, messages, clientAssistantMessageId, slot.release);
+      } else if (modelType === 'volcano') {
       console.log('==========================================');
       console.log('🌋 开始调用火山引擎豆包模型...');
       console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
@@ -1374,10 +1449,10 @@ export async function post({
       console.log('==========================================');
       
       // 检查配置
-      if (!volcengineService.isConfigured()) {
-        console.error('❌ 火山引擎 API 未配置！');
-        return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
-      }
+        if (!volcengineService.isConfigured()) {
+          console.error('❌ 火山引擎 API 未配置！');
+          return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
+        }
 
       // ==========================================
       // 📌 阶段 1: 构建消息历史（带上下文记忆）
@@ -1401,13 +1476,20 @@ export async function post({
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       console.log('📨 准备发送消息到火山引擎，消息数量:', messages.length);
       
-      const stream = await callVolcengineModel(messages);
+        const stream = await callVolcengineModel(messages);
       console.log('✅ 已收到火山引擎的流式响应');
       
       // 将流式响应转换为 SSE 格式并返回
-      return streamVolcengineToSSEResponse(stream, conversationId, userId, modelType, messages);
-    } else {
-      return errorResponse('不支持的模型类型');
+        handoffToStream = true;
+      return streamVolcengineToSSEResponse(stream, conversationId, userId, modelType, messages, clientAssistantMessageId, slot.release);
+      } else {
+        return errorResponse('不支持的模型类型');
+      }
+    } finally {
+      // ✅ 没有进入流式返回，就在这里释放名额（避免泄漏）
+      if (!handoffToStream) {
+        slot.release();
+      }
     }
   } catch (error: any) {
     console.error('处理聊天请求失败:', error);

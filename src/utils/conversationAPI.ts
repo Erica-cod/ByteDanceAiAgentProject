@@ -14,6 +14,7 @@ export interface Conversation {
 export interface Message {
   _id?: string;
   messageId: string;
+  clientMessageId?: string; // 前端生成的临时消息ID（用于本地缓存与服务端持久化对齐）
   conversationId: string;
   userId: string;
   role: 'user' | 'assistant';
