@@ -48,19 +48,45 @@ interface ChatRequestData {
   clientUserMessageId?: string;
   /** 前端生成的 assistant 占位消息ID：用于和本地缓存对齐（精确去重） */
   clientAssistantMessageId?: string;
+  /** 队列 token（客户端重试时携带，用于保持队列位置） */
+  queueToken?: string;
 }
 
 /**
- * 统一返回 429（用于限流/并发限制）
- * 注意：前端目前只判断 response.ok，不会专门解析错误体，所以这里给简洁信息即可。
+ * 统一返回 429（用于限流/并发限制）+ 队列信息
+ * 
+ * @param message 错误提示信息
+ * @param retryAfterSec 建议重试等待时间（秒）
+ * @param queueToken 队列 token（可选）
+ * @param queuePosition 队列位置（可选）
+ * @param estimatedWaitSec 预估等待时间（可选）
  */
-function tooManyRequests(message: string, retryAfterSec: number) {
+function tooManyRequests(
+  message: string,
+  retryAfterSec: number,
+  queueToken?: string,
+  queuePosition?: number,
+  estimatedWaitSec?: number
+) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Retry-After': String(retryAfterSec),
+  };
+
+  // 添加队列相关 header（如果有）
+  if (queueToken) {
+    headers['X-Queue-Token'] = queueToken;
+  }
+  if (queuePosition !== undefined) {
+    headers['X-Queue-Position'] = String(queuePosition);
+  }
+  if (estimatedWaitSec !== undefined) {
+    headers['X-Queue-Estimated-Wait'] = String(estimatedWaitSec);
+  }
+
   return new Response(JSON.stringify({ success: false, error: message }), {
     status: 429,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Retry-After': String(retryAfterSec),
-    },
+    headers,
   });
 }
 
@@ -1435,6 +1461,7 @@ export async function post({
       mode,
       clientUserMessageId,
       clientAssistantMessageId,
+      queueToken,
     } = data;
 
     console.log('解析后的 message:', message);
@@ -1442,6 +1469,7 @@ export async function post({
     console.log('解析后的 conversationId:', reqConversationId);
     console.log('解析后的 userId:', userId);
     console.log('解析后的 mode:', mode || 'single');
+    console.log('解析后的 queueToken:', queueToken || '无');
 
     // 参数验证
     if (!message || !message.trim()) {
@@ -1454,13 +1482,19 @@ export async function post({
     }
 
     // ==========================================
-    // 📌 入口并发限制：全局 + 单用户（SSE长连接占位）
+    // 📌 入口并发限制：全局 + 单用户（SSE长连接占位）+ 队列化支持
     // ==========================================
-    const slot = acquireSSESlot(userId);
+    const slot = acquireSSESlot(userId, queueToken);
     // 用显式比较，确保 TS 能正确做联合类型收窄
     if (slot.ok === false) {
-      console.warn('⚠️  SSE 并发限制触发:', slot);
-      return tooManyRequests(slot.reason, slot.retryAfterSec);
+      console.warn('⚠️  SSE 并发限制触发，已加入队列:', slot);
+      return tooManyRequests(
+        slot.reason,
+        slot.retryAfterSec,
+        slot.queueToken,
+        slot.queuePosition,
+        slot.estimatedWaitSec
+      );
     }
 
     // 是否已把 release“交接”给流式处理（交接后由流式 finally 释放）

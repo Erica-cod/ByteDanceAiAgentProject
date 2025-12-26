@@ -86,6 +86,7 @@ const ChatInterface: React.FC = () => {
   const thinkingEndRef = useRef<HTMLDivElement>(null); // thinking 区域底部锚点
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map()); // 存储每个对话的消息计数 DOM 元素
   const shouldScrollToBottomRef = useRef(false); // 标记是否需要滚动到底部（用于切换对话后）
+  const queueTokenRef = useRef<string | null>(null); // 队列 token（用于保持队列位置）
   
   // 分页加载状态
   const [firstItemIndex, setFirstItemIndex] = useState(0); // Virtuoso 虚拟索引起点
@@ -427,6 +428,7 @@ const ChatInterface: React.FC = () => {
         mode: chatMode, // 新增：传递聊天模式
         clientUserMessageId: userMessage.id,
         clientAssistantMessageId: assistantMessageId,
+        queueToken: queueTokenRef.current || undefined, // 携带队列 token（如果有）
       };
 
       // 多agent模式的状态（重连时也要保留）
@@ -454,10 +456,33 @@ const ChatInterface: React.FC = () => {
           signal,
         });
 
-        // 429：尊重 Retry-After 并重试（通常是服务端并发限制）
+        // 429：尊重 Retry-After 并重试（通常是服务端并发限制/队列）
         if (response.status === 429) {
           const retryAfter = response.headers.get('Retry-After');
           const retryAfterSec = retryAfter ? Number.parseInt(retryAfter, 10) : 1;
+          
+          // 读取队列信息
+          const queueToken = response.headers.get('X-Queue-Token');
+          const queuePosition = response.headers.get('X-Queue-Position');
+          const estimatedWait = response.headers.get('X-Queue-Estimated-Wait');
+          
+          // 保存 token，下次重试时携带
+          if (queueToken) {
+            queueTokenRef.current = queueToken;
+            console.log(`🎫 收到队列 token: ${queueToken}，位置: ${queuePosition || '未知'}，预估等待: ${estimatedWait || '未知'}秒`);
+          }
+          
+          // 显示队列信息给用户
+          if (queuePosition) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId && msg.role === 'assistant'
+                  ? { ...msg, thinking: `排队中，您前面还有 ${queuePosition} 个请求，预计等待 ${estimatedWait || retryAfterSec} 秒...` }
+                  : msg
+              )
+            );
+          }
+          
           return { completed: false, aborted: false, retryAfterMs: Math.max(0, retryAfterSec) * 1000 };
         }
 
@@ -680,6 +705,12 @@ const ChatInterface: React.FC = () => {
 
         await sleep(waitMs);
         attempt += 1;
+      }
+
+      // ✅ 流式处理成功完成，清除队列 token
+      if (queueTokenRef.current) {
+        console.log(`🎫 清除队列 token: ${queueTokenRef.current}`);
+        queueTokenRef.current = null;
       }
 
       // 确保最终消息已保存

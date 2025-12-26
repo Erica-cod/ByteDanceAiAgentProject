@@ -341,6 +341,196 @@
 
 ---
 
+## 🎫 **队列化机制（MVP 内存版本）- 防惊群效应**
+
+### **背景：为什么需要队列化？**
+
+当并发名额满时，如果所有客户端都得到相同的 `Retry-After`（比如 2 秒），那么 2 秒后大家会**同时重连**，可能再次触发 429，形成**惊群效应（Thundering Herd）**。
+
+**队列化的核心思路**：  
+不再让客户端"盲目重试"，而是给每个请求分配一个**队列 token + 队列位置**，并根据位置计算**差异化的等待时间**，天然错峰重连。
+
+---
+
+### **✅ 1. 后端：内存队列管理器**
+
+#### **📍 核心组件（queueManager.ts）**
+
+**队列存储**：
+```typescript
+const queue: QueueItem[] = [];  // 按入队顺序排列
+const tokenMap = new Map<string, QueueItem>();  // token -> QueueItem 快速查找
+```
+
+**入队逻辑（enqueue）**：
+- 如果客户端带了 token 且 token 还在队列中 → 返回原位置（不重新排队）
+- 否则 → 生成新 token，加入队列尾部
+- 计算 `Retry-After = ceil(position / rate) + jitter`（rate = 每秒放行 5 个）
+
+**出队逻辑（dequeue）**：
+- 成功获得并发名额时，从队列中移除 token
+- 自动清理过期 token（3 分钟 TTL）
+
+**jitter 防同秒重试**：
+```typescript
+function addJitter(baseMs: number): number {
+  const jitter = Math.floor(Math.random() * (1000 - 300 + 1)) + 300;  // 300~1000ms
+  return baseMs + jitter;
+}
+```
+
+---
+
+#### **📍 sseLimiter 改造**
+
+**新增参数**：
+```typescript
+export function acquireSSESlot(userId: string, queueToken?: string): AcquireResult
+```
+
+**核心逻辑**：
+```typescript
+if (activeGlobal >= maxGlobal) {
+  const queueInfo = enqueue(userId, queueToken);  // 加入队列
+  return {
+    ok: false,
+    queueToken: queueInfo.token,
+    queuePosition: queueInfo.position,
+    retryAfterSec: queueInfo.retryAfterSec,  // 含 jitter
+    estimatedWaitSec: queueInfo.estimatedWaitSec,
+    // ...
+  };
+}
+// 有空位，发放名额 + 出队
+dequeue(queueToken);
+return { ok: true, release, ... };
+```
+
+---
+
+#### **📍 HTTP 429 返回格式**
+
+**Header 新增**：
+```
+Retry-After: 3
+X-Queue-Token: q_1234567890_abc123
+X-Queue-Position: 8
+X-Queue-Estimated-Wait: 2
+```
+
+**Body**（保持不变）：
+```json
+{ "success": false, "error": "服务端繁忙：当前流式连接过多，已加入队列" }
+```
+
+---
+
+### **✅ 2. 前端：读取 Token 并回传**
+
+#### **📍 核心改动（ChatInterface.tsx）**
+
+**1. 添加 queueToken ref**：
+```typescript
+const queueTokenRef = useRef<string | null>(null);
+```
+
+**2. 请求体携带 token**：
+```typescript
+const requestBody = {
+  // ...
+  queueToken: queueTokenRef.current || undefined,
+};
+```
+
+**3. 429 响应处理 - 读取队列信息**：
+```typescript
+if (response.status === 429) {
+  const queueToken = response.headers.get('X-Queue-Token');
+  const queuePosition = response.headers.get('X-Queue-Position');
+  const estimatedWait = response.headers.get('X-Queue-Estimated-Wait');
+  
+  // 保存 token，下次重试时携带
+  if (queueToken) {
+    queueTokenRef.current = queueToken;
+  }
+  
+  // 显示队列信息给用户
+  if (queuePosition) {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantMessageId
+          ? { ...msg, thinking: `排队中，您前面还有 ${queuePosition} 个请求，预计等待 ${estimatedWait} 秒...` }
+          : msg
+      )
+    );
+  }
+  
+  return { completed: false, retryAfterMs: ... };
+}
+```
+
+**4. 成功后清除 token**：
+```typescript
+// 流式处理成功完成
+if (queueTokenRef.current) {
+  queueTokenRef.current = null;  // 避免下次请求带旧 token
+}
+```
+
+---
+
+### **✅ 3. 工作流程（完整闭环）**
+
+```
+【第 1 次请求】
+用户 A 发送消息 → 并发满 → 后端返回 429：
+  - Token: q_123
+  - Position: 8
+  - Retry-After: 2s (含 jitter)
+→ 前端保存 token，显示"排队中，您前面还有 8 个请求"
+
+【第 2 次重试（2 秒后）】
+前端携带 token: q_123 → 后端：
+  - 识别 token，位置可能变成 3（前面 5 个已处理）
+  - 返回新的 Retry-After: 1s
+→ 前端更新提示："排队中，您前面还有 3 个请求"
+
+【第 3 次重试（1 秒后）】
+前端携带 token: q_123 → 后端：
+  - 有空位！发放名额 → 从队列移除 token
+  - 返回 200，进入 SSE 流式推送
+→ 前端清除 token，正常接收回答
+```
+
+---
+
+### **✅ 4. 优势与局限**
+
+#### **优势**
+- **防惊群**：不同位置的用户等待时间不同（jitter 叠加位置差异）
+- **公平性**：先来先服务（token 保证位置不变）
+- **用户体验**：显示队列位置和预估等待时间，减少焦虑
+- **实现简单**：MVP 版本纯内存，无需引入 Redis
+
+#### **局限（MVP 版本）**
+- **单进程**：重启会丢失队列
+- **不跨实例**：多实例部署时每个实例有独立队列
+- **无持久化**：进程崩溃队列丢失
+
+#### **生产升级方案**
+- 用 **Redis ZSET** 存储队列（score = 入队时间，member = token）
+- 用 **Redis HASH** 存储 token 元数据（userId, createdAt, expireAt）
+- 用 **Lua 脚本** 保证出队/入队的原子性
+- 支持用户取消（`/api/queue/cancel` 端点）
+
+---
+
+### **✅ 5. 面试如何讲（30 秒版本）**
+
+"我们的并发控制从'429 + 固定 Retry-After'升级到了**队列化机制**。当并发满时，服务端把请求加入队列，返回 `X-Queue-Token` 和队列位置，并根据 `position / rate + jitter` 计算差异化的等待时间，避免惊群。前端携带 token 重试，保证先来先服务。MVP 用内存实现，生产环境会迁移到 Redis + Lua 原子化处理。这样既保证了公平性，又提升了系统稳定性。"
+
+---
+
 ## 💾 **消息持久化策略（重要补充）**
 
 ### **核心问题：中断的回答会存入数据库吗？**
