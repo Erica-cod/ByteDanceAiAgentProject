@@ -91,15 +91,21 @@ export async function getConversationDetails(
 }
 
 /**
- * 获取对话的所有消息
+ * 获取对话的消息（支持分页）
  */
 export async function getConversationMessages(
   userId: string,
-  conversationId: string
-): Promise<Message[]> {
+  conversationId: string,
+  limit?: number,
+  skip?: number
+): Promise<{ messages: Message[]; total: number }> {
   try {
-    console.log('🌐 API 调用: GET /api/conversations/' + conversationId, { userId });
-    const response = await fetch(`/api/conversations/${conversationId}?userId=${userId}`);
+    const params = new URLSearchParams({ userId });
+    if (limit !== undefined) params.append('limit', String(limit));
+    if (skip !== undefined) params.append('skip', String(skip));
+    
+    console.log('🌐 API 调用: GET /api/conversations/' + conversationId, { userId, limit, skip });
+    const response = await fetch(`/api/conversations/${conversationId}?${params.toString()}`);
     console.log('📡 API 响应状态:', response.status, response.statusText);
     
     if (!response.ok) {
@@ -109,13 +115,17 @@ export async function getConversationMessages(
     const data = await response.json();
     console.log('📦 API 返回数据:', data);
     
-    const messages = data.success ? data.data.messages : [];
-    console.log('💬 提取的消息列表:', messages);
+    if (data.success && data.data) {
+      return {
+        messages: data.data.messages || [],
+        total: data.data.total || 0,
+      };
+    }
     
-    return messages;
+    return { messages: [], total: 0 };
   } catch (error) {
     console.error('❌ 获取消息失败:', error);
-    return [];
+    return { messages: [], total: 0 };
   }
 }
 

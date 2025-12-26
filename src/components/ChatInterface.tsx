@@ -85,18 +85,41 @@ const ChatInterface: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null); // thinking 区域底部锚点
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map()); // 存储每个对话的消息计数 DOM 元素
+  const shouldScrollToBottomRef = useRef(false); // 标记是否需要滚动到底部（用于切换对话后）
+  
+  // 分页加载状态
+  const [firstItemIndex, setFirstItemIndex] = useState(0); // Virtuoso 虚拟索引起点
+  const [hasMoreMessages, setHasMoreMessages] = useState(false); // 是否还有更早的消息
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // 是否正在加载更早的消息
+  const [totalMessages, setTotalMessages] = useState(0); // 服务端总消息数
+  const PAGE_SIZE = 30; // 每次加载消息数量
 
   useEffect(() => {
-    // 先滚动 thinking 区域（如果存在）
+    // 只滚动 thinking 区域（如果存在）
     if (thinkingEndRef.current) {
       const thinkingContainer = thinkingEndRef.current.closest('.thinking-content');
       if (thinkingContainer) {
         thinkingContainer.scrollTop = thinkingContainer.scrollHeight;
       }
     }
-    // 全局滚动交给 Virtuoso 的 followOutput 处理（只在用户位于底部时自动跟随）
+    // 消息列表的滚动完全交给 Virtuoso 的 followOutput 处理
   }, [messages]);//注意：这里的思考区域滚动会干扰消息区域的滚动，所以需要分开处理。
   //至于thinking区域滚动到最底部，我们使用了一个锚点（.thinking-anchor），它是一个不可见的 div，用于触发滚动操作。
+
+  // 监听消息变化，只在标记需要滚动时才执行（避免流式输出时频繁触发）
+  useEffect(() => {
+    if (shouldScrollToBottomRef.current && messages.length > 0 && virtuosoRef.current) {
+      // 使用 requestAnimationFrame 确保 DOM 已渲染且布局稳定
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: messages.length - 1,
+          align: 'end',
+          behavior: 'smooth', // 平滑滚动，避免闪烁
+        });
+      });
+      shouldScrollToBottomRef.current = false; // 滚动完成后重置标记
+    }
+  }, [messages]); // 只依赖 messages，但通过 ref 控制是否执行
 
   // 初始化用户
   useEffect(() => {
@@ -123,12 +146,12 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // 加载指定对话的历史消息
+  // 加载指定对话的历史消息（首屏只加载最新一页）
   const loadConversationMessages = async (convId: string) => {
     try {
-      console.log('🔄 开始加载对话消息:', { userId, convId });
+      console.log('🔄 开始加载对话消息（首屏）:', { userId, convId });
 
-      // 1) 先读本地缓存，做到“秒开”
+      // 1) 先读本地缓存，做到"秒开"
       const cached = readConversationCache(convId);
       if (cached.length > 0) {
         const cachedMessages: Message[] = cached.map((m) => ({
@@ -142,34 +165,43 @@ const ChatInterface: React.FC = () => {
           pendingSync: m.pendingSync,
         }));
         setMessages(cachedMessages);
+        setFirstItemIndex(0);
+        // 有缓存时立即标记需要滚动
+        shouldScrollToBottomRef.current = true;
       }
 
-      // 2) 再拉服务端权威数据并对齐回写
-      const msgs = await getConversationMessages(userId, convId);
-      console.log('📦 收到消息数据:', msgs);
-      console.log('📊 消息数量:', msgs.length);
+      // 2) 拉服务端数据：首屏只加载最新 PAGE_SIZE 条
+      const result = await getConversationMessages(userId, convId, PAGE_SIZE, 0);
+      console.log('📦 首屏消息数据:', result);
+      setTotalMessages(result.total);
+      
+      // 计算实际加载的起始位置
+      const actualSkip = Math.max(0, result.total - PAGE_SIZE);
+      const needLoadMore = result.total > PAGE_SIZE;
+      
+      // 如果总消息超过一页，重新拉取最后一页
+      const finalResult = needLoadMore
+        ? await getConversationMessages(userId, convId, PAGE_SIZE, actualSkip)
+        : result;
+      
+      console.log('📊 消息统计:', { 
+        total: result.total, 
+        loaded: finalResult.messages.length,
+        skip: actualSkip,
+        hasMore: needLoadMore 
+      });
       
       // 转换消息格式
-      const formattedMessages: Message[] = msgs.map((msg) => ({
+      const formattedMessages: Message[] = finalResult.messages.map((msg) => ({
         id: msg.messageId,
         role: msg.role,
         content: msg.content,
         thinking: msg.thinking,
-        sources: msg.sources,  // 保留搜索来源链接
+        sources: msg.sources,
         timestamp: new Date(msg.timestamp).getTime(),
       }));
       
-      console.log('✅ 格式化后的消息:', formattedMessages);
-      console.log('🔗 有 sources 的消息数量:', formattedMessages.filter(m => m.sources && m.sources.length > 0).length);
-      
-      // 打印每条有 sources 的消息
-      formattedMessages.forEach((msg, index) => {
-        if (msg.sources && msg.sources.length > 0) {
-          console.log(`📎 前端消息 ${index + 1} 有 sources:`, msg.sources);
-        }
-      });
-      
-      const serverForCache: CachedMessage[] = msgs.map((msg) => ({
+      const serverForCache: CachedMessage[] = finalResult.messages.map((msg) => ({
         id: msg.messageId,
         clientMessageId: msg.clientMessageId,
         role: msg.role,
@@ -194,10 +226,57 @@ const ChatInterface: React.FC = () => {
       }));
 
       setMessages(mergedForUI);
+      // 正确设置 firstItemIndex：如果跳过了前面的消息，索引应该从 actualSkip 开始
+      setFirstItemIndex(actualSkip);
+      setHasMoreMessages(needLoadMore);
       writeConversationCache(convId, merged);
+      // 服务端数据回来后也标记需要滚动（兜底，确保最终位置正确）
+      shouldScrollToBottomRef.current = true;
     } catch (error) {
       console.error('❌ 加载消息失败:', error);
       setMessages([]);
+      setFirstItemIndex(0);
+      setHasMoreMessages(false);
+    }
+  };
+
+  // 加载更早的消息（向上滚动触发）
+  const loadOlderMessages = async () => {
+    if (!conversationId || isLoadingMore || !hasMoreMessages) return;
+
+    setIsLoadingMore(true);
+    try {
+      const currentLoaded = messages.length;
+      const skip = Math.max(0, totalMessages - currentLoaded - PAGE_SIZE);
+      
+      console.log('⬆️ 加载更早消息:', { skip, limit: PAGE_SIZE, currentLoaded, totalMessages });
+      
+      const result = await getConversationMessages(userId, conversationId, PAGE_SIZE, skip);
+      
+      if (result.messages.length === 0) {
+        setHasMoreMessages(false);
+        return;
+      }
+
+      // 转换并 prepend 到前面
+      const olderMessages: Message[] = result.messages.map((msg) => ({
+        id: msg.messageId,
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking,
+        sources: msg.sources,
+        timestamp: new Date(msg.timestamp).getTime(),
+      }));
+
+      setMessages((prev) => [...olderMessages, ...prev]);
+      setFirstItemIndex((prev) => prev - olderMessages.length);
+      setHasMoreMessages(skip > 0);
+      
+      console.log('✅ 已加载更早消息:', olderMessages.length, '条，还有更多:', skip > 0);
+    } catch (error) {
+      console.error('❌ 加载更早消息失败:', error);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -225,11 +304,22 @@ const ChatInterface: React.FC = () => {
 
   // 新建对话
   const handleNewConversation = async () => {
+    // ✅ 新建对话前先停止正在进行的生成
+    if (abortControllerRef.current) {
+      console.log('🛑 新建对话前先中断正在进行的请求');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+    }
+    
     const newConv = await createConversation(userId, `对话 ${conversations.length + 1}`);
     if (newConv) {
       setConversations([newConv, ...conversations]);
       setConversationId(newConv.conversationId);
       setMessages([]);
+      setFirstItemIndex(0);
+      setHasMoreMessages(false);
+      setTotalMessages(0);
     }
   };
 
@@ -240,6 +330,15 @@ const ChatInterface: React.FC = () => {
       console.log('⚠️ 已经是当前对话，跳过');
       return;
     }
+    
+    // ✅ 切换对话前先停止正在进行的生成
+    if (abortControllerRef.current) {
+      console.log('🛑 切换对话前先中断正在进行的请求');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+    }
+    
     setConversationId(convId);
     await loadConversationMessages(convId);
   };
@@ -259,6 +358,9 @@ const ChatInterface: React.FC = () => {
         } else {
           setConversationId(null);
           setMessages([]);
+          setFirstItemIndex(0);
+          setHasMoreMessages(false);
+          setTotalMessages(0);
         }
       }
     }
@@ -281,179 +383,157 @@ const ChatInterface: React.FC = () => {
     saveMessages(updatedMessages);
     setInputValue('');
     setIsLoading(true);
+    // Virtuoso 的 followOutput 会自动滚动到底部
 
     // 创建新的 AbortController
     abortControllerRef.current = new AbortController();
 
     // 创建助手消息占位符
     const assistantMessageId = `client_${Date.now() + 1}_${Math.random().toString(36).slice(2, 8)}`;
+    
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      pendingSync: true,
+    };
+
+    // 立即添加助手占位消息
+    const messagesWithAssistant = [...updatedMessages, assistantMessage];
+    setMessages(messagesWithAssistant);
+
+    // 确保滚动到底部，让 followOutput 能正常工作（流式输出时自动跟随）
+    requestAnimationFrame(() => {
+      virtuosoRef.current?.scrollToIndex({
+        index: messagesWithAssistant.length - 1,
+        align: 'end',
+        behavior: 'smooth',
+      });
+    });
+
+    // SSE 重连配置
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const BASE_RETRY_DELAY_MS = 500; // 基础退避时间
+    const MAX_RETRY_DELAY_MS = 5000; // 最大退避时间
 
     try {
-      const assistantMessage: Message = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        pendingSync: true,
+
+      const requestBody = {
+        message: inputValue,
+        modelType: modelType,
+        userId: userId,
+        conversationId: conversationId,
+        mode: chatMode, // 新增：传递聊天模式
+        clientUserMessageId: userMessage.id,
+        clientAssistantMessageId: assistantMessageId,
       };
 
-      setMessages([...updatedMessages, assistantMessage]);
-
-      // 使用 SSE 接收流式响应
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: inputValue,
-          modelType: modelType,
-          userId: userId,
-          conversationId: conversationId,
-          mode: chatMode, // 新增：传递聊天模式
-          clientUserMessageId: userMessage.id,
-          clientAssistantMessageId: assistantMessageId,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error('请求失败');
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentContent = '';
-      let currentThinking = '';
-      let isDone = false;
-
-      // 多agent模式的状态
+      // 多agent模式的状态（重连时也要保留）
       let multiAgentRounds: RoundData[] = [];
       let multiAgentStatus: 'in_progress' | 'converged' | 'terminated' = 'in_progress';
       let multiAgentConsensusTrend: number[] = [];
       let currentRound: RoundData | null = null;
 
-      if (!reader) {
-        throw new Error('无法读取响应流');
-      }
+      let currentContent = '';
+      let currentThinking = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const computeBackoff = (attempt: number) => {
+        const exp = Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * Math.pow(2, attempt));
+        const jitter = Math.floor(Math.random() * 250);
+        return exp + jitter;
+      };
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 保留最后一个不完整的行
+      const runStreamOnce = async (): Promise<{ completed: boolean; aborted: boolean; retryAfterMs?: number }> => {
+        const signal = abortControllerRef.current?.signal;
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal,
+        });
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            
-            if (data === '[DONE]') {
-              isDone = true;
-              break;
-            }
+        // 429：尊重 Retry-After 并重试（通常是服务端并发限制）
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const retryAfterSec = retryAfter ? Number.parseInt(retryAfter, 10) : 1;
+          return { completed: false, aborted: false, retryAfterMs: Math.max(0, retryAfterSec) * 1000 };
+        }
 
-            try {
-              const parsed = JSON.parse(data);
-              console.log('接收到 SSE 数据:', parsed); // 调试日志
-              
-              // 处理初始化消息（包含 conversationId）
-              if (parsed.type === 'init' && parsed.conversationId) {
-                console.log('收到 conversationId:', parsed.conversationId);
-                // 如果当前没有 conversationId，说明是新建的对话
-                if (!conversationId) {
-                  setConversationId(parsed.conversationId);
-                  // 重新加载对话列表
-                  loadConversations();
-                }
-                
-                // 如果是多agent模式，初始化多agent数据
-                if (parsed.mode === 'multi_agent') {
-                  console.log('🤖 多Agent模式初始化');
-                  multiAgentStatus = 'in_progress';
-                }
-                continue;
+        if (!response.ok) {
+          throw new Error(`请求失败: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('无法读取响应流');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let isDone = false;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6).trim();
+
+              if (data === '[DONE]') {
+                isDone = true;
+                break;
               }
-              
-              // ========== 多Agent模式事件处理 ==========
-              if (chatMode === 'multi_agent') {
-                // Agent输出事件
-                if (parsed.type === 'agent_output') {
-                  console.log(`📤 收到Agent输出: ${parsed.agent} (第${parsed.round}轮)`);
-                  
-                  // 如果是新的一轮，创建新的round
-                  if (!currentRound || currentRound.round !== parsed.round) {
-                    if (currentRound) {
-                      multiAgentRounds.push(currentRound);
-                    }
-                    currentRound = {
-                      round: parsed.round,
-                      outputs: [],
-                    };
+
+              try {
+                const parsed = JSON.parse(data);
+
+                // init：同步 conversationId
+                if (parsed.type === 'init' && parsed.conversationId) {
+                  if (!conversationId) {
+                    setConversationId(parsed.conversationId);
+                    // ✅ 异步刷新对话列表，不阻塞当前流
+                    loadConversations().catch(err => console.error('刷新对话列表失败:', err));
                   }
-                  
-                  // 添加agent输出
-                  const agentOutput: MAAgentOutput = {
-                    agent: parsed.agent,
-                    round: parsed.round,
-                    output_type: parsed.output_type,
-                    content: parsed.content,
-                    metadata: parsed.metadata,
-                    timestamp: parsed.timestamp,
-                  };
-                  currentRound.outputs.push(agentOutput);
-                  
-                  // 如果是Reporter的输出，更新最终内容
-                  if (parsed.agent === 'reporter') {
-                    currentContent = parsed.content;
+                  if (parsed.mode === 'multi_agent') {
+                    multiAgentStatus = 'in_progress';
                   }
-                  
-                  // 实时更新多agent数据
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? {
-                            ...msg,
-                            content: currentContent || '多Agent协作中...',
-                            multiAgentData: {
-                              rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
-                              status: multiAgentStatus,
-                              consensusTrend: multiAgentConsensusTrend,
-                            },
-                          }
-                        : msg
-                    )
-                  );
                   continue;
                 }
-                
-                // Host决策事件
-                if (parsed.type === 'host_decision') {
-                  console.log(`🎯 收到Host决策: ${parsed.action}`);
-                  
-                  if (currentRound) {
-                    const hostDecision: MAHostDecision = {
-                      action: parsed.action,
-                      reason: parsed.reason,
-                      next_agents: parsed.next_agents,
-                      consensus_level: parsed.consensus_level,
+
+                // ========== 多Agent模式事件处理 ==========
+                if (chatMode === 'multi_agent') {
+                  if (parsed.type === 'agent_output') {
+                    if (!currentRound || currentRound.round !== parsed.round) {
+                      if (currentRound) multiAgentRounds.push(currentRound);
+                      currentRound = { round: parsed.round, outputs: [] };
+                    }
+
+                    const agentOutput: MAAgentOutput = {
+                      agent: parsed.agent,
+                      round: parsed.round,
+                      output_type: parsed.output_type,
+                      content: parsed.content,
+                      metadata: parsed.metadata,
                       timestamp: parsed.timestamp,
                     };
-                    currentRound.hostDecision = hostDecision;
-                    
-                    // 更新共识趋势
-                    if (parsed.consensus_level !== undefined) {
-                      multiAgentConsensusTrend.push(parsed.consensus_level);
+                    currentRound.outputs.push(agentOutput);
+
+                    if (parsed.agent === 'reporter') {
+                      currentContent = parsed.content;
                     }
-                    
-                    // 实时更新
+
                     setMessages((prev) =>
                       prev.map((msg) =>
                         msg.id === assistantMessageId
                           ? {
                               ...msg,
+                              content: currentContent || '多Agent协作中...',
                               multiAgentData: {
                                 rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
                                 status: multiAgentStatus,
@@ -463,94 +543,143 @@ const ChatInterface: React.FC = () => {
                           : msg
                       )
                     );
+                    continue;
                   }
-                  continue;
-                }
-                
-                // 轮次完成事件
-                if (parsed.type === 'round_complete') {
-                  console.log(`✅ 第 ${parsed.round} 轮完成`);
-                  continue;
-                }
-                
-                // 会话完成事件
-                if (parsed.type === 'session_complete') {
-                  console.log(`🎉 多Agent会话完成，状态: ${parsed.status}`);
-                  multiAgentStatus = parsed.status;
-                  
-                  // 保存最后一轮
-                  if (currentRound) {
-                    multiAgentRounds.push(currentRound);
-                    currentRound = null;
+
+                  if (parsed.type === 'host_decision') {
+                    if (currentRound) {
+                      const hostDecision: MAHostDecision = {
+                        action: parsed.action,
+                        reason: parsed.reason,
+                        next_agents: parsed.next_agents,
+                        consensus_level: parsed.consensus_level,
+                        timestamp: parsed.timestamp,
+                      };
+                      currentRound.hostDecision = hostDecision;
+                      if (parsed.consensus_level !== undefined) {
+                        multiAgentConsensusTrend.push(parsed.consensus_level);
+                      }
+
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                multiAgentData: {
+                                  rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                                  status: multiAgentStatus,
+                                  consensusTrend: multiAgentConsensusTrend,
+                                },
+                              }
+                            : msg
+                        )
+                      );
+                    }
+                    continue;
                   }
-                  
-                  // 最终更新
+
+                  if (parsed.type === 'session_complete') {
+                    multiAgentStatus = parsed.status;
+                    if (currentRound) {
+                      multiAgentRounds.push(currentRound);
+                      currentRound = null;
+                    }
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              content: currentContent || '多Agent协作完成',
+                              multiAgentData: {
+                                rounds: multiAgentRounds,
+                                status: multiAgentStatus,
+                                consensusTrend: multiAgentConsensusTrend,
+                              },
+                            }
+                          : msg
+                      )
+                    );
+                    continue;
+                  }
+
+                  if (parsed.type === 'error') {
+                    currentContent = `多Agent协作失败: ${parsed.error}`;
+                    multiAgentStatus = 'terminated';
+                    continue;
+                  }
+                }
+
+                // ========== 单Agent模式事件处理 ==========
+                if (parsed.thinking !== undefined && parsed.thinking !== null) {
+                  currentThinking = parsed.thinking;
+                }
+                if (parsed.content !== undefined && parsed.content !== null) {
+                  currentContent = parsed.content;
+                }
+
+                const currentSources = parsed.sources;
+
+                if (chatMode === 'single') {
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === assistantMessageId
                         ? {
                             ...msg,
-                            content: currentContent || '多Agent协作完成',
-                            multiAgentData: {
-                              rounds: multiAgentRounds,
-                              status: multiAgentStatus,
-                              consensusTrend: multiAgentConsensusTrend,
-                            },
+                            content: currentContent,
+                            thinking: currentThinking || undefined,
+                            sources: currentSources || msg.sources,
                           }
                         : msg
                     )
                   );
-                  continue;
                 }
-                
-                // 错误事件
-                if (parsed.type === 'error') {
-                  console.error('❌ 多Agent错误:', parsed.error);
-                  currentContent = `多Agent协作失败: ${parsed.error}`;
-                  multiAgentStatus = 'terminated';
-                  continue;
-                }
+              } catch (e) {
+                console.error('解析 SSE 数据失败:', e, '数据:', data);
               }
-              
-              // ========== 单Agent模式事件处理 ==========
-              // 处理 thinking、content 和 sources
-              if (parsed.thinking !== undefined && parsed.thinking !== null) {
-                currentThinking = parsed.thinking;
-                console.log('更新 thinking:', currentThinking.substring(0, 50));
-              }
-              if (parsed.content !== undefined && parsed.content !== null) {
-                currentContent = parsed.content;
-                console.log('更新 content:', currentContent.substring(0, 50));
-              }
-              
-              // 如果有 sources，也需要保存
-              let currentSources = parsed.sources;
-              if (currentSources) {
-                console.log('收到搜索来源:', currentSources.length, '条');
-              }
-
-              // 实时更新消息（打字机效果）- 仅单Agent模式
-              if (chatMode === 'single') {
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? {
-                          ...msg,
-                          content: currentContent,
-                          thinking: currentThinking || undefined,
-                          sources: currentSources || msg.sources, // 保留或更新 sources
-                        }
-                      : msg
-                  )
-                );
-              }
-            } catch (error) {
-              console.error('解析 SSE 数据失败:', error, '数据:', data);
             }
+
+            if (isDone) break;
           }
+        } catch (e: any) {
+          // 用户手动停止
+          if (e?.name === 'AbortError') {
+            return { completed: false, aborted: true };
+          }
+          // 断网/中断：交给外层重试
+          return { completed: false, aborted: false };
         }
-        
-        if (isDone) break;
+
+        // 正常结束：必须收到 [DONE]
+        return { completed: isDone, aborted: false };
+      };
+
+      // 断线重连：指数退避 + Retry-After
+      let attempt = 0;
+      while (true) {
+        const result = await runStreamOnce();
+        if (result.aborted) {
+          throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
+        }
+        if (result.completed) break;
+
+        if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+          throw new Error('SSE 连接中断，已达到最大重试次数');
+        }
+
+        const waitMs = result.retryAfterMs ?? computeBackoff(attempt);
+        console.warn(`⚠️ SSE 中断/限流，准备第 ${attempt + 1} 次重连，等待 ${waitMs}ms`);
+
+        // 给用户一点提示（不覆盖已有内容）
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId && msg.role === 'assistant'
+              ? { ...msg, thinking: msg.thinking || '连接中断，正在尝试重连...' }
+              : msg
+          )
+        );
+
+        await sleep(waitMs);
+        attempt += 1;
       }
 
       // 确保最终消息已保存
@@ -562,10 +691,16 @@ const ChatInterface: React.FC = () => {
                 ...msg,
                 content: currentContent || '模型未返回内容',
                 thinking: currentThinking || undefined,
+                pendingSync: false,
               }
             : msg
         );
-        saveMessages(final);
+
+        // 用户消息也标记为已同步（服务端按 clientMessageId 幂等入库）
+        const finalWithUserSync = final.map((msg) =>
+          msg.id === userMessage.id ? { ...msg, pendingSync: false } : msg
+        );
+        saveMessages(finalWithUserSync);
         
         // 实时更新对话列表中的消息计数（从服务器获取最新值）
         if (conversationId) {
@@ -582,7 +717,7 @@ const ChatInterface: React.FC = () => {
           });
         }
         
-        return final;
+        return finalWithUserSync;
       });
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -682,9 +817,28 @@ const ChatInterface: React.FC = () => {
           ref={virtuosoRef}
           style={{ height: '100%' }}
           data={messages}
+          firstItemIndex={firstItemIndex}
+          startReached={loadOlderMessages}
+          atTopThreshold={100}
+          increaseViewportBy={{ top: 600, bottom: 600 }}
+          defaultItemHeight={100}
           computeItemKey={(_index: number, item: Message) => item.id}
-          followOutput={(isAtBottom) => (isAtBottom ? 'smooth' : false)}
+          followOutput="smooth"
           components={{
+            Header: () =>
+              isLoadingMore ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                  加载更早消息中...
+                </div>
+              ) : hasMoreMessages ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                  向上滚动加载更多
+                </div>
+              ) : messages.length > 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                  已加载全部消息
+                </div>
+              ) : null,
             Scroller: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
               function Scroller(props, ref) {
                 return <div {...props} ref={ref} className="chat-messages-scroller" />;

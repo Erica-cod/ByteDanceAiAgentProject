@@ -19,9 +19,63 @@ export class MessageService {
     const db = await getDatabase();
     const collection = db.collection<Message>('messages');
 
+    // 如果带了 clientMessageId，就按 (conversationId, userId, clientMessageId) 做幂等写入
+    // 目的：支持前端断线重连/重试，避免重复插入用户消息或 assistant 最终消息
+    if (clientMessageId) {
+      console.log('💾 MessageService.addMessage - 幂等保存消息:', {
+        role,
+        clientMessageId,
+        hasSources: !!sources,
+        sourcesCount: sources?.length || 0,
+      });
+
+      const now = new Date();
+      const result = await collection.findOneAndUpdate(
+        { conversationId, userId, clientMessageId },
+        {
+          $setOnInsert: {
+            messageId: uuidv4(),
+            clientMessageId,
+            conversationId,
+            userId,
+            role,
+            timestamp: now,
+          },
+          // 重试时允许覆盖内容（assistant 可能在重连后生成完整版本）
+          $set: {
+            content,
+            thinking,
+            sources,
+            modelType,
+          },
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+
+      if (!result) {
+        // 理论上不会发生；兜底用 insertOne
+        const fallback: Message = {
+          messageId: uuidv4(),
+          clientMessageId,
+          conversationId,
+          userId,
+          role,
+          content,
+          thinking,
+          sources,
+          modelType,
+          timestamp: now,
+        };
+        await collection.insertOne(fallback);
+        return fallback;
+      }
+
+      return result;
+    }
+
+    // 不带 clientMessageId：按旧逻辑直接插入
     const message: Message = {
       messageId: uuidv4(),
-      clientMessageId,
       conversationId,
       userId,
       role,
@@ -29,20 +83,16 @@ export class MessageService {
       thinking,
       sources,
       modelType,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     console.log('💾 MessageService.addMessage - 保存消息:', {
       role,
       hasSources: !!sources,
       sourcesCount: sources?.length || 0,
-      sources: sources
     });
 
     await collection.insertOne(message);
-    
-    console.log('✅ MessageService.addMessage - 消息已保存到数据库');
-    
     return message;
   }
 

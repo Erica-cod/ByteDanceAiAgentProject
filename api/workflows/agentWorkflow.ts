@@ -12,6 +12,7 @@ import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import { validateToolCall } from '../tools/toolValidator.js';
 import { searchWeb } from '../tools/tavilySearch.js';
 import { routePlanningTool } from '../tools/planningTools.js';
+import { extractToolCall } from '../utils/jsonExtractor.js';
 
 /**
  * Agent 状态定义 - 使用 Annotation
@@ -73,72 +74,8 @@ const AgentStateAnnotation = Annotation.Root({
 
 export type AgentState = typeof AgentStateAnnotation.State;
 
-/**
- * 提取工具调用的辅助函数
- */
-function extractToolCallFromText(text: string): any | null {
-  try {
-    // 1. 尝试匹配 <tool_call> 标签
-    const tagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
-    const tagMatch = text.match(tagRegex);
-    
-    if (tagMatch) {
-      const jsonStr = tagMatch[1].trim();
-      return JSON.parse(jsonStr);
-    }
-    
-    // 2. 尝试直接提取 JSON（包含 "tool" 字段）
-    const startIndex = text.indexOf('{');
-    if (startIndex !== -1 && text.includes('"tool"')) {
-      let braceCount = 0;
-      let jsonEndIndex = -1;
-      let inString = false;
-      let escapeNext = false;
-      
-      for (let i = startIndex; i < text.length; i++) {
-        const char = text[i];
-        
-        if (escapeNext) {
-          escapeNext = false;
-          continue;
-        }
-        
-        if (char === '\\') {
-          escapeNext = true;
-          continue;
-        }
-        
-        if (char === '"') {
-          inString = !inString;
-          continue;
-        }
-        
-        if (!inString) {
-          if (char === '{') braceCount++;
-          if (char === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              jsonEndIndex = i + 1;
-              break;
-            }
-          }
-        }
-      }
-      
-      if (jsonEndIndex !== -1) {
-        let jsonStr = text.substring(startIndex, jsonEndIndex);
-        // 移除注释
-        jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-        return JSON.parse(jsonStr);
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('❌ [ExtractTool] 解析失败:', error);
-    return null;
-  }
-}
+// ✅ 工具调用提取已迁移到 api/utils/jsonExtractor.ts
+// 直接使用导入的 extractToolCall 函数
 
 /**
  * 工具执行节点
@@ -158,7 +95,7 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
   }
   
   // 提取工具调用
-  const toolCall = extractToolCallFromText(lastAIResponse);
+  const toolCall = extractToolCall(lastAIResponse);
   
   if (!toolCall) {
     console.log('✅ [ToolExecutor] 没有检测到工具调用，结束工作流');

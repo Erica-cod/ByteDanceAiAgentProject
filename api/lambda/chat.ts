@@ -23,6 +23,7 @@ import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/mul
 import { acquireSSESlot } from '../services/sseLimiter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
+import { extractToolCallWithRemainder } from '../utils/jsonExtractor.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -260,106 +261,8 @@ async function callVolcengineModel(messages: ChatMessage[]) {
   return stream;
 }
 
-/**
- * 提取工具调用（处理 <tool_call> 标签或纯 JSON）
- */
-function extractToolCall(text: string): { toolCall: any; remainingText: string } | null {
-  // 优先匹配完整的闭合标签
-  const closedTagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
-  const closedMatch = text.match(closedTagRegex);
-  
-  if (closedMatch) {
-    try {
-      const toolCallJson = closedMatch[1].trim();
-      console.log('🔧 发现完整的工具调用标签:', toolCallJson);
-      const toolCall = JSON.parse(toolCallJson);
-      const remainingText = text.replace(closedMatch[0], '').trim();
-      return { toolCall, remainingText };
-    } catch (error) {
-      console.error('❌ 解析完整标签失败:', error);
-    }
-  }
-  
-  // 如果没有闭合标签，尝试匹配开放标签
-  const openTagRegex = /<tool_call>([\s\S]*?)(?:<\/tool_call>|$)/;
-  const openMatch = text.match(openTagRegex);
-  
-  if (openMatch) {
-    try {
-      const toolCallJson = openMatch[1].trim();
-      console.log('🔧 发现开放的工具调用标签:', toolCallJson);
-      const toolCall = JSON.parse(toolCallJson);
-      const remainingText = text.replace(openMatch[0], '').trim();
-      return { toolCall, remainingText };
-    } catch (error) {
-      console.error('❌ 解析开放标签失败:', error);
-    }
-  }
-  
-  // 如果没有标签，尝试直接匹配 JSON 格式（适配不同模型的输出）
-  // 尝试提取完整的 JSON 对象（包含 "tool" 字段）
-  const startIndex = text.indexOf('{');
-  if (startIndex !== -1 && text.includes('"tool"')) {
-    try {
-      // 找到完整的 JSON
-      let braceCount = 0;
-      let jsonEndIndex = -1;
-      let inString = false;
-      let escapeNext = false;
-      
-      for (let i = startIndex; i < text.length; i++) {
-        const char = text[i];
-        
-        if (escapeNext) {
-          escapeNext = false;
-          continue;
-        }
-        
-        if (char === '\\') {
-          escapeNext = true;
-          continue;
-        }
-        
-        if (char === '"') {
-          inString = !inString;
-          continue;
-        }
-        
-        if (!inString) {
-          if (char === '{') braceCount++;
-          if (char === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              jsonEndIndex = i + 1;
-              break;
-            }
-          }
-        }
-      }
-      
-      if (jsonEndIndex !== -1) {
-        let toolCallJson = text.substring(startIndex, jsonEndIndex);
-        
-        // 移除 JSON 注释
-        toolCallJson = toolCallJson.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-        
-        console.log('🔧 发现纯 JSON 格式的工具调用（前100字符）:', toolCallJson.substring(0, 100) + '...');
-        const toolCall = JSON.parse(toolCallJson);
-        
-        // 验证是否是有效的工具调用（检查是否有 tool 字段）
-        if (toolCall.tool) {
-          const remainingText = text.substring(0, startIndex) + text.substring(jsonEndIndex);
-          console.log(`✅ 成功提取工具调用: ${toolCall.tool}`);
-          return { toolCall, remainingText: remainingText.trim() };
-        }
-      }
-    } catch (error) {
-      console.error('❌ 解析纯 JSON 失败:', error);
-    }
-  }
-  
-  return null;
-}
+// ✅ 工具调用提取已迁移到 api/utils/jsonExtractor.ts
+// 直接使用导入的 extractToolCallWithRemainder 函数
 
 /**
  * 执行工具调用
@@ -525,6 +428,16 @@ async function streamVolcengineToSSEResponse(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
+  /**
+   * SSE 心跳（用于避免反向代理/负载均衡因“空闲超时”断开连接）
+   * - 使用 SSE 注释行（以 ":" 开头），前端解析时会忽略，不会触发 JSON.parse
+   * - 间隔可通过环境变量 SSE_HEARTBEAT_MS 覆盖，默认 15s
+   */
+  const HEARTBEAT_MS = (() => {
+    const n = Number.parseInt(String(process.env.SSE_HEARTBEAT_MS ?? ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 15000;
+  })();
+
   let buffer = '';
   let accumulatedText = '';
   let lastSentContent = '';
@@ -533,15 +446,47 @@ async function streamVolcengineToSSEResponse(
   // 存储搜索来源链接
   let searchSources: Array<{title: string; url: string}> | undefined;
 
+  // 添加连接状态标志
+  let isStreamClosed = false;
+  
+  // 标记消息是否已保存到数据库（避免重复保存）
+  let messageSaved = false;
+  
+  // 安全的写入辅助函数（防止客户端断开后继续写入导致错误日志）
+  const safeWrite = async (data: string) => {
+    if (isStreamClosed) {
+      return false;
+    }
+    
+    try {
+      await writer.write(encoder.encode(data));
+      return true;
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.code === 'ABORT_ERR' || error.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        console.log('⚠️  [SSE] 客户端已关闭连接');
+        isStreamClosed = true;
+        return false;
+      }
+      throw error;
+    }
+  };
+
   // 异步处理流
   (async () => {
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     try {
       // 首先发送 conversationId（用于前端同步）
       const initData = JSON.stringify({
         conversationId: conversationId,
         type: 'init'
       });
-      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+      await safeWrite(`data: ${initData}\n\n`);
+
+      // 启动心跳：只要连接还在，就定期写入注释行，避免中间层判定“空闲”
+      heartbeatTimer = setInterval(() => {
+        // 不要 await，避免阻塞主流；safeWrite 内部会处理连接关闭
+        void safeWrite(`: keep-alive\n\n`);
+      }, HEARTBEAT_MS);
 
       for await (const chunk of stream) {
         const chunkStr = chunk.toString();
@@ -566,7 +511,7 @@ async function streamVolcengineToSSEResponse(
               });
               
               console.log('📤 发送到前端:', mainContent.substring(0, 50) + (mainContent.length > 50 ? '...' : ''));
-              await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+              if (!await safeWrite(`data: ${sseData}\n\n`)) return;
               lastSentContent = mainContent;
               lastSentThinking = thinking;
             }
@@ -610,7 +555,7 @@ async function streamVolcengineToSSEResponse(
                   content: `正在执行工具: ${workflowResult.toolCall?.tool}...`,
                   toolCall: workflowResult.toolCall,
                 });
-                await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
+                if (!await safeWrite(`data: ${toolCallNotice}\n\n`)) return;
                 
                 // 保存搜索来源
                 if (workflowResult.toolResult?.sources) {
@@ -748,7 +693,7 @@ async function streamVolcengineToSSEResponse(
                           thinking: thinking || undefined,
                         });
                         
-                        await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                        if (!await safeWrite(`data: ${sseData}\n\n`)) return;
                         lastSentContent = mainContent;
                         lastSentThinking = thinking;
                       }
@@ -796,7 +741,7 @@ async function streamVolcengineToSSEResponse(
                   thinking: thinking || undefined,
                   sources: searchSources || undefined,
                 });
-                await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                if (!await safeWrite(`data: ${sseData}\n\n`)) return;
                 
                 // 保存 AI 回复到数据库
                 try {
@@ -812,14 +757,17 @@ async function streamVolcengineToSSEResponse(
                     searchSources || undefined  // 保存搜索来源链接
                   );
                   await ConversationService.incrementMessageCount(conversationId, userId);
-                  console.log('✅ AI message saved to database with sources:', searchSources?.length || 0);
+                  messageSaved = true;  // ✅ 标记已保存
+                  console.log('✅ AI完整回答已保存到数据库 with sources:', searchSources?.length || 0);
                 } catch (dbError) {
                   console.error('❌ Failed to save AI message:', dbError);
                 }
               }
               
-              await writer.write(encoder.encode('data: [DONE]\n\n'));
-              await writer.close();
+              if (!isStreamClosed) {
+                await safeWrite('data: [DONE]\n\n');
+                await writer.close();
+              }
               return;
             }
           }
@@ -837,18 +785,66 @@ async function streamVolcengineToSSEResponse(
             content: mainContent || accumulatedText,
             thinking: thinking || undefined,
           });
-          await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+          if (!await safeWrite(`data: ${sseData}\n\n`)) return;
         }
       }
       
-      await writer.write(encoder.encode('data: [DONE]\n\n'));
-      await writer.close();
+      if (!isStreamClosed) {
+        await safeWrite('data: [DONE]\n\n');
+        await writer.close();
+      }
     } catch (error: any) {
-      console.error('流处理错误:', error);
-      const errorData = JSON.stringify({ error: error.message });
-      await writer.write(encoder.encode(`data: ${errorData}\n\n`));
-      await writer.close();
+      // 如果是客户端断开连接，不打印错误日志（这是正常情况）
+      if (error.name === 'AbortError' || error.code === 'ABORT_ERR' || error.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        console.log('⚠️  [SSE] 客户端主动断开连接');
+      } else {
+        console.error('❌ [SSE] 流处理错误:', error);
+        // 只有在流没关闭时才尝试发送错误
+        if (!isStreamClosed) {
+          try {
+            const errorData = JSON.stringify({ error: error.message });
+            await safeWrite(`data: ${errorData}\n\n`);
+          } catch (writeError) {
+            // 忽略写入错误
+          }
+        }
+      }
+      
+      // 尝试关闭 writer
+      try {
+        await writer.close();
+      } catch (closeError) {
+        // 忽略关闭错误
+      }
     } finally {
+      // ✅ 保存不完整的回答（参考 ChatGPT 设计：即使中断，已生成的内容也要保存）
+      if (!messageSaved && accumulatedText && accumulatedText.trim()) {
+        try {
+          console.log('💾 [Finally] 保存不完整的回答到数据库，长度:', accumulatedText.length);
+          const { thinking, content } = extractThinkingAndContent(accumulatedText);
+          
+          await MessageService.addMessage(
+            conversationId,
+            userId,
+            'assistant',
+            content || accumulatedText,
+            clientAssistantMessageId,
+            thinking || undefined,
+            modelType,
+            searchSources || undefined
+          );
+          await ConversationService.incrementMessageCount(conversationId, userId);
+          console.log('✅ [Finally] 不完整的回答已保存到数据库');
+        } catch (dbError) {
+          console.error('❌ [Finally] 保存不完整回答失败:', dbError);
+        }
+      }
+      
+      // ✅ 确保清理心跳定时器，避免资源泄漏
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       // ✅ 确保释放并发名额
       try {
         onFinally?.();
@@ -883,6 +879,16 @@ async function streamToSSEResponse(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
+  /**
+   * SSE 心跳（用于避免反向代理/负载均衡因“空闲超时”断开连接）
+   * - 使用 SSE 注释行（以 ":" 开头），前端解析时会忽略，不会触发 JSON.parse
+   * - 间隔可通过环境变量 SSE_HEARTBEAT_MS 覆盖，默认 15s
+   */
+  const HEARTBEAT_MS = (() => {
+    const n = Number.parseInt(String(process.env.SSE_HEARTBEAT_MS ?? ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 15000;
+  })();
+
   let buffer = '';
   let accumulatedText = '';
   let lastSentContent = '';
@@ -891,15 +897,46 @@ async function streamToSSEResponse(
   // 存储搜索来源链接
   let searchSources: Array<{title: string; url: string}> | undefined;
 
+  // 添加连接状态标志
+  let isStreamClosed = false;
+  
+  // 标记消息是否已保存到数据库（避免重复保存）
+  let messageSaved = false;
+  
+  // 安全的写入辅助函数（防止客户端断开后继续写入导致错误日志）
+  const safeWrite = async (data: string) => {
+    if (isStreamClosed) {
+      return false;
+    }
+    
+    try {
+      await writer.write(encoder.encode(data));
+      return true;
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.code === 'ABORT_ERR' || error.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        console.log('⚠️  [SSE] 客户端已关闭连接');
+        isStreamClosed = true;
+        return false;
+      }
+      throw error;
+    }
+  };
+
   // 异步处理流
   (async () => {
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     try {
       // 首先发送 conversationId（用于前端同步）
       const initData = JSON.stringify({
         conversationId: conversationId,
         type: 'init'
       });
-      await writer.write(encoder.encode(`data: ${initData}\n\n`));
+      await safeWrite(`data: ${initData}\n\n`);
+
+      // 启动心跳：只要连接还在，就定期写入注释行，避免中间层判定“空闲”
+      heartbeatTimer = setInterval(() => {
+        void safeWrite(`: keep-alive\n\n`);
+      }, HEARTBEAT_MS);
       
       for await (const chunk of stream) {
         const chunkStr = chunk.toString();
@@ -923,7 +960,7 @@ async function streamToSSEResponse(
                     thinking: thinking || undefined,
                   });
                   
-                  await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                  if (!await safeWrite(`data: ${sseData}\n\n`)) return;
                   lastSentContent = content;
                   lastSentThinking = thinking;
                 }
@@ -934,20 +971,20 @@ async function streamToSSEResponse(
                 console.log('📝 完整响应内容:', accumulatedText);
                 
                 // 检测是否有工具调用
-                const toolCallResult = extractToolCall(accumulatedText);
+                const toolCallResult = extractToolCallWithRemainder(accumulatedText);
                 
                 if (toolCallResult) {
-                  console.log('🔧 [本地模型] 检测到工具调用:', toolCallResult.toolCall);
+                  console.log('🔧 [本地模型] 检测到工具调用:', toolCallResult.data);
                   
                   // 发送工具调用通知
                   const toolCallNotice = JSON.stringify({
                     content: '正在搜索...',
-                    toolCall: toolCallResult.toolCall,
+                    toolCall: toolCallResult.data,
                   });
-                  await writer.write(encoder.encode(`data: ${toolCallNotice}\n\n`));
+                  if (!await safeWrite(`data: ${toolCallNotice}\n\n`)) return;
                   
                   // 执行工具调用
-                  const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.toolCall, userId);
+                  const { resultText: toolResult, sources } = await executeToolCall(toolCallResult.data, userId);
                   console.log('📦 工具执行结果（前200字符）:', toolResult.substring(0, 200) + '...');
                   console.log('🔗 来源链接:', sources?.length || 0, '条');
                   
@@ -993,7 +1030,7 @@ async function streamToSSEResponse(
                                 thinking: thinking || undefined,
                               });
                               
-                              await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                              if (!await safeWrite(`data: ${sseData}\n\n`)) return;
                               lastSentContent = content;
                               lastSentThinking = thinking;
                             }
@@ -1018,7 +1055,7 @@ async function streamToSSEResponse(
                     thinking: thinking || undefined,
                     sources: searchSources || undefined,
                   });
-                  await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+                  if (!await safeWrite(`data: ${sseData}\n\n`)) return;
                   
                   // 保存 AI 回复到数据库
                   try {
@@ -1040,8 +1077,10 @@ async function streamToSSEResponse(
                   }
                 }
                 
-                await writer.write(encoder.encode('data: [DONE]\n\n'));
-                await writer.close();
+                if (!isStreamClosed) {
+                  await safeWrite('data: [DONE]\n\n');
+                  await writer.close();
+                }
                 return;
               }
             } catch (error) {
@@ -1062,21 +1101,69 @@ async function streamToSSEResponse(
               content: content || accumulatedText,
               thinking: thinking || undefined,
             });
-            await writer.write(encoder.encode(`data: ${sseData}\n\n`));
+            if (!await safeWrite(`data: ${sseData}\n\n`)) return;
           }
         } catch (error) {
           console.error('解析最后数据失败:', error);
         }
       }
       
-      await writer.write(encoder.encode('data: [DONE]\n\n'));
-      await writer.close();
+      if (!isStreamClosed) {
+        await safeWrite('data: [DONE]\n\n');
+        await writer.close();
+      }
     } catch (error: any) {
-      console.error('流处理错误:', error);
-      const errorData = JSON.stringify({ error: error.message });
-      await writer.write(encoder.encode(`data: ${errorData}\n\n`));
-      await writer.close();
+      // 如果是客户端断开连接，不打印错误日志（这是正常情况）
+      if (error.name === 'AbortError' || error.code === 'ABORT_ERR' || error.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        console.log('⚠️  [SSE] 客户端主动断开连接');
+      } else {
+        console.error('❌ [SSE] 流处理错误:', error);
+        // 只有在流没关闭时才尝试发送错误
+        if (!isStreamClosed) {
+          try {
+            const errorData = JSON.stringify({ error: error.message });
+            await safeWrite(`data: ${errorData}\n\n`);
+          } catch (writeError) {
+            // 忽略写入错误
+          }
+        }
+      }
+      
+      // 尝试关闭 writer
+      try {
+        await writer.close();
+      } catch (closeError) {
+        // 忽略关闭错误
+      }
     } finally {
+      // ✅ 保存不完整的回答（参考 ChatGPT 设计：即使中断，已生成的内容也要保存）
+      if (!messageSaved && accumulatedText && accumulatedText.trim()) {
+        try {
+          console.log('💾 [Finally] 保存不完整的回答到数据库，长度:', accumulatedText.length);
+          const { thinking, content } = extractThinkingAndContent(accumulatedText);
+          
+          await MessageService.addMessage(
+            conversationId,
+            userId,
+            'assistant',
+            content || accumulatedText,
+            clientAssistantMessageId,
+            thinking || undefined,
+            modelType,
+            searchSources || undefined
+          );
+          await ConversationService.incrementMessageCount(conversationId, userId);
+          console.log('✅ [Finally] 不完整的回答已保存到数据库');
+        } catch (dbError) {
+          console.error('❌ [Finally] 保存不完整回答失败:', dbError);
+        }
+      }
+      
+      // ✅ 确保清理心跳定时器，避免资源泄漏
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       // ✅ 确保释放并发名额
       try {
         onFinally?.();
@@ -1109,6 +1196,16 @@ async function handleMultiAgentMode(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
+  /**
+   * SSE 心跳（用于避免反向代理/负载均衡因“空闲超时”断开连接）
+   * - 使用 SSE 注释行（以 ":" 开头），前端解析时会忽略，不会触发 JSON.parse
+   * - 间隔可通过环境变量 SSE_HEARTBEAT_MS 覆盖，默认 15s
+   */
+  const HEARTBEAT_MS = (() => {
+    const n = Number.parseInt(String(process.env.SSE_HEARTBEAT_MS ?? ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 15000;
+  })();
+
   // 添加连接状态标志
   let isStreamClosed = false;
   
@@ -1134,6 +1231,7 @@ async function handleMultiAgentMode(
 
   // 异步处理多Agent协作
   (async () => {
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     try {
       // 首先发送 conversationId
       const initData = JSON.stringify({
@@ -1142,6 +1240,11 @@ async function handleMultiAgentMode(
         mode: 'multi_agent',
       });
       await safeWrite(`data: ${initData}\n\n`);
+
+      // 启动心跳：只要连接还在，就定期写入注释行，避免中间层判定“空闲”
+      heartbeatTimer = setInterval(() => {
+        void safeWrite(`: keep-alive\n\n`);
+      }, HEARTBEAT_MS);
 
       // 创建编排器
       const orchestrator = new MultiAgentOrchestrator(
@@ -1286,12 +1389,18 @@ async function handleMultiAgentMode(
         // 忽略关闭错误
       }
     } finally {
+      // ✅ 确保清理心跳定时器，避免资源泄漏
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       // ✅ 确保释放并发名额
       try {
         onFinally?.();
       } catch (e) {
         // 忽略释放时的异常，避免影响主流程
       }
+      // 注意：多Agent 模式的保存逻辑在 onSessionComplete 回调里，不在这里
     }
   })();
 
