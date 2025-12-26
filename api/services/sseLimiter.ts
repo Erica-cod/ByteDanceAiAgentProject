@@ -78,15 +78,32 @@ export function acquireSSESlot(userId: string, queueToken?: string): AcquireResu
 
   // 全局上限：加入队列
   if (activeGlobal >= maxGlobal) {
-    const queueInfo = enqueue(userId, queueToken);
+    const queueResult = enqueue(userId, queueToken);
+    
+    // 检查是否被限频拒绝
+    if (queueResult.rejected) {
+      return {
+        ok: false,
+        reason: queueResult.reason,
+        retryAfterSec: queueResult.cooldownSec,
+        snapshot: { global: activeGlobal, user: currentUser, maxGlobal, maxPerUser },
+        queueToken: queueToken || `rejected_${Date.now()}`,
+        queuePosition: -1,
+        estimatedWaitSec: queueResult.cooldownSec,
+      };
+    }
+    
+    // TypeScript 类型收窄：此时 queueResult 一定是 rejected: false 的类型
+    // 使用类型断言明确告诉 TypeScript
+    const successResult = queueResult as { rejected: false; token: string; position: number; retryAfterSec: number; estimatedWaitSec: number };
     return {
       ok: false,
       reason: '服务端繁忙：当前流式连接过多，已加入队列',
-      retryAfterSec: queueInfo.retryAfterSec,
+      retryAfterSec: successResult.retryAfterSec,
       snapshot: { global: activeGlobal, user: currentUser, maxGlobal, maxPerUser },
-      queueToken: queueInfo.token,
-      queuePosition: queueInfo.position,
-      estimatedWaitSec: queueInfo.estimatedWaitSec,
+      queueToken: successResult.token,
+      queuePosition: successResult.position,
+      estimatedWaitSec: successResult.estimatedWaitSec,
     };
   }
 

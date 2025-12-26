@@ -525,9 +525,118 @@ if (queueTokenRef.current) {
 
 ---
 
-### **✅ 5. 面试如何讲（30 秒版本）**
+### **✅ 5. 无效 Token 惩罚机制（防恶意刷队列）**
 
-"我们的并发控制从'429 + 固定 Retry-After'升级到了**队列化机制**。当并发满时，服务端把请求加入队列，返回 `X-Queue-Token` 和队列位置，并根据 `position / rate + jitter` 计算差异化的等待时间，避免惊群。前端携带 token 重试，保证先来先服务。MVP 用内存实现，生产环境会迁移到 Redis + Lua 原子化处理。这样既保证了公平性，又提升了系统稳定性。"
+#### **背景：为什么需要？**
+如果客户端恶意发送"不存在的 token"，现有逻辑会当成新请求入队，攻击者可能无限刷爆队列（内存 DoS）。
+
+#### **方案 C：仅惩罚"持续发送无效 token"的行为**
+- **不误伤正常多窗口**：各窗口拿到合法 token 后重试不受影响
+- **精准打击恶意行为**：只惩罚"10 秒内发送 3 次以上无效 token"的模式
+
+#### **核心实现（queueManager.ts）**
+
+**1. 追踪无效 token 尝试**：
+```typescript
+interface InvalidTokenRecord {
+  count: number;           // 无效 token 次数
+  firstAttemptAt: number;  // 第一次无效尝试时间
+  lastAttemptAt: number;   // 最后一次无效尝试时间
+}
+const invalidTokenAttempts = new Map<string, InvalidTokenRecord>();
+
+// 配置参数
+const INVALID_TOKEN_WINDOW_MS = 10 * 1000;     // 10秒窗口
+const INVALID_TOKEN_MAX_COUNT = 3;              // 最多3次
+const INVALID_TOKEN_COOLDOWN_MS = 30 * 1000;   // 30秒冷却
+```
+
+**2. 检测逻辑（在 enqueue 中）**：
+```typescript
+if (existingToken && !tokenMap.has(existingToken)) {
+  // 记录无效尝试
+  const record = invalidTokenAttempts.get(userId);
+  
+  // 检查是否在冷却期内
+  if (record && now - record.lastAttemptAt < INVALID_TOKEN_COOLDOWN_MS) {
+    return { rejected: true, reason: '检测到异常请求模式，请稍后重试', cooldownSec: ... };
+  }
+  
+  // 检查窗口内次数
+  if (record && now - record.firstAttemptAt < INVALID_TOKEN_WINDOW_MS) {
+    record.count += 1;
+    if (record.count >= INVALID_TOKEN_MAX_COUNT) {
+      return { rejected: true, reason: '检测到频繁的无效请求，已触发保护机制', cooldownSec: 30 };
+    }
+  }
+}
+```
+
+**3. 自动清理**：
+```typescript
+// 在 cleanExpiredTokens 中清理过期记录
+for (const [userId, record] of invalidTokenAttempts.entries()) {
+  if (now - record.lastAttemptAt > INVALID_TOKEN_COOLDOWN_MS + INVALID_TOKEN_WINDOW_MS) {
+    invalidTokenAttempts.delete(userId);
+  }
+}
+```
+
+#### **工作流程**
+```
+正常用户（多窗口）:
+窗口 A 获得 token_A → 重试携带 token_A → ✅ 正常复用队列位置
+窗口 B 获得 token_B → 重试携带 token_B → ✅ 正常复用队列位置
+
+恶意用户（刷无效 token）:
+第 1 次: 发送 fake_token_1 → 记录无效尝试 (count=1)
+第 2 次: 发送 fake_token_2 → 记录无效尝试 (count=2)
+第 3 次: 发送 fake_token_3 → 🚫 触发惩罚，返回 rejected: true，冷却 30 秒
+第 4 次: 任何请求 → 🚫 仍在冷却期，拒绝入队
+```
+
+#### **测试验证**
+```bash
+# 位置：test/test-queue-invalid-final.js
+node test/test-queue-invalid-final.js
+
+# 预期结果：
+# 1. 全局队列触发 ✅
+# 2. 3 次无效 token 触发惩罚 ✅
+# 3. 冷却期内请求被拒绝 ✅
+```
+
+#### **优点**
+- ✅ **不误伤正常用户**：只惩罚"持续发送无效 token"的异常模式
+- ✅ **自动恢复**：30 秒冷却期后自动解除
+- ✅ **内存友好**：自动清理过期记录
+- ✅ **可配置**：窗口、次数、冷却时间都可调
+
+#### **面试追问：为什么不"每 userId 只允许 1 个队列项"？**
+> **你**：那样会误伤正常的多窗口场景。用户可能同时打开 3 个标签页问不同问题，这是合理需求。我们的方案是"仅惩罚异常模式"：正常用户拿到合法 token 后重试不会被计数，只有"持续发送不存在 token"才触发惩罚。如果业务需要，也可以加"每用户最多 N 个队列项"的上限（例如 3-5 个），兼顾公平和体验。
+
+---
+
+### **✅ 6. 面试如何讲（30 秒版本）**
+
+"我们的并发控制从'429 + 固定 Retry-After'升级到了**队列化机制**。当并发满时，服务端把请求加入队列，返回 `X-Queue-Token` 和队列位置，并根据 `position / rate + jitter` 计算差异化的等待时间，避免惊群。前端携带 token 重试，保证先来先服务。为了防止恶意刷队列，我们加了'无效 token 惩罚'：10 秒内发送 3 次以上无效 token 触发 30 秒冷却，但不影响正常多窗口用户。MVP 用内存实现，生产环境会迁移到 Redis + Lua 原子化处理。"
+
+---
+
+### **✅ 7. 测试文件说明**
+
+所有队列化相关测试位于 `test/` 目录：
+
+| 文件 | 用途 | 运行命令 |
+|------|------|----------|
+| `test-queue.js` | 基础队列功能测试（单用户并发限制） | `node test/test-queue.js` |
+| `test-queue-global.js` | 多用户全局队列测试 | `node test/test-queue-global.js` |
+| `test-queue-stress.js` | 压力测试（10 并发触发全局队列） | `node test/test-queue-stress.js` |
+| `test-queue-invalid-final.js` | 无效 token 惩罚机制测试 | `node test/test-queue-invalid-final.js` |
+
+**运行前提**：
+- 服务已启动：`npm run dev`
+- 设置并发限制：`.env` 中 `MAX_SSE_CONNECTIONS=3`（用于触发全局队列）
 
 ---
 
