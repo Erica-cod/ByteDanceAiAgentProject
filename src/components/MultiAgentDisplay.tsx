@@ -8,7 +8,7 @@
  * - 高亮最终报告
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
 import './MultiAgentDisplay.css';
 
@@ -96,6 +96,27 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(
     new Set([rounds.length]) // 默认展开最新一轮
   );
+
+  /**
+   * ✅ 自动展开正在流式生成的轮次
+   */
+  useEffect(() => {
+    const roundsWithStreaming = rounds.map(r => r.round).filter(round => {
+      return rounds.find(rd => rd.round === round)?.outputs.some(output => {
+        const streamKey = `${output.agent}:${output.round}`;
+        return streamingAgentContent[streamKey] && 
+               streamingAgentContent[streamKey] !== output.content;
+      });
+    });
+
+    if (roundsWithStreaming.length > 0) {
+      setExpandedRounds(prev => {
+        const newSet = new Set(prev);
+        roundsWithStreaming.forEach(round => newSet.add(round));
+        return newSet;
+      });
+    }
+  }, [streamingAgentContent, rounds]);
 
   /**
    * 切换轮次展开/收起
@@ -203,6 +224,13 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
           const isExpanded = expandedRounds.has(roundData.round);
           const isLastRound = roundData.round === rounds.length;
 
+          // ✅ 检查本轮是否有正在流式生成的agent
+          const streamingAgentsInRound = roundData.outputs.filter(output => {
+            const streamKey = `${output.agent}:${output.round}`;
+            return streamingAgentContent[streamKey] && 
+                   streamingAgentContent[streamKey] !== output.content;
+          });
+
           return (
             <div
               key={roundData.round}
@@ -217,7 +245,12 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
               >
                 <div className="round-title">
                   <span className="round-number">第 {roundData.round} 轮</span>
-                  {roundData.hostDecision && (
+                  {streamingAgentsInRound.length > 0 && (
+                    <span className="consensus-badge" style={{ backgroundColor: '#4CAF50' }}>
+                      ⚡ {streamingAgentsInRound.map(a => AGENT_NAMES[a.agent]).join('、')} 生成中...
+                    </span>
+                  )}
+                  {!streamingAgentsInRound.length && roundData.hostDecision && (
                     <span
                       className="consensus-badge"
                       style={{
@@ -232,11 +265,21 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                   )}
                 </div>
                 <div className="round-agents">
-                  {roundData.outputs.map((output) => (
-                    <span key={output.agent} className="agent-badge">
-                      {AGENT_ICONS[output.agent]} {AGENT_NAMES[output.agent]}
-                    </span>
-                  ))}
+                  {roundData.outputs.map((output) => {
+                    const streamKey = `${output.agent}:${output.round}`;
+                    const isStreaming = streamingAgentContent[streamKey] && 
+                                       streamingAgentContent[streamKey] !== output.content;
+                    return (
+                      <span key={output.agent} className="agent-badge" style={{
+                        background: isStreaming ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : undefined,
+                        color: isStreaming ? 'white' : undefined,
+                        animation: isStreaming ? 'pulse 1.5s ease-in-out infinite' : undefined,
+                      }}>
+                        {AGENT_ICONS[output.agent]} {AGENT_NAMES[output.agent]}
+                        {isStreaming && ' ⚡'}
+                      </span>
+                    );
+                  })}
                 </div>
                 <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>
                   ▼
