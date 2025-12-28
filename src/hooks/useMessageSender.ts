@@ -1,9 +1,10 @@
 import { useChatStore, useUIStore } from '../stores';
 import { useSSEStream } from './useSSEStream';
+import type { MessageListHandle } from '../components/MessageList';
 
 interface UseMessageSenderOptions {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
-  virtuosoRef?: React.RefObject<any>;
+  listRef?: React.RefObject<MessageListHandle>;
   onConversationCreated?: (convId: string) => void;
 }
 
@@ -58,18 +59,8 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
 
     addMessage(assistantMessage);
 
-    // ✅ 滚动到底部（使用最新的消息数量）
-    const virtuosoRef = options.virtuosoRef;
-    if (virtuosoRef?.current) {
-      requestAnimationFrame(() => {
-        const currentMessages = useChatStore.getState().messages;
-        virtuosoRef.current?.scrollToIndex({
-          index: currentMessages.length - 1,
-          align: 'end',
-          behavior: 'smooth',
-        });
-      });
-    }
+    // ✅ react-virtualized 会在 MessageList 内部处理首次滚动
+    // 不需要在这里手动滚动
 
     try {
       await sendSSEMessage(

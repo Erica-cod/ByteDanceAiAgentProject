@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { type VirtuosoHandle } from 'react-virtuoso';
 import ConversationList from './ConversationList';
-import MessageList from './MessageList';
+import MessageList, { type MessageListHandle } from './MessageList';
 import { initializeUser } from '../utils/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../utils/privacyFirstFingerprint';
 import { useChatStore, useUIStore } from '../stores';
@@ -30,14 +29,14 @@ const ChatInterface: React.FC = () => {
 
   // ===== 本地 UI 状态 =====
   const [inputValue, setInputValue] = useState('');
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const listRef = useRef<MessageListHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   // ===== 自定义 Hooks =====
   const { sendMessageInternal, retryMessage, abort } = useMessageSender({
     messageCountRefs,
-    virtuosoRef,
+    listRef,
     onConversationCreated: (convId) => {
       conversationManager.loadConversations().catch((err) =>
         console.error('刷新对话列表失败:', err)
@@ -73,33 +72,18 @@ const ChatInterface: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Thinking 区域自动滚动
-  useEffect(() => {
-    if (thinkingEndRef.current) {
-      const thinkingContainer = thinkingEndRef.current.closest('.thinking-content');
-      if (thinkingContainer) {
-        thinkingContainer.scrollTop = thinkingContainer.scrollHeight;
-      }
-    }
-  }, [messages]);
+  // ✅ 移除 Thinking 区域自动滚动，避免触发意外的滚动行为
+  // useEffect(() => {
+  //   if (thinkingEndRef.current) {
+  //     const thinkingContainer = thinkingEndRef.current.closest('.thinking-content');
+  //     if (thinkingContainer) {
+  //       thinkingContainer.scrollTop = thinkingContainer.scrollHeight;
+  //     }
+  //   }
+  // }, [messages]);
 
-  // 切换对话后滚动到底部
-  useEffect(() => {
-    if (
-      conversationManager.shouldScrollToBottomRef.current &&
-      messages.length > 0 &&
-      virtuosoRef.current
-    ) {
-      requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({
-          index: messages.length - 1,
-          align: 'end',
-          behavior: 'smooth',
-        });
-      });
-      conversationManager.shouldScrollToBottomRef.current = false;
-    }
-  }, [messages, conversationManager.shouldScrollToBottomRef]);
+  // ✅ 切换对话时通过 key 强制重新挂载，MessageList 会自动滚动到底部
+  // 不需要额外的 useEffect，避免重复滚动
 
   // 初始化用户
   useEffect(() => {
@@ -199,8 +183,10 @@ const ChatInterface: React.FC = () => {
         </div>
 
         <div className="chat-messages">
+          {/* ✅ 关键修复：使用 key 强制在切换对话时重新挂载，确保滚动到底部 */}
           <MessageList
-            ref={virtuosoRef}
+            key={conversationId || 'new'}
+            ref={listRef}
             messages={messages}
             queue={messageQueue.queue}
             firstItemIndex={firstItemIndex}
