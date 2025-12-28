@@ -345,6 +345,12 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
                     status={message.multiAgentData.status}
                     consensusTrend={message.multiAgentData.consensusTrend}
                     streamingAgentContent={message.streamingAgentContent}
+                    onHeightChange={() => {
+                      // ✅ 展开/收起时重新测量高度
+                      cacheRef.current.clear(index, 0);
+                      measure();
+                      listRef.current?.recomputeRowHeights(index);
+                    }}
                   />
                 )}
 

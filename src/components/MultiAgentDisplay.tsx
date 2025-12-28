@@ -52,6 +52,7 @@ interface MultiAgentDisplayProps {
   status: 'in_progress' | 'converged' | 'terminated';
   consensusTrend: number[];
   streamingAgentContent?: Record<string, string>; // ✅ 新增：流式内容
+  onHeightChange?: () => void; // ✅ 新增：高度变化回调（通知父组件重新计算虚拟化高度）
 }
 
 /**
@@ -92,6 +93,7 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
   status,
   consensusTrend,
   streamingAgentContent = {}, // ✅ 新增：流式内容
+  onHeightChange, // ✅ 新增：高度变化回调
 }) => {
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(
     new Set([rounds.length]) // 默认展开最新一轮
@@ -112,11 +114,21 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
     if (roundsWithStreaming.length > 0) {
       setExpandedRounds(prev => {
         const newSet = new Set(prev);
-        roundsWithStreaming.forEach(round => newSet.add(round));
+        let hasChanges = false;
+        roundsWithStreaming.forEach(round => {
+          if (!newSet.has(round)) {
+            newSet.add(round);
+            hasChanges = true;
+          }
+        });
+        // ✅ 只有在真正展开新轮次时才通知高度变化
+        if (hasChanges) {
+          setTimeout(() => onHeightChange?.(), 100);
+        }
         return newSet;
       });
     }
-  }, [streamingAgentContent, rounds]);
+  }, [streamingAgentContent, rounds, onHeightChange]);
 
   /**
    * 切换轮次展开/收起
@@ -129,6 +141,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
       newExpanded.add(round);
     }
     setExpandedRounds(newExpanded);
+    // ✅ 通知父组件高度变化
+    setTimeout(() => onHeightChange?.(), 50);
   };
 
   /**
@@ -136,6 +150,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
    */
   const expandAll = () => {
     setExpandedRounds(new Set(rounds.map((r) => r.round)));
+    // ✅ 通知父组件高度变化
+    setTimeout(() => onHeightChange?.(), 100);
   };
 
   /**
@@ -143,6 +159,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
    */
   const collapseAll = () => {
     setExpandedRounds(new Set());
+    // ✅ 通知父组件高度变化
+    setTimeout(() => onHeightChange?.(), 50);
   };
 
   /**
