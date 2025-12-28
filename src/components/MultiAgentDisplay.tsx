@@ -248,9 +248,10 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                 <div className="round-content">
                   {roundData.outputs.map((output, index) => {
                     // ✅ 优先使用流式内容（如果agent正在生成中）
-                    const displayContent = streamingAgentContent[output.agent] || output.content;
-                    const isStreaming = streamingAgentContent[output.agent] && 
-                                       streamingAgentContent[output.agent] !== output.content;
+                    const streamKey = `${output.agent}:${output.round}`; // ✅ 使用 agent:round 格式
+                    const displayContent = streamingAgentContent[streamKey] || output.content;
+                    const isStreaming = streamingAgentContent[streamKey] && 
+                                       streamingAgentContent[streamKey] !== output.content;
                     
                     return (
                       <div key={index} className={`agent-output agent-${output.agent}`}>

@@ -154,10 +154,12 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   // ✅ 新增：agent_start 事件
                   if (parsed.type === 'agent_start') {
                     const agentId = parsed.agent;
+                    const round = parsed.round;
+                    const key = `${agentId}:${round}`; // ✅ 使用 agent:round 格式，避免不同轮次覆盖
                     // 重置该agent的流式内容
-                    agentStreamingContent.set(agentId, '');
+                    agentStreamingContent.set(key, '');
                     
-                    console.log(`🚀 [MultiAgent] ${agentId} 开始生成 (第${parsed.round}轮)`);
+                    console.log(`🚀 [MultiAgent] ${agentId} 开始生成 (第${round}轮)`);
                     
                     // 更新UI状态
                     updateMessage(assistantMessageId, {
@@ -169,9 +171,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   // ✅ 新增：agent_chunk 事件（流式内容）
                   if (parsed.type === 'agent_chunk') {
                     const agentId = parsed.agent;
-                    const currentAgentContent = agentStreamingContent.get(agentId) || '';
+                    const round = parsed.round;
+                    const key = `${agentId}:${round}`; // ✅ 使用 agent:round 格式
+                    const currentAgentContent = agentStreamingContent.get(key) || '';
                     const newContent = currentAgentContent + parsed.chunk;
-                    agentStreamingContent.set(agentId, newContent);
+                    agentStreamingContent.set(key, newContent);
                     
                     // 如果是reporter，更新主内容
                     if (agentId === 'reporter') {
@@ -194,18 +198,20 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   // ✅ 修改：agent_complete 事件（替代原来的agent_output）
                   if (parsed.type === 'agent_complete') {
                     const agentId = parsed.agent;
+                    const round = parsed.round;
+                    const key = `${agentId}:${round}`; // ✅ 使用 agent:round 格式
                     // agent完成后，用完整内容替换流式内容
-                    agentStreamingContent.set(agentId, parsed.full_content);
+                    agentStreamingContent.set(key, parsed.full_content);
                     
                     // 添加到rounds
-                    if (!currentRound || currentRound.round !== parsed.round) {
+                    if (!currentRound || currentRound.round !== round) {
                       if (currentRound) multiAgentRounds.push(currentRound);
-                      currentRound = { round: parsed.round, outputs: [] };
+                      currentRound = { round: round, outputs: [] };
                     }
 
                     const agentOutput: MAAgentOutput = {
                       agent: agentId,
-                      round: parsed.round,
+                      round: round,
                       output_type: 'text',
                       content: parsed.full_content,
                       metadata: parsed.metadata,
