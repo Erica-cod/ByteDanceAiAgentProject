@@ -30,6 +30,11 @@
     "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
     "test:volcengine": "node test-volcengine.js",
     "test:planning": "node test-planning-tools.js",
+    "test:redis": "node test/test-redis-connection.js",
+    "test:redis:resume": "node test/test-redis-resume.js",
+    "test:redis:optimization": "node test/test-redis-optimization.js",
+    "test:refactored": "node test/test-refactored-code.js",
+    "test:refactored:files": "node test/test-refactored-files.js",
     "test:all": "node test-volcengine.js && node test-planning-tools.js"
   },
   "dependencies": {
@@ -37,8 +42,11 @@
     "@langchain/langgraph": "^1.0.2",
     "@modern-js/runtime": "^2.68.0",
     "@tavily/core": "^0.5.13",
+    "@types/ioredis": "^5.0.0",
     "dotenv": "^17.2.3",
     "highlight.js": "^11.11.1",
+    "immer": "^11.1.0",
+    "ioredis": "^5.8.2",
     "langchain": "^1.1.1",
     "mongodb": "^7.0.0",
     "node-fetch": "^2.7.0",
@@ -46,9 +54,11 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
     "react-virtuoso": "^4.17.0",
+    "redis": "^5.10.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@modern-js/app-tools": "^2.68.0",
