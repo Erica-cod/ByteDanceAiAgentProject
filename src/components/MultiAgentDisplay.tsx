@@ -51,6 +51,7 @@ interface MultiAgentDisplayProps {
   rounds: RoundData[];
   status: 'in_progress' | 'converged' | 'terminated';
   consensusTrend: number[];
+  streamingAgentContent?: Record<string, string>; // ✅ 新增：流式内容
 }
 
 /**
@@ -90,6 +91,7 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
   rounds,
   status,
   consensusTrend,
+  streamingAgentContent = {}, // ✅ 新增：流式内容
 }) => {
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(
     new Set([rounds.length]) // 默认展开最新一轮
@@ -244,22 +246,30 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
               {/* 轮次内容 */}
               {isExpanded && (
                 <div className="round-content">
-                  {roundData.outputs.map((output, index) => (
-                    <div key={index} className={`agent-output agent-${output.agent}`}>
-                      <div className="agent-header">
-                        <span className="agent-icon">
-                          {AGENT_ICONS[output.agent]}
-                        </span>
-                        <span className="agent-name">
-                          {AGENT_NAMES[output.agent]}
-                        </span>
-                        <span className="output-type">{output.output_type}</span>
+                  {roundData.outputs.map((output, index) => {
+                    // ✅ 优先使用流式内容（如果agent正在生成中）
+                    const displayContent = streamingAgentContent[output.agent] || output.content;
+                    const isStreaming = streamingAgentContent[output.agent] && 
+                                       streamingAgentContent[output.agent] !== output.content;
+                    
+                    return (
+                      <div key={index} className={`agent-output agent-${output.agent}`}>
+                        <div className="agent-header">
+                          <span className="agent-icon">
+                            {AGENT_ICONS[output.agent]}
+                          </span>
+                          <span className="agent-name">
+                            {AGENT_NAMES[output.agent]}
+                          </span>
+                          <span className="output-type">{output.output_type}</span>
+                          {isStreaming && <span className="streaming-indicator">⚡ 生成中...</span>}
+                        </div>
+                        <div className="agent-content">
+                          <StreamingMarkdown content={displayContent} />
+                        </div>
                       </div>
-                      <div className="agent-content">
-                        <StreamingMarkdown content={output.content} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Host决策 */}
                   {roundData.hostDecision && (

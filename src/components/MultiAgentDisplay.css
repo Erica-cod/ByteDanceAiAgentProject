@@ -309,6 +309,24 @@
   color: #666;
 }
 
+/* ✅ 新增：流式生成指示器 */
+.streaming-indicator {
+  margin-left: auto;
+  font-size: 11px;
+  color: #4CAF50;
+  font-weight: bold;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .agent-content {
   font-size: 14px;
   line-height: 1.6;

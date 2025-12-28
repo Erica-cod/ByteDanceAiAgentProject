@@ -25,6 +25,7 @@ export interface Message {
     status: 'in_progress' | 'converged' | 'terminated';
     consensusTrend: number[];
   };
+  streamingAgentContent?: Record<string, string>; // ✅ 新增：流式内容（agentId -> 累积内容）
 }
 
 interface ChatState {

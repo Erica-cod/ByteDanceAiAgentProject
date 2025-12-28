@@ -44,6 +44,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       let multiAgentConsensusTrend: number[] = [];
       let currentRound: RoundData | null = null;
       let completedRounds = 0; // ✅ 记录已完成的轮次（用于断点续传）
+      
+      // ✅ 新增：流式内容累积（每个agent独立累积）
+      let agentStreamingContent: Map<string, string> = new Map();
 
       let currentContent = '';
       let currentThinking = '';
@@ -148,6 +151,85 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
                 // 多Agent模式事件处理
                 if (chatMode === 'multi_agent') {
+                  // ✅ 新增：agent_start 事件
+                  if (parsed.type === 'agent_start') {
+                    const agentId = parsed.agent;
+                    // 重置该agent的流式内容
+                    agentStreamingContent.set(agentId, '');
+                    
+                    console.log(`🚀 [MultiAgent] ${agentId} 开始生成 (第${parsed.round}轮)`);
+                    
+                    // 更新UI状态
+                    updateMessage(assistantMessageId, {
+                      thinking: `${agentId} 正在思考...`,
+                    });
+                    continue;
+                  }
+                  
+                  // ✅ 新增：agent_chunk 事件（流式内容）
+                  if (parsed.type === 'agent_chunk') {
+                    const agentId = parsed.agent;
+                    const currentAgentContent = agentStreamingContent.get(agentId) || '';
+                    const newContent = currentAgentContent + parsed.chunk;
+                    agentStreamingContent.set(agentId, newContent);
+                    
+                    // 如果是reporter，更新主内容
+                    if (agentId === 'reporter') {
+                      currentContent = newContent;
+                    }
+                    
+                    // 实时更新UI（显示流式内容）
+                    updateMessage(assistantMessageId, {
+                      content: currentContent || '多Agent协作中...',
+                      streamingAgentContent: Object.fromEntries(agentStreamingContent),
+                      multiAgentData: {
+                        rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                        status: multiAgentStatus,
+                        consensusTrend: multiAgentConsensusTrend,
+                      },
+                    });
+                    continue;
+                  }
+                  
+                  // ✅ 修改：agent_complete 事件（替代原来的agent_output）
+                  if (parsed.type === 'agent_complete') {
+                    const agentId = parsed.agent;
+                    // agent完成后，用完整内容替换流式内容
+                    agentStreamingContent.set(agentId, parsed.full_content);
+                    
+                    // 添加到rounds
+                    if (!currentRound || currentRound.round !== parsed.round) {
+                      if (currentRound) multiAgentRounds.push(currentRound);
+                      currentRound = { round: parsed.round, outputs: [] };
+                    }
+
+                    const agentOutput: MAAgentOutput = {
+                      agent: agentId,
+                      round: parsed.round,
+                      output_type: 'text',
+                      content: parsed.full_content,
+                      metadata: parsed.metadata,
+                      timestamp: parsed.timestamp,
+                    };
+                    currentRound.outputs.push(agentOutput);
+
+                    if (agentId === 'reporter') {
+                      currentContent = parsed.full_content;
+                    }
+
+                    updateMessage(assistantMessageId, {
+                      content: currentContent || '多Agent协作中...',
+                      streamingAgentContent: Object.fromEntries(agentStreamingContent),
+                      multiAgentData: {
+                        rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                        status: multiAgentStatus,
+                        consensusTrend: multiAgentConsensusTrend,
+                      },
+                    });
+                    continue;
+                  }
+                  
+                  // ⚠️ 保留向后兼容：agent_output 事件（如果后端没更新）
                   if (parsed.type === 'agent_output') {
                     if (!currentRound || currentRound.round !== parsed.round) {
                       if (currentRound) multiAgentRounds.push(currentRound);
