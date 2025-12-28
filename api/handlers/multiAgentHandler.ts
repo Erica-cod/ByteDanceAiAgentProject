@@ -6,9 +6,17 @@
 import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/multiAgentOrchestrator.js';
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
-import { isRedisAvailable, saveMultiAgentState, loadMultiAgentState, deleteMultiAgentState } from '../services/redisClient.js';
+import { MultiAgentSessionService } from '../services/multiAgentSessionService.js';
+import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
+
+// =====================================================================
+// 已弃用 Redis 版本（保留用于参考）
+// 原因：MongoDB 更适合多 Agent 状态保存（低频、持久化、查询能力）
+// 详见：docs/ARCHITECTURE_DECISION.md
+// =====================================================================
+// import { isRedisAvailable, saveMultiAgentState, loadMultiAgentState, deleteMultiAgentState } from '../services/redisClient.js';
 
 /**
  * 处理多Agent协作并转换为SSE流式响应
@@ -23,89 +31,53 @@ export async function handleMultiAgentMode(
 ): Promise<Response> {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
-  const encoder = new TextEncoder();
-
-  /**
-   * SSE 心跳（用于避免反向代理/负载均衡因"空闲超时"断开连接）
-   */
-  const HEARTBEAT_MS = (() => {
-    const n = Number.parseInt(String(process.env.SSE_HEARTBEAT_MS ?? ''), 10);
-    return Number.isFinite(n) && n > 0 ? n : 15000;
-  })();
-
-  // 添加连接状态标志
-  let isStreamClosed = false;
   
-  // 安全的写入辅助函数
-  const safeWrite = async (data: string) => {
-    if (isStreamClosed) {
-      console.warn('⚠️  [SSE] 流已关闭，跳过写入');
-      return false;
-    }
-    
-    try {
-      await writer.write(encoder.encode(data));
-      return true;
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.code === 'ABORT_ERR') {
-        console.warn('⚠️  [SSE] 客户端关闭了连接');
-        isStreamClosed = true;
-        return false;
-      }
-      throw error;
-    }
-  };
+  // ✅ 使用 SSEStreamWriter 工具类
+  const sseWriter = new SSEStreamWriter(writer);
 
   // 异步处理多Agent协作
   (async () => {
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     try {
       // 首先发送 conversationId
-      const initData = JSON.stringify({
+      await sseWriter.sendEvent({
         conversationId: conversationId,
         type: 'init',
         mode: 'multi_agent',
       });
-      await safeWrite(`data: ${initData}\n\n`);
 
       // 启动心跳
-      heartbeatTimer = setInterval(() => {
-        void safeWrite(`: keep-alive\n\n`);
-      }, HEARTBEAT_MS);
+      sseWriter.startHeartbeat(15000);
 
-      // ✅ 尝试从 Redis 恢复状态（断点续传）
+      // ✅ 尝试从 MongoDB 恢复状态（断点续传）
       let initialState: any = undefined;
       let actualResumeFromRound: number | undefined = resumeFromRound;
       
       if (resumeFromRound && resumeFromRound > 1 && clientAssistantMessageId) {
-        const redisAvailable = await isRedisAvailable();
-        if (redisAvailable) {
-          const cachedState = await loadMultiAgentState(
-            conversationId, 
-            clientAssistantMessageId,
-            {
-              renewTTL: true, // 启用滑动过期（访问时续期）
-              maxRounds: 5,   // 用于计算续期后的 TTL
-            }
+        try {
+          const cachedState = await MultiAgentSessionService.loadState(
+            conversationId,
+            userId,
+            clientAssistantMessageId
           );
+          
           if (cachedState && cachedState.completedRounds >= resumeFromRound - 1) {
             initialState = cachedState.sessionState;
             actualResumeFromRound = cachedState.completedRounds + 1;
-            console.log(`🔄 [MultiAgent] 从 Redis 恢复状态，将从第 ${actualResumeFromRound} 轮继续`);
+            console.log(`🔄 [MultiAgent] 从 MongoDB 恢复状态，将从第 ${actualResumeFromRound} 轮继续`);
             
             // 通知前端恢复状态
-            await safeWrite(`data: ${JSON.stringify({
+            await sseWriter.sendEvent({
               type: 'resume',
               resumedFromRound: cachedState.completedRounds,
               continueFromRound: actualResumeFromRound,
               timestamp: new Date().toISOString(),
-            })}\n\n`);
+            });
           } else {
-            console.log(`⚠️  [MultiAgent] Redis 中未找到可用状态，将从头开始`);
+            console.log(`⚠️  [MultiAgent] MongoDB 中未找到可用状态，将从头开始`);
             actualResumeFromRound = undefined;
           }
-        } else {
-          console.log(`⚠️  [MultiAgent] Redis 不可用，无法恢复状态`);
+        } catch (error) {
+          console.error('❌ [MultiAgent] 从 MongoDB 恢复状态失败:', error);
           actualResumeFromRound = undefined;
         }
       }
@@ -118,34 +90,60 @@ export async function handleMultiAgentMode(
           conversationId,
           resumeFromRound: actualResumeFromRound,
           initialState: initialState,
+          // ✅ 传递连接检查器（防止前端刷新后继续浪费token）
+          connectionChecker: () => !sseWriter.isClosed(),
         },
         {
-          // Agent输出回调
-          onAgentOutput: async (output: AgentOutput) => {
-            if (isStreamClosed) return;
+          // ✅ 新增：Agent开始回调（流式显示）
+          onAgentStart: async (agentId: string, round: number) => {
+            if (sseWriter.isClosed()) return;
             
-            console.log(`📤 [SSE] 发送Agent输出: ${output.agent_id}`);
+            console.log(`🚀 [SSE] Agent开始: ${agentId} (第${round}轮)`);
             
-            const sseData = JSON.stringify({
-              type: 'agent_output',
+            await sseWriter.sendEvent({
+              type: 'agent_start',
+              agent: agentId,
+              round: round,
+              timestamp: new Date().toISOString(),
+            });
+          },
+          
+          // ✅ 新增：Agent chunk回调（流式内容）
+          onAgentChunk: async (agentId: string, round: number, chunk: string) => {
+            if (sseWriter.isClosed()) return;
+            
+            await sseWriter.sendEvent({
+              type: 'agent_chunk',
+              agent: agentId,
+              round: round,
+              chunk: chunk,
+              timestamp: new Date().toISOString(),
+            });
+          },
+          
+          // ✅ 修改：Agent完成回调（发送完整内容用于保存）
+          onAgentComplete: async (output: AgentOutput) => {
+            if (sseWriter.isClosed()) return;
+            
+            console.log(`✅ [SSE] Agent完成: ${output.agent_id}`);
+            
+            await sseWriter.sendEvent({
+              type: 'agent_complete',
               agent: output.agent_id,
               round: output.round,
-              output_type: output.output_type,
-              content: output.content,
+              full_content: output.content,
               metadata: output.metadata,
               timestamp: output.timestamp,
             });
-            
-            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // Host决策回调
           onHostDecision: async (decision: HostDecision, analysis: any) => {
-            if (isStreamClosed) return;
+            if (sseWriter.isClosed()) return;
             
             console.log(`📤 [SSE] 发送Host决策: ${decision.action}`);
             
-            const sseData = JSON.stringify({
+            await sseWriter.sendEvent({
               type: 'host_decision',
               action: decision.action,
               reason: decision.reason,
@@ -153,49 +151,43 @@ export async function handleMultiAgentMode(
               consensus_level: analysis.consensus_level,
               timestamp: new Date().toISOString(),
             });
-            
-            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // 轮次完成回调
           onRoundComplete: async (round: number) => {
             console.log(`📤 [SSE] 第 ${round} 轮完成`);
             
-            // ✅ 保存当前状态到 Redis（断点续传）
+            // ✅ 保存当前状态到 MongoDB（断点续传）
             // 🔴 关键修复：即使客户端断开连接，也要保存状态！
             if (clientAssistantMessageId) {
-              const redisAvailable = await isRedisAvailable();
-              if (redisAvailable) {
+              try {
                 const currentSession = orchestrator.getSession();
-                await saveMultiAgentState(
-                  conversationId, 
-                  clientAssistantMessageId, 
+                await MultiAgentSessionService.saveState(
+                  conversationId,
+                  userId,
+                  clientAssistantMessageId,
                   {
                     completedRounds: round,
                     sessionState: currentSession,
                     userQuery: userQuery,
-                  },
-                  {
-                    maxRounds: 5, // 传递最大轮次，用于计算动态 TTL
-                    async: true,  // 🚀 使用异步写入，避免阻塞 SSE 流
                   }
                 );
+              } catch (error) {
+                console.error('❌ [MultiAgent] 保存状态到 MongoDB 失败:', error);
               }
             }
             
             // 只有连接还在时才发送 SSE 事件
-            if (isStreamClosed) {
-              console.log(`⚠️  [SSE] 客户端已断开，但状态已保存到 Redis (第 ${round} 轮)`);
+            if (sseWriter.isClosed()) {
+              console.log(`⚠️  [SSE] 客户端已断开，但状态已保存到 MongoDB (第 ${round} 轮)`);
               return;
             }
             
-            const sseData = JSON.stringify({
+            await sseWriter.sendEvent({
               type: 'round_complete',
               round,
               timestamp: new Date().toISOString(),
             });
-            
-            await safeWrite(`data: ${sseData}\n\n`);
           },
 
           // 会话完成回调
@@ -223,29 +215,32 @@ export async function handleMultiAgentMode(
               console.error('❌ 保存多Agent报告失败:', dbError);
             }
 
-            // ✅ 删除 Redis 中的状态（会话已完成）
+            // ✅ 删除 MongoDB 中的状态（会话已完成）
             if (clientAssistantMessageId) {
-              const redisAvailable = await isRedisAvailable();
-              if (redisAvailable) {
-                await deleteMultiAgentState(conversationId, clientAssistantMessageId);
+              try {
+                await MultiAgentSessionService.deleteState(
+                  conversationId,
+                  userId,
+                  clientAssistantMessageId
+                );
+              } catch (error) {
+                console.error('❌ [MultiAgent] 删除 MongoDB 状态失败:', error);
               }
             }
 
             // 只有连接还在时才发送 SSE 事件
-            if (isStreamClosed) {
+            if (sseWriter.isClosed()) {
               console.log(`⚠️  [SSE] 客户端已断开，但最终报告已保存到数据库`);
               return;
             }
 
-            const sseData = JSON.stringify({
+            await sseWriter.sendEvent({
               type: 'session_complete',
               status: session.status,
               rounds: session.current_round,
               consensus_trend: session.consensus_trend,
               timestamp: new Date().toISOString(),
             });
-            
-            await safeWrite(`data: ${sseData}\n\n`);
           },
         }
       );
@@ -254,50 +249,29 @@ export async function handleMultiAgentMode(
       console.log('🚀 [MultiAgent] 开始运行多Agent协作...');
       await orchestrator.run(userQuery, actualResumeFromRound);
 
-      // 发送完成信号
-      if (!isStreamClosed) {
-        await safeWrite('data: [DONE]\n\n');
-        await writer.close();
-        console.log('✅ [MultiAgent] 多Agent协作完成，SSE流正常关闭');
-      } else {
-        console.log('⚠️  [MultiAgent] 多Agent协作完成，但客户端已提前关闭连接');
-        try {
-          await writer.close();
-        } catch (e) {
-          // 忽略关闭错误
-        }
-      }
+      // 关闭SSE流
+      await sseWriter.close();
+      console.log('✅ [MultiAgent] 多Agent协作完成，SSE流正常关闭');
+      
     } catch (error: any) {
       console.error('❌ [MultiAgent] 多Agent协作失败:', error);
       
       // 如果连接还在，发送错误信息
-      if (!isStreamClosed) {
+      if (!sseWriter.isClosed()) {
         try {
-          const errorData = JSON.stringify({
+          await sseWriter.sendEvent({
             type: 'error',
             error: error.message,
             timestamp: new Date().toISOString(),
           });
-          
-          await safeWrite(`data: ${errorData}\n\n`);
-          await safeWrite('data: [DONE]\n\n');
         } catch (writeError) {
           console.error('❌ 发送错误信息失败:', writeError);
         }
       }
       
-      // 尝试关闭writer
-      try {
-        await writer.close();
-      } catch (closeError) {
-        // 忽略关闭错误
-      }
+      // 关闭流
+      await sseWriter.close();
     } finally {
-      // ✅ 确保清理心跳定时器，避免资源泄漏
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer);
-        heartbeatTimer = null;
-      }
       // ✅ 确保释放并发名额
       try {
         onFinally?.();

@@ -95,9 +95,13 @@ export abstract class BaseAgent {
    * 调用火山引擎模型
    * 
    * @param messages - 消息列表
+   * @param onChunk - 可选的流式回调（每个chunk调用一次）
    * @returns AI回复内容
    */
-  protected async callModel(messages: VolcengineMessage[]): Promise<string> {
+  protected async callModel(
+    messages: VolcengineMessage[],
+    onChunk?: (chunk: string) => void | Promise<void>
+  ): Promise<string> {
     try {
       console.log(`🤖 [${this.agentId}] 调用火山引擎模型...`);
       
@@ -122,6 +126,11 @@ export abstract class BaseAgent {
             const content = volcengineService.parseStreamLine(line);
             if (content) {
               fullResponse += content;
+              
+              // ✅ 实时回调
+              if (onChunk) {
+                await onChunk(content);
+              }
             }
           }
         }

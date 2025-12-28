@@ -49,13 +49,16 @@ export interface OrchestratorConfig {
   conversationId: string;    // 会话ID
   resumeFromRound?: number;  // ✅ 从指定轮次恢复（用于断点续传）
   initialState?: Partial<MultiAgentSession>;  // ✅ 初始状态（用于恢复）
+  connectionChecker?: () => boolean; // ✅ 连接状态检查器（检测SSE连接是否断开）
 }
 
 /**
  * 编排器回调
  */
 export interface OrchestratorCallbacks {
-  onAgentOutput?: (output: AgentOutput) => void | Promise<void>;
+  onAgentStart?: (agentId: string, round: number) => void | Promise<void>;  // ✅ 新增：Agent开始
+  onAgentChunk?: (agentId: string, round: number, chunk: string) => void | Promise<void>;  // ✅ 新增：流式内容
+  onAgentComplete?: (output: AgentOutput) => void | Promise<void>;  // ✅ 重命名：原 onAgentOutput
   onHostDecision?: (decision: HostDecision, analysis: any) => void | Promise<void>;
   onRoundComplete?: (round: number) => void | Promise<void>;
   onSessionComplete?: (session: MultiAgentSession) => void | Promise<void>;
@@ -72,8 +75,10 @@ export class MultiAgentOrchestrator {
 
   private session: MultiAgentSession;
   private callbacks: OrchestratorCallbacks;
+  private connectionChecker?: () => boolean; // ✅ 连接状态检查器
 
   constructor(config: OrchestratorConfig, callbacks: OrchestratorCallbacks = {}) {
+    this.connectionChecker = config.connectionChecker;
     // 初始化所有Agent
     this.planner = new PlannerAgent();
     this.critic = new CriticAgent();
@@ -148,6 +153,13 @@ export class MultiAgentOrchestrator {
     try {
       // 主循环：最多执行 max_rounds 轮
       for (let round = startRound; round <= this.session.max_rounds; round++) {
+        // ✅ 检查连接状态（防止前端刷新后继续浪费token）
+        if (this.connectionChecker && !this.connectionChecker()) {
+          console.warn(`⚠️  [Orchestrator] 检测到SSE连接断开，停止生成（第 ${round} 轮）`);
+          this.session.status = 'terminated';
+          break;
+        }
+        
         console.log(`\n${'='.repeat(60)}`);
         console.log(`🔄 [Orchestrator] 第 ${round} 轮开始`);
         console.log(`${'='.repeat(60)}`);
@@ -155,42 +167,70 @@ export class MultiAgentOrchestrator {
         this.session.current_round = round;
         const roundOutputs: AgentOutput[] = [];
 
-        // 1. Planner生成计划
+        // 1. Planner生成计划（流式）
         console.log(`\n📋 [Orchestrator] Planner 生成计划...`);
         this.session.agents.planner.status = 'running';
         
+        // ✅ 生成前检查连接
+        if (this.connectionChecker && !this.connectionChecker()) {
+          console.warn(`⚠️  [Orchestrator] 连接断开，跳过Planner生成`);
+          break;
+        }
+        
         const plannerContext = this.buildPlannerContext(round);
-        const plannerOutput = await this.planner.generate(userQuery, plannerContext, round);
+        const plannerOutput = await this.generateWithStreaming(
+          this.planner,
+          'planner',
+          userQuery,
+          plannerContext,
+          round
+        );
         
         this.session.agents.planner.status = 'completed';
         this.session.agents.planner.last_output = plannerOutput;
         roundOutputs.push(plannerOutput);
 
-        if (this.callbacks.onAgentOutput) {
-          await this.callbacks.onAgentOutput(plannerOutput);
-        }
-
-        // 2. Critic批评计划
+        // 2. Critic批评计划（流式）
         console.log(`\n🔍 [Orchestrator] Critic 批评计划...`);
         this.session.agents.critic.status = 'running';
         
+        // ✅ 生成前检查连接
+        if (this.connectionChecker && !this.connectionChecker()) {
+          console.warn(`⚠️  [Orchestrator] 连接断开，跳过Critic生成`);
+          break;
+        }
+        
         const criticContext = this.buildCriticContext(round, plannerOutput);
-        const criticOutput = await this.critic.generate(userQuery, criticContext, round);
+        const criticOutput = await this.generateWithStreaming(
+          this.critic,
+          'critic',
+          userQuery,
+          criticContext,
+          round
+        );
         
         this.session.agents.critic.status = 'completed';
         this.session.agents.critic.last_output = criticOutput;
         roundOutputs.push(criticOutput);
 
-        if (this.callbacks.onAgentOutput) {
-          await this.callbacks.onAgentOutput(criticOutput);
-        }
-
-        // 3. Host分析并决策
+        // 3. Host分析并决策（流式）
         console.log(`\n🎯 [Orchestrator] Host 分析决策...`);
         this.session.agents.host.status = 'running';
         
+        // ✅ 生成前检查连接
+        if (this.connectionChecker && !this.connectionChecker()) {
+          console.warn(`⚠️  [Orchestrator] 连接断开，跳过Host生成`);
+          break;
+        }
+        
         const hostContext = this.buildHostContext(round, plannerOutput, criticOutput);
-        const hostOutput = await this.host.generate(userQuery, hostContext, round);
+        const hostOutput = await this.generateWithStreaming(
+          this.host,
+          'host',
+          userQuery,
+          hostContext,
+          round
+        );
         
         this.session.agents.host.status = 'completed';
         this.session.agents.host.last_output = hostOutput;
@@ -234,12 +274,21 @@ export class MultiAgentOrchestrator {
         console.log(`🔄 [Orchestrator] 继续下一轮讨论...`);
       }
 
-      // 5. 生成最终报告
+      // 5. 生成最终报告（流式）
       console.log(`\n📝 [Orchestrator] Reporter 生成最终报告...`);
       this.session.agents.reporter.status = 'running';
       
+      // ✅ 生成前检查连接
+      if (this.connectionChecker && !this.connectionChecker()) {
+        console.warn(`⚠️  [Orchestrator] 连接断开，跳过Reporter生成`);
+        this.session.status = 'terminated';
+        return this.session;
+      }
+      
       const reporterContext = this.buildReporterContext();
-      const reporterOutput = await this.reporter.generate(
+      const reporterOutput = await this.generateWithStreaming(
+        this.reporter,
+        'reporter',
         this.session.user_query,
         reporterContext,
         this.session.current_round + 1
@@ -256,10 +305,6 @@ export class MultiAgentOrchestrator {
           round: 1,
           outputs: [reporterOutput],
         });
-      }
-
-      if (this.callbacks.onAgentOutput) {
-        await this.callbacks.onAgentOutput(reporterOutput);
       }
 
       // 6. 完成会话
@@ -423,6 +468,52 @@ export class MultiAgentOrchestrator {
     if (similarity > 0.85) return 'high';
     if (similarity > 0.70) return 'medium';
     return 'low';
+  }
+
+  /**
+   * ✅ 新增：带流式回调的Agent生成（包装generate方法）
+   * 
+   * 这个方法在调用agent.generate之前，先hook callModel方法来实现流式推送
+   */
+  private async generateWithStreaming(
+    agent: any,
+    agentId: string,
+    userQuery: string,
+    context: any,
+    round: number
+  ): Promise<AgentOutput> {
+    // 通知开始
+    if (this.callbacks.onAgentStart) {
+      await this.callbacks.onAgentStart(agentId, round);
+    }
+    
+    // 保存原始的callModel方法
+    const originalCallModel = agent.callModel.bind(agent);
+    
+    // 临时替换callModel方法，添加流式回调
+    agent.callModel = async (messages: any[], onChunk?: any) => {
+      return await originalCallModel(messages, async (chunk: string) => {
+        // 实时推送chunk
+        if (this.callbacks.onAgentChunk) {
+          await this.callbacks.onAgentChunk(agentId, round, chunk);
+        }
+      });
+    };
+    
+    try {
+      // 调用原有的generate方法（它内部会调用我们修改后的callModel）
+      const output = await agent.generate(userQuery, context, round);
+      
+      // 通知完成
+      if (this.callbacks.onAgentComplete) {
+        await this.callbacks.onAgentComplete(output);
+      }
+      
+      return output;
+    } finally {
+      // 恢复原始的callModel方法
+      agent.callModel = originalCallModel;
+    }
   }
 
   /**
