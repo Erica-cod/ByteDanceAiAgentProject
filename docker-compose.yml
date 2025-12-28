@@ -1,4 +1,22 @@
 services:
+  # Redis for multi-agent state caching
+  redis:
+    image: redis:7-alpine
+    container_name: redis-ai-agent
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass your_redis_password
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   # Modern.js Application
   app:
     build:
@@ -13,6 +31,9 @@ services:
       - OLLAMA_API_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=deepseek-r1:7b
       - MONGODB_URI=mongodb://mongodb-global:27017/ai-agent
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=your_redis_password
       - TAVILY_API_KEY=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
       - ARK_API_KEY=9a75dc8d-4bde-4094-90f0-19e13071f275
       - ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
@@ -22,6 +43,8 @@ services:
     restart: unless-stopped
     networks:
       - shared-network
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
@@ -39,5 +62,7 @@ networks:
   # - MongoDB runs in mongodb-global container
   # - shared-network is created externally and mongodb-global is already connected
 
-volumes: {}
+volumes:
+  redis-data:
+    driver: local
 

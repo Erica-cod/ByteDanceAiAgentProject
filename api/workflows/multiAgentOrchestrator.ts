@@ -47,6 +47,8 @@ export interface OrchestratorConfig {
   maxRounds?: number;        // 最大轮次，默认5
   userId: string;            // 用户ID
   conversationId: string;    // 会话ID
+  resumeFromRound?: number;  // ✅ 从指定轮次恢复（用于断点续传）
+  initialState?: Partial<MultiAgentSession>;  // ✅ 初始状态（用于恢复）
 }
 
 /**
@@ -80,25 +82,48 @@ export class MultiAgentOrchestrator {
 
     this.callbacks = callbacks;
 
-    // 初始化会话状态
-    this.session = {
-      session_id: `session_${Date.now()}`,
-      user_query: '',
-      mode: 'multi_agent',
-      status: 'in_progress',
-      current_round: 0,
-      max_rounds: config.maxRounds || 5,
-      agents: {
-        planner: { status: 'idle' },
-        critic: { status: 'idle' },
-        host: { status: 'idle' },
-        reporter: { status: 'idle' },
-      },
-      history: [],
-      consensus_trend: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    // ✅ 支持从保存的状态恢复
+    if (config.initialState) {
+      console.log(`🔄 [Orchestrator] 从已保存状态恢复 (第 ${config.initialState.current_round} 轮)`);
+      this.session = {
+        session_id: config.initialState.session_id || `session_${Date.now()}`,
+        user_query: config.initialState.user_query || '',
+        mode: 'multi_agent',
+        status: config.initialState.status || 'in_progress',
+        current_round: config.initialState.current_round || 0,
+        max_rounds: config.maxRounds || config.initialState.max_rounds || 5,
+        agents: config.initialState.agents || {
+          planner: { status: 'idle' },
+          critic: { status: 'idle' },
+          host: { status: 'idle' },
+          reporter: { status: 'idle' },
+        },
+        history: config.initialState.history || [],
+        consensus_trend: config.initialState.consensus_trend || [],
+        created_at: config.initialState.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    } else {
+      // 初始化会话状态
+      this.session = {
+        session_id: `session_${Date.now()}`,
+        user_query: '',
+        mode: 'multi_agent',
+        status: 'in_progress',
+        current_round: 0,
+        max_rounds: config.maxRounds || 5,
+        agents: {
+          planner: { status: 'idle' },
+          critic: { status: 'idle' },
+          host: { status: 'idle' },
+          reporter: { status: 'idle' },
+        },
+        history: [],
+        consensus_trend: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
   }
 
   /**
@@ -107,16 +132,22 @@ export class MultiAgentOrchestrator {
    * @param userQuery - 用户查询
    * @returns 最终会话状态
    */
-  async run(userQuery: string): Promise<MultiAgentSession> {
+  async run(userQuery: string, resumeFromRound?: number): Promise<MultiAgentSession> {
     console.log(`\n🚀 [Orchestrator] 启动多Agent协作...`);
     console.log(`📝 [Orchestrator] 用户查询: ${userQuery}`);
     console.log(`⚙️  [Orchestrator] 最大轮次: ${this.session.max_rounds}`);
+    
+    // ✅ 断点续传支持
+    const startRound = resumeFromRound || 1;
+    if (resumeFromRound && resumeFromRound > 1) {
+      console.log(`🔄 [Orchestrator] 从第 ${resumeFromRound} 轮继续（断点续传）`);
+    }
 
     this.session.user_query = userQuery;
 
     try {
       // 主循环：最多执行 max_rounds 轮
-      for (let round = 1; round <= this.session.max_rounds; round++) {
+      for (let round = startRound; round <= this.session.max_rounds; round++) {
         console.log(`\n${'='.repeat(60)}`);
         console.log(`🔄 [Orchestrator] 第 ${round} 轮开始`);
         console.log(`${'='.repeat(60)}`);
@@ -399,6 +430,29 @@ export class MultiAgentOrchestrator {
    */
   getSession(): MultiAgentSession {
     return this.session;
+  }
+
+  /**
+   * ✅ 序列化会话状态（用于 Redis 缓存）
+   * 
+   * 将会话状态序列化为 JSON，用于断点续传
+   */
+  serializeState(): string {
+    return JSON.stringify(this.session);
+  }
+
+  /**
+   * ✅ 从序列化状态恢复（用于断点续传）
+   * 
+   * @param serializedState - 序列化的会话状态
+   */
+  restoreFromState(serializedState: string): void {
+    const restoredSession = JSON.parse(serializedState) as MultiAgentSession;
+    this.session = {
+      ...restoredSession,
+      updated_at: new Date().toISOString(), // 更新时间戳
+    };
+    console.log(`✅ [Orchestrator] 已从保存状态恢复 (第 ${this.session.current_round} 轮)`);
   }
 
   /**

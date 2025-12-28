@@ -24,6 +24,7 @@ import { acquireSSESlot } from '../services/sseLimiter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
 import { extractToolCallWithRemainder } from '../utils/jsonExtractor.js';
+import { isRedisAvailable, saveMultiAgentState, loadMultiAgentState, deleteMultiAgentState } from '../services/redisClient.js';
 
 // 请求选项类型
 interface RequestOption<Q = any, D = any> {
@@ -43,6 +44,7 @@ interface ChatRequestData {
   modelType: 'local' | 'volcano';
   conversationId?: string;
   userId: string;
+  deviceId?: string; // ✅ 新增：设备指纹 ID（用于并发控制，优先于 userId）
   mode?: 'single' | 'multi_agent';  // 聊天模式：单agent或多agent
   /** 前端生成的消息ID：用于和本地缓存对齐（精确去重） */
   clientUserMessageId?: string;
@@ -50,6 +52,8 @@ interface ChatRequestData {
   clientAssistantMessageId?: string;
   /** 队列 token（客户端重试时携带，用于保持队列位置） */
   queueToken?: string;
+  /** ✅ 断点续传：从指定轮次恢复（用于多 agent 模式） */
+  resumeFromRound?: number;
 }
 
 /**
@@ -1216,7 +1220,8 @@ async function handleMultiAgentMode(
   userId: string,
   conversationId: string,
   clientAssistantMessageId?: string,
-  onFinally?: () => void
+  onFinally?: () => void,
+  resumeFromRound?: number // ✅ 断点续传：从指定轮次恢复
 ) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -1267,10 +1272,47 @@ async function handleMultiAgentMode(
       });
       await safeWrite(`data: ${initData}\n\n`);
 
-      // 启动心跳：只要连接还在，就定期写入注释行，避免中间层判定“空闲”
+      // 启动心跳：只要连接还在，就定期写入注释行，避免中间层判定"空闲"
       heartbeatTimer = setInterval(() => {
         void safeWrite(`: keep-alive\n\n`);
       }, HEARTBEAT_MS);
+
+      // ✅ 尝试从 Redis 恢复状态（断点续传）
+      let initialState: any = undefined;
+      let actualResumeFromRound: number | undefined = resumeFromRound;
+      
+      if (resumeFromRound && resumeFromRound > 1 && clientAssistantMessageId) {
+        const redisAvailable = await isRedisAvailable();
+        if (redisAvailable) {
+          const cachedState = await loadMultiAgentState(
+            conversationId, 
+            clientAssistantMessageId,
+            {
+              renewTTL: true, // 🔄 启用滑动过期（访问时续期）
+              maxRounds: 5,   // 用于计算续期后的 TTL
+            }
+          );
+          if (cachedState && cachedState.completedRounds >= resumeFromRound - 1) {
+            initialState = cachedState.sessionState;
+            actualResumeFromRound = cachedState.completedRounds + 1;
+            console.log(`🔄 [MultiAgent] 从 Redis 恢复状态，将从第 ${actualResumeFromRound} 轮继续`);
+            
+            // 通知前端恢复状态
+            await safeWrite(`data: ${JSON.stringify({
+              type: 'resume',
+              resumedFromRound: cachedState.completedRounds,
+              continueFromRound: actualResumeFromRound,
+              timestamp: new Date().toISOString(),
+            })}\n\n`);
+          } else {
+            console.log(`⚠️  [MultiAgent] Redis 中未找到可用状态，将从头开始`);
+            actualResumeFromRound = undefined;
+          }
+        } else {
+          console.log(`⚠️  [MultiAgent] Redis 不可用，无法恢复状态`);
+          actualResumeFromRound = undefined;
+        }
+      }
 
       // 创建编排器
       const orchestrator = new MultiAgentOrchestrator(
@@ -1278,6 +1320,8 @@ async function handleMultiAgentMode(
           maxRounds: 5,
           userId,
           conversationId,
+          resumeFromRound: actualResumeFromRound,
+          initialState: initialState,
         },
         {
           // Agent输出回调
@@ -1319,9 +1363,35 @@ async function handleMultiAgentMode(
 
           // 轮次完成回调
           onRoundComplete: async (round: number) => {
-            if (isStreamClosed) return;
-            
             console.log(`📤 [SSE] 第 ${round} 轮完成`);
+            
+            // ✅ 保存当前状态到 Redis（断点续传）
+            // 🔴 关键修复：即使客户端断开连接，也要保存状态！
+            if (clientAssistantMessageId) {
+              const redisAvailable = await isRedisAvailable();
+              if (redisAvailable) {
+                const currentSession = orchestrator.getSession();
+                await saveMultiAgentState(
+                  conversationId, 
+                  clientAssistantMessageId, 
+                  {
+                    completedRounds: round,
+                    sessionState: currentSession,
+                    userQuery: userQuery,
+                  },
+                  {
+                    maxRounds: 5, // 传递最大轮次，用于计算动态 TTL
+                    async: true,  // 🚀 使用异步写入，避免阻塞 SSE 流
+                  }
+                );
+              }
+            }
+            
+            // 只有连接还在时才发送 SSE 事件
+            if (isStreamClosed) {
+              console.log(`⚠️  [SSE] 客户端已断开，但状态已保存到 Redis (第 ${round} 轮)`);
+              return;
+            }
             
             const sseData = JSON.stringify({
               type: 'round_complete',
@@ -1334,10 +1404,9 @@ async function handleMultiAgentMode(
 
           // 会话完成回调
           onSessionComplete: async (session: MultiAgentSession) => {
-            if (isStreamClosed) return;
-            
             console.log(`📤 [SSE] 多Agent会话完成`);
             
+            // 🔴 关键修复：即使客户端断开连接，也要保存最终报告到数据库！
             // 保存最终报告到数据库
             try {
               const reporterOutput = session.agents.reporter.last_output;
@@ -1359,6 +1428,20 @@ async function handleMultiAgentMode(
               console.error('❌ 保存多Agent报告失败:', dbError);
             }
 
+            // ✅ 删除 Redis 中的状态（会话已完成）
+            if (clientAssistantMessageId) {
+              const redisAvailable = await isRedisAvailable();
+              if (redisAvailable) {
+                await deleteMultiAgentState(conversationId, clientAssistantMessageId);
+              }
+            }
+
+            // 只有连接还在时才发送 SSE 事件
+            if (isStreamClosed) {
+              console.log(`⚠️  [SSE] 客户端已断开，但最终报告已保存到数据库`);
+              return;
+            }
+
             const sseData = JSON.stringify({
               type: 'session_complete',
               status: session.status,
@@ -1374,7 +1457,7 @@ async function handleMultiAgentMode(
 
       // 运行多Agent协作
       console.log('🚀 [MultiAgent] 开始运行多Agent协作...');
-      await orchestrator.run(userQuery);
+      await orchestrator.run(userQuery, actualResumeFromRound);
 
       // 发送完成信号
       if (!isStreamClosed) {
@@ -1458,6 +1541,7 @@ export async function post({
       modelType,
       conversationId: reqConversationId,
       userId,
+      deviceId, // ✅ 新增：设备指纹 ID
       mode,
       clientUserMessageId,
       clientAssistantMessageId,
@@ -1468,6 +1552,7 @@ export async function post({
     console.log('解析后的 modelType:', modelType);
     console.log('解析后的 conversationId:', reqConversationId);
     console.log('解析后的 userId:', userId);
+    console.log('解析后的 deviceId:', deviceId || '未提供（降级到 userId）'); // ✅ 新增
     console.log('解析后的 mode:', mode || 'single');
     console.log('解析后的 queueToken:', queueToken || '无');
 
@@ -1482,9 +1567,11 @@ export async function post({
     }
 
     // ==========================================
-    // 📌 入口并发限制：全局 + 单用户（SSE长连接占位）+ 队列化支持
+    // 📌 入口并发限制：全局 + 单设备（SSE长连接占位）+ 队列化支持
     // ==========================================
-    const slot = acquireSSESlot(userId, queueToken);
+    // ✅ 优先使用 deviceId（跨浏览器识别），降级到 userId
+    const identityId = deviceId || userId;
+    const slot = acquireSSESlot(identityId, queueToken);
     // 用显式比较，确保 TS 能正确做联合类型收窄
     if (slot.ok === false) {
       console.warn('⚠️  SSE 并发限制触发，已加入队列:', slot);
@@ -1540,7 +1627,14 @@ export async function post({
       if (mode === 'multi_agent') {
         console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
         handoffToStream = true;
-      return handleMultiAgentMode(message, userId, conversationId, clientAssistantMessageId, slot.release);
+      return handleMultiAgentMode(
+        message, 
+        userId, 
+        conversationId, 
+        clientAssistantMessageId, 
+        slot.release,
+        data.resumeFromRound // ✅ 传递断点续传参数
+      );
       }
 
     // ==========================================
