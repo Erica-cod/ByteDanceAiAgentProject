@@ -124,3 +124,52 @@ export interface PlanListResponse {
   total: number;
 }
 
+// ==================== 多 Agent 会话状态管理 ====================
+
+/**
+ * 多 Agent 会话状态（用于断点续传）
+ * 
+ * 设计说明：
+ * - 保存在 MongoDB，不使用 Redis
+ * - 原因：低频操作（每轮才保存一次）、需要持久化、数据规模小且可预测
+ * - TTL：5分钟后自动过期（MongoDB TTL索引）
+ * 
+ * 详见：docs/ARCHITECTURE_DECISION.md
+ */
+export interface MultiAgentSession {
+  _id?: string;
+  sessionId: string;              // conversationId:assistantMessageId 组合键
+  conversationId: string;         // 对话ID
+  userId: string;                 // 用户ID
+  assistantMessageId: string;     // 助手消息ID（客户端生成）
+  completedRounds: number;        // 已完成的轮次
+  sessionState: any;              // 完整的会话状态（orchestrator.getSession()）
+  userQuery: string;              // 用户查询
+  createdAt: Date;                // 创建时间
+  updatedAt: Date;                // 最后更新时间
+  expiresAt: Date;                // 过期时间（用于 MongoDB TTL 索引自动清理）
+}
+
+/**
+ * 保存多 Agent 状态请求
+ */
+export interface SaveMultiAgentStateRequest {
+  conversationId: string;
+  userId: string;
+  assistantMessageId: string;
+  completedRounds: number;
+  sessionState: any;
+  userQuery: string;
+}
+
+/**
+ * 多 Agent 状态响应
+ */
+export interface MultiAgentStateResponse {
+  found: boolean;
+  completedRounds?: number;
+  sessionState?: any;
+  userQuery?: string;
+  updatedAt?: Date;
+}
+

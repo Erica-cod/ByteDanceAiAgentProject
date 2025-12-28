@@ -1,13 +1,29 @@
 /**
- * Redis 客户端工具类
- * 用于多 agent 状态缓存和断点续传
+ * ============================================================
+ * ⚠️ 已弃用：Redis 客户端工具类（保留用于学习参考）
+ * ============================================================
  * 
- * 性能优化：
- * - ✅ gzip 压缩存储（节省 60-80% 内存）
- * - ✅ 异步写入（Fire and Forget，避免阻塞）
- * - ✅ 动态 TTL（根据会话进度调整过期时间）
- * - ✅ 滑动过期（访问时自动续期）
- * - ✅ 性能监控（记录读写耗时、压缩率）
+ * 为什么弃用：
+ * - 多 Agent 状态保存已迁移到 MongoDB
+ * - 原因：低频操作（6.7次/秒）、需要持久化、数据规模小且可预测
+ * - MongoDB 性能完全够用（300倍富余量），且提供更好的持久化和查询能力
+ * 
+ * 何时需要 Redis：
+ * - 高频操作（数千次/秒以上）
+ * - 需要极致性能（亚毫秒级响应）
+ * - 临时数据缓存（不需要持久化）
+ * 
+ * 详见：docs/ARCHITECTURE_DECISION.md
+ * 
+ * ============================================================
+ * 原功能说明（保留用于参考）：
+ * - 用于多 agent 状态缓存和断点续传
+ * - gzip 压缩存储（节省 60-80% 内存）
+ * - 异步写入（Fire and Forget，避免阻塞）
+ * - 动态 TTL（根据会话进度调整过期时间）
+ * - 滑动过期（访问时自动续期）
+ * - 性能监控（记录读写耗时、压缩率）
+ * ============================================================
  */
 
 import Redis from 'ioredis';
@@ -61,6 +77,9 @@ let redisClient: Redis | null = null;
  * 获取 Redis 客户端实例（单例模式）
  */
 export function getRedisClient(): Redis {
+  throw new Error('❌ Redis已弃用，请使用MongoDB。详见：docs/ARCHITECTURE_DECISION.md');
+  
+  /* ❌ 已注释：避免自动连接Redis
   if (!redisClient) {
     redisClient = new Redis({
       host: REDIS_HOST,
@@ -87,6 +106,7 @@ export function getRedisClient(): Redis {
   }
 
   return redisClient;
+  */
 }
 
 /**

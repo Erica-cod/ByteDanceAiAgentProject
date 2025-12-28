@@ -71,7 +71,24 @@ async function createIndexes() {
     await db.collection('plans').createIndex({ userId: 1, updatedAt: -1 });
     await db.collection('plans').createIndex({ userId: 1, isActive: 1 });
 
-    console.log('✅ Database indexes created');
+    // Multi-Agent Sessions collection indexes (新增)
+    // TTL索引：自动清理过期的会话（5分钟后）
+    await db.collection('multi_agent_sessions').createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0, name: 'ttl_index' }
+    );
+    // 查询索引：提高按sessionId和userId查询的性能
+    await db.collection('multi_agent_sessions').createIndex(
+      { sessionId: 1, userId: 1 },
+      { name: 'session_user_index' }
+    );
+    // 唯一索引：确保同一个sessionId只有一条记录
+    await db.collection('multi_agent_sessions').createIndex(
+      { sessionId: 1 },
+      { unique: true, name: 'session_unique_index' }
+    );
+
+    console.log('✅ Database indexes created (包括多Agent会话TTL索引)');
   } catch (error) {
     console.error('❌ Failed to create indexes:', error);
   }
