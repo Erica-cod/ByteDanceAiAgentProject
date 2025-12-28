@@ -1,6 +1,5 @@
 /**
  * System Prompt 配置
- * 动态包含工具定义，防止工具幻觉
  */
 
 import { generateToolPrompt } from '../tools/toolValidator.js';
@@ -139,4 +138,3 @@ ${toolPrompt}
 
 // 缓存生成的 System Prompt
 export const SYSTEM_PROMPT = buildSystemPrompt();
-

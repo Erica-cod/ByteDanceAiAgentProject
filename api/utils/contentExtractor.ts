@@ -1,12 +1,12 @@
 /**
  * 内容提取工具
- * 处理 <think> 标签和其他内容分离
+ * 提取 thinking 内容、工具调用等
  */
 
 /**
  * 提取 thinking 内容（处理 <think> 标签）
  */
-export function extractThinkingAndContent(text: string): { thinking: string; content: string } {
+export function extractThinkingAndContent(text: string) {
   let thinking = '';
   let content = text;
 
@@ -39,4 +39,3 @@ export function extractThinkingAndContent(text: string): { thinking: string; con
 
   return { thinking, content };
 }
-
