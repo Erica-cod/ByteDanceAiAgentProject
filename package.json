@@ -47,6 +47,7 @@
     "highlight.js": "^11.11.1",
     "immer": "^11.1.0",
     "ioredis": "^5.8.2",
+    "jsonrepair": "^3.13.1",
     "langchain": "^1.1.1",
     "mongodb": "^7.0.0",
     "node-fetch": "^2.7.0",
