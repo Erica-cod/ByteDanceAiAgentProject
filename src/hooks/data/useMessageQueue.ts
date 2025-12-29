@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useQueueStore, useChatStore, useUIStore } from '../stores';
+import { useQueueStore, useChatStore, useUIStore } from '../../stores';
 
 interface UseMessageQueueOptions {
   onProcessQueue: () => Promise<void>;

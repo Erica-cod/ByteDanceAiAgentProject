@@ -1,6 +1,6 @@
-import { useChatStore, useUIStore } from '../stores';
+import { useChatStore, useUIStore } from '../../stores';
 import { useSSEStream } from './useSSEStream';
-import type { MessageListHandle } from '../components/MessageList';
+import type { MessageListHandle } from '../../components/MessageList';
 
 interface UseMessageSenderOptions {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;

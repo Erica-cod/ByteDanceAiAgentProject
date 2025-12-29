@@ -4,8 +4,8 @@ import {
   createConversation,
   deleteConversation,
   type Conversation,
-} from '../utils/conversationAPI';
-import { useChatStore } from '../stores';
+} from '../../utils/conversationAPI';
+import { useChatStore } from '../../stores';
 
 export function useConversationManager(userId: string, onAbort: () => void) {
   const [conversations, setConversations] = useState<Conversation[]>([]);

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
-import { useChatStore, useQueueStore, useUIStore } from '../stores';
-import { getConversationDetails, type Conversation } from '../utils/conversationAPI';
-import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../components/MultiAgentDisplay';
+import { useChatStore, useQueueStore, useUIStore } from '../../stores';
+import { getConversationDetails, type Conversation } from '../../utils/conversationAPI';
+import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../components/MultiAgentDisplay';
 
 interface UseSSEStreamOptions {
   onConversationCreated?: (convId: string) => void;
