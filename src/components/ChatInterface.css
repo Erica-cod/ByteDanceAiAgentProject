@@ -444,8 +444,12 @@
   font-size: 14px;
   font-family: inherit;
   resize: none;
-  max-height: 120px;
   line-height: 1.5;
+  min-height: 40px; /* 单行起步 */
+  max-height: 200px; /* 最大高度约 10 行 */
+  overflow-y: hidden; /* 初始隐藏滚动条，由 JS 控制 */
+  transition: height 0.1s ease; /* 平滑过渡 */
+  box-sizing: border-box; /* 确保 padding 不影响高度计算 */
 }
 
 .chat-input:focus {

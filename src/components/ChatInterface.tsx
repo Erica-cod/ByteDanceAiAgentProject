@@ -4,9 +4,7 @@ import MessageList, { type MessageListHandle } from './MessageList';
 import { initializeUser } from '../utils/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../utils/privacyFirstFingerprint';
 import { useChatStore, useUIStore } from '../stores';
-import { useConversationManager } from '../hooks/useConversationManager';
-import { useMessageQueue } from '../hooks/useMessageQueue';
-import { useMessageSender } from '../hooks/useMessageSender';
+import { useConversationManager, useMessageQueue, useMessageSender, useThrottle, useAutoResizeTextarea } from '../hooks';
 import './ChatInterface.css';
 
 const ChatInterface: React.FC = () => {
@@ -32,6 +30,9 @@ const ChatInterface: React.FC = () => {
   const listRef = useRef<MessageListHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
+  
+  // ===== 自适应输入框 =====
+  const textareaRef = useAutoResizeTextarea(inputValue, 40, 200);
 
   // ===== 自定义 Hooks =====
   const { sendMessageInternal, retryMessage, abort } = useMessageSender({
@@ -118,6 +119,15 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // 🔧 节流：防止用户快速点击发送按钮导致重复发送
+  const throttledSendMessage = useThrottle(sendMessage, 1000);
+
+  // 🔧 节流：防止用户快速切换模式
+  const throttledSetChatMode = useThrottle(setChatMode, 500);
+
+  // 🔧 节流：防止用户误触清空历史（危险操作，时间长一点）
+  const throttledClearHistory = useThrottle(conversationManager.clearHistory, 2000);
+
   const stopGeneration = () => {
     abort();
     setLoading(false);
@@ -161,7 +171,7 @@ const ChatInterface: React.FC = () => {
               <span>模式：</span>
               <button
                 className={`mode-btn ${chatMode === 'single' ? 'active' : ''}`}
-                onClick={() => setChatMode('single')}
+                onClick={() => throttledSetChatMode('single')}
                 disabled={isLoading}
                 title="单Agent模式：快速响应"
               >
@@ -169,14 +179,14 @@ const ChatInterface: React.FC = () => {
               </button>
               <button
                 className={`mode-btn ${chatMode === 'multi_agent' ? 'active' : ''}`}
-                onClick={() => setChatMode('multi_agent')}
+                onClick={() => throttledSetChatMode('multi_agent')}
                 disabled={isLoading}
                 title="多Agent协作模式：深度规划和分析"
               >
                 🧠 Smart AI
               </button>
             </label>
-            <button onClick={conversationManager.clearHistory} className="clear-btn">
+            <button onClick={throttledClearHistory} className="clear-btn">
               清空历史
             </button>
           </div>
@@ -202,17 +212,17 @@ const ChatInterface: React.FC = () => {
         <div className="chat-input-container">
           <div className="chat-input-wrapper">
             <textarea
+              ref={textareaRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  sendMessage();
+                  throttledSendMessage();
                 }
               }}
               placeholder={isLoading ? '当前消息发送中，输入将加入队列...' : '输入你的问题...'}
               disabled={false}
-              rows={1}
               className="chat-input"
             />
             {isLoading ? (
@@ -220,7 +230,7 @@ const ChatInterface: React.FC = () => {
                 停止
               </button>
             ) : (
-              <button onClick={sendMessage} className="send-btn" disabled={!inputValue.trim()}>
+              <button onClick={throttledSendMessage} className="send-btn" disabled={!inputValue.trim()}>
                 {messageQueue.queue.length > 0 ? `发送 (队列: ${messageQueue.queue.length})` : '发送'}
               </button>
             )}
