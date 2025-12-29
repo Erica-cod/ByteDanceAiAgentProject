@@ -5,7 +5,7 @@
 
 // 加载环境变量
 import '../config/env.js';
-import type { RequestOption } from '@modern-js/runtime/server';
+import type { RequestOption } from '../types/chat.js';
 import { connectToDatabase } from '../db/connection.js';
 import { UserService } from '../services/userService.js';
 import { successResponse, errorResponse } from './_utils/response.js';

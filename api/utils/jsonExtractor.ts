@@ -1,7 +1,13 @@
 /**
  * 统一的 JSON 提取工具模块
  * 用于从 AI 回复中提取结构化 JSON（支持多种格式容错）
+ * 
+ * 修复策略：
+ * 1. 先尝试 jsonrepair 包（成熟的第三方库）
+ * 2. 失败后使用自定义修复逻辑（备用方案）
  */
+
+import { jsonrepair } from 'jsonrepair';
 
 /**
  * 提取选项
@@ -189,19 +195,30 @@ export function extractJSON<T = any>(
           console.warn(`${logPrefix} ⚠️  JSON 解析失败: ${parseError.message}`);
           console.warn(`${logPrefix} 尝试自动修复...`);
           
-          const fixedJsonStr = fixCommonJSONErrors(jsonStr);
-          
-          if (fixedJsonStr !== jsonStr) {
-            console.log(`${logPrefix} 🔧 已应用修复，修复后长度: ${fixedJsonStr.length}`);
-          }
-          
+          // 🔧 修复策略 1: 使用 jsonrepair 包（成熟的第三方库）
           try {
-            const result = JSON.parse(fixedJsonStr);
-            console.log(`${logPrefix} ✅ JSON 修复并解析成功（策略: ${strategy.name}）`);
+            const repairedJsonStr = jsonrepair(jsonStr);
+            const result = JSON.parse(repairedJsonStr);
+            console.log(`${logPrefix} ✅ JSON 修复成功（使用 jsonrepair 包，策略: ${strategy.name}）`);
             return result;
-          } catch (fixError: any) {
-            console.warn(`${logPrefix} ❌ 修复失败: ${fixError.message}`);
-            // 继续尝试下一个策略
+          } catch (repairError: any) {
+            console.warn(`${logPrefix} ⚠️  jsonrepair 包修复失败: ${repairError.message}`);
+            
+            // 🔧 修复策略 2: 使用自定义修复逻辑（备用方案）
+            try {
+              const fixedJsonStr = fixCommonJSONErrors(jsonStr);
+              
+              if (fixedJsonStr !== jsonStr) {
+                console.log(`${logPrefix} 🔧 已应用自定义修复，修复后长度: ${fixedJsonStr.length}`);
+              }
+              
+              const result = JSON.parse(fixedJsonStr);
+              console.log(`${logPrefix} ✅ JSON 修复成功（使用自定义逻辑，策略: ${strategy.name}）`);
+              return result;
+            } catch (fixError: any) {
+              console.warn(`${logPrefix} ❌ 自定义修复也失败: ${fixError.message}`);
+              // 继续尝试下一个策略
+            }
           }
         }
       }
@@ -245,13 +262,23 @@ export function extractJSONWithRemainder<T = any>(
     } catch (error: any) {
       // 尝试修复
       if (options.autoFix !== false) {
+        // 先尝试 jsonrepair 包
         try {
-          const fixedJsonStr = fixCommonJSONErrors(closedMatch[1].trim());
-          const data = JSON.parse(fixedJsonStr);
+          const repairedJsonStr = jsonrepair(closedMatch[1].trim());
+          const data = JSON.parse(repairedJsonStr);
           const remainingText = text.replace(closedTagRegex, '').trim();
-          console.log(`🔍 [extractJSONWithRemainder] JSON 修复成功`);
+          console.log(`🔍 [extractJSONWithRemainder] JSON 修复成功（jsonrepair）`);
           return { data, remainingText };
-        } catch {}
+        } catch {
+          // 备用：自定义修复
+          try {
+            const fixedJsonStr = fixCommonJSONErrors(closedMatch[1].trim());
+            const data = JSON.parse(fixedJsonStr);
+            const remainingText = text.replace(closedTagRegex, '').trim();
+            console.log(`🔍 [extractJSONWithRemainder] JSON 修复成功（自定义）`);
+            return { data, remainingText };
+          } catch {}
+        }
       }
     }
   }
@@ -312,7 +339,18 @@ export function extractToolCallWithRemainder<T = any>(
 }
 
 /**
- * 修复常见的 JSON 格式错误
+ * 修复常见的 JSON 格式错误（自定义逻辑，作为 jsonrepair 的备用方案）
+ * 
+ * ⚠️  注意：此函数作为备用方案，优先使用 jsonrepair 包
+ * 
+ * 修复内容：
+ * - 移除 BOM 和零宽字符
+ * - 移除单行/多行注释
+ * - 修复尾随逗号
+ * - 修复未闭合的字符串
+ * - 修复未闭合的对象/数组
+ * - 转义未转义的引号
+ * 
  * （从 baseAgent.ts 迁移而来，保留原有逻辑）
  */
 export function fixCommonJSONErrors(jsonStr: string): string {
