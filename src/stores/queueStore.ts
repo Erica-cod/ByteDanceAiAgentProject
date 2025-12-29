@@ -48,7 +48,7 @@ export const useQueueStore = create<QueueState>()(
   immer((set, get) => ({
     queue: loadQueueFromStorage(), // ✅ 初始化时从 localStorage 加载
     isProcessing: false,
-    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true, // ⚠️ 建议在组件中使用 useOnlineStatus hook 同步
     queueToken: null,
 
     enqueue: (content, userMessageId) => {
@@ -92,12 +92,12 @@ export const useQueueStore = create<QueueState>()(
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     useQueueStore.getState().setOnline(true);
-    console.log('网络已恢复');
+    console.log('✅ 网络已恢复');
   });
 
   window.addEventListener('offline', () => {
     useQueueStore.getState().setOnline(false);
-    console.log('网络已断开');
+    console.log('⚠️ 网络已断开');
   });
 }
 

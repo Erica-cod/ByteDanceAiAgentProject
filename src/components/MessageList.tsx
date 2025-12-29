@@ -22,6 +22,7 @@ import StreamingMarkdown from './StreamingMarkdown';
 import MultiAgentDisplay from './MultiAgentDisplay';
 import type { Message } from '../stores/chatStore';
 import type { QueueItem } from '../stores/queueStore';
+import { useToggle } from '../hooks';
 import 'react-virtualized/styles.css';
 import './ChatInterface.css';
 
@@ -45,11 +46,11 @@ export interface MessageListHandle {
 
 // 来源链接组件
 const SourceLinks: React.FC<{ sources: Array<{ title: string; url: string }> }> = ({ sources }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, toggleExpanded] = useToggle(false);
 
   return (
     <div className="source-links-container">
-      <button className="source-links-toggle" onClick={() => setIsExpanded(!isExpanded)}>
+      <button className="source-links-toggle" onClick={toggleExpanded}>
         <span className="source-icon">🔗</span>
         <span className="source-text">来源链接 ({sources.length})</span>
         <span className={`source-arrow ${isExpanded ? 'expanded' : ''}`}>▼</span>

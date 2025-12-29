@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Conversation } from '../utils/conversationAPI';
+import { useDateFormat, useThrottle } from '../hooks';
 import './ConversationList.css';
 
 interface ConversationListProps {
@@ -12,6 +13,12 @@ interface ConversationListProps {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
 }
 
+// 时间显示组件（使用 useDateFormat hook）
+const ConversationTime: React.FC<{ updatedAt: string }> = ({ updatedAt }) => {
+  const formattedDate = useDateFormat(updatedAt);
+  return <span className="conversation-time">{formattedDate}</span>;
+};
+
 const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
   currentConversationId,
@@ -23,21 +30,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  // 🔧 节流：防止用户快速切换对话导致频繁加载数据
+  const throttledSelectConversation = useThrottle(onSelectConversation, 500);
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    } else if (diffInHours < 48) {
-      return '昨天';
-    } else if (diffInHours < 168) {
-      return `${Math.floor(diffInHours / 24)}天前`;
-    } else {
-      return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-    }
-  };
+  // 🔧 节流：防止用户误触创建多个空对话
+  const throttledNewConversation = useThrottle(onNewConversation, 1000);
+
+  // 🔧 节流：防止重复删除请求
+  const throttledDeleteConversation = useThrottle(onDeleteConversation, 1000);
 
   return (
     <div className={`conversation-sidebar ${isExpanded ? 'expanded' : 'collapsed'}`}>
@@ -54,7 +54,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             <h2>对话列表</h2>
             <button
               className="new-conversation-btn"
-              onClick={onNewConversation}
+              onClick={throttledNewConversation}
               disabled={isLoading}
               title="新建对话"
             >
@@ -78,7 +78,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 className={`conversation-item ${
                   conversation.conversationId === currentConversationId ? 'active' : ''
                 }`}
-                onClick={() => onSelectConversation(conversation.conversationId)}
+                onClick={() => throttledSelectConversation(conversation.conversationId)}
               >
                 <div className="conversation-info">
                   <div className="conversation-title">{conversation.title}</div>
@@ -95,7 +95,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                       </span>
                       {' 条消息'}
                     </span>
-                    <span className="conversation-time">{formatDate(conversation.updatedAt)}</span>
+                    <ConversationTime updatedAt={conversation.updatedAt} />
                   </div>
                 </div>
                 <button
@@ -103,7 +103,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (window.confirm(`确定删除对话"${conversation.title}"吗?`)) {
-                      onDeleteConversation(conversation.conversationId);
+                      throttledDeleteConversation(conversation.conversationId);
                     }
                   }}
                   title="删除对话"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDateFormat } from '../hooks';
 import './PlanCard.css';
 
 interface Task {
@@ -33,20 +34,15 @@ interface PlanCardProps {
  * @param compact - 精简模式（不显示完整任务列表）
  * @param index - 在列表中的序号（用于精简模式）
  */
+// 日期显示组件（使用 useDateFormat hook）
+const DateDisplay: React.FC<{ date?: string }> = ({ date }) => {
+  const formattedDate = useDateFormat(date || '', { relative: false });
+  return <>{formattedDate}</>;
+};
+
 const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index }) => {
   const planId = planData.plan_id || planData.planId;
   const tasksCount = planData.tasks_count || planData.tasks?.length || 0;
-
-  // 格式化日期
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
 
   // 获取状态标签
   const getStatusBadge = (status?: string) => {
@@ -116,13 +112,13 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
             {planData.created_at && (
               <span className="meta-item">
                 <span className="meta-icon">📅</span>
-                创建于 {formatDate(planData.created_at)}
+                创建于 <DateDisplay date={planData.created_at} />
               </span>
             )}
             {planData.updated_at && planData.updated_at !== planData.created_at && (
               <span className="meta-item">
                 <span className="meta-icon">🔄</span>
-                更新于 {formatDate(planData.updated_at)}
+                更新于 <DateDisplay date={planData.updated_at} />
               </span>
             )}
           </div>
@@ -148,7 +144,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
           {planData.created_at && (
             <span className="plan-date">
               <span className="meta-icon">📅</span>
-              {formatDate(planData.created_at)}
+              <DateDisplay date={planData.created_at} />
             </span>
           )}
         </div>
@@ -205,7 +201,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
       {planData.updated_at && (
         <div className="plan-footer">
           <span className="update-time">
-            最后更新: {formatDate(planData.updated_at)}
+            最后更新: <DateDisplay date={planData.updated_at} />
           </span>
         </div>
       )}
