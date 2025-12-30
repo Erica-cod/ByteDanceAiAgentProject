@@ -26,6 +26,11 @@ import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentH
 import { handleChunkingPlanReview } from '../services/chunkingPlanReviewService.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
+import { UploadService } from '../services/uploadService.js';
+import { gunzip } from 'zlib';
+import { promisify } from 'util';
+
+const gunzipAsync = promisify(gunzip);
 
 // 初始化数据库连接
 connectToDatabase().catch(console.error);
@@ -64,7 +69,7 @@ export async function post({
   try {
     console.log('=== 收到聊天请求 ===');
     
-    const {
+    let {
       message,
       modelType,
       conversationId: reqConversationId,
@@ -74,9 +79,40 @@ export async function post({
       clientUserMessageId,
       clientAssistantMessageId,
       queueToken,
+      uploadSessionId,
+      isCompressed,
     } = data;
 
-    console.log('解析后的 message:', message);
+    // ✅ 处理上传会话（压缩或分片上传）
+    if (uploadSessionId) {
+      console.log(`📦 [Upload] 检测到上传会话: ${uploadSessionId}`);
+      
+      try {
+        // 组装分片
+        const assembled = await UploadService.assembleChunks(uploadSessionId);
+        console.log(`📦 [Upload] 组装完成: ${assembled.length} bytes`);
+        
+        // 如果是压缩的，解压
+        if (isCompressed) {
+          console.log(`📦 [Upload] 正在解压...`);
+          const decompressed = await gunzipAsync(assembled);
+          message = decompressed.toString('utf-8');
+          console.log(`📦 [Upload] 解压完成: ${message.length} 字符`);
+        } else {
+          message = assembled.toString('utf-8');
+        }
+        
+        // 清理临时文件
+        await UploadService.cleanupSession(uploadSessionId);
+        console.log(`📦 [Upload] 已清理临时文件`);
+        
+      } catch (error: any) {
+        console.error(`❌ [Upload] 处理上传会话失败:`, error);
+        return errorResponse(`上传处理失败: ${error.message}`);
+      }
+    }
+
+    console.log('解析后的 message长度:', message?.length || 0);
     console.log('解析后的 modelType:', modelType);
     console.log('解析后的 conversationId:', reqConversationId);
     console.log('解析后的 userId:', userId);

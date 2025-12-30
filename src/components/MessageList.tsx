@@ -20,9 +20,11 @@ import { List, CellMeasurer, CellMeasurerCache, AutoSizer, WindowScroller } from
 import type { ListRowProps } from 'react-virtualized';
 import StreamingMarkdown from './StreamingMarkdown';
 import MultiAgentDisplay from './MultiAgentDisplay';
+import { ProgressiveMessage } from './ProgressiveMessage';
 import type { Message } from '../stores/chatStore';
 import type { QueueItem } from '../stores/queueStore';
 import { useToggle } from '../hooks';
+import { useChatStore } from '../stores';
 import 'react-virtualized/styles.css';
 import './ChatInterface.css';
 
@@ -91,6 +93,9 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
 
   const listRef = useRef<List>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // ✅ 获取userId用于渐进式加载
+  const userId = useChatStore((s) => s.userId);
   
   // ✅ CellMeasurerCache：缓存每行的高度（优化 CLS）
   const cacheRef = useRef(
@@ -382,7 +387,18 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
                 <div className="message-text">
                   {message.content ? (
                     message.role === 'assistant' ? (
-                      <StreamingMarkdown content={message.content} />
+                      // ✅ 如果内容长度超过1000字符，使用渐进式加载组件
+                      message.contentLength && message.contentLength > 1000 ? (
+                        <ProgressiveMessage
+                          messageId={message.id}
+                          userId={userId}
+                          initialContent={message.content}
+                          totalLength={message.contentLength}
+                          chunkSize={1000}
+                        />
+                      ) : (
+                        <StreamingMarkdown content={message.content} />
+                      )
                     ) : (
                       message.content
                     )

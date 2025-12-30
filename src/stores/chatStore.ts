@@ -15,6 +15,7 @@ export interface Message {
   clientMessageId?: string;
   role: 'user' | 'assistant';
   content: string;
+  contentLength?: number;  // ✅ 新增：完整内容长度
   thinking?: string;
   sources?: Array<{ title: string; url: string }>;
   timestamp: number;

@@ -6,7 +6,7 @@
  * 聊天请求数据
  */
 export interface ChatRequestData {
-  message: string;
+  message?: string;  // ✅ 修改为可选，因为可能通过uploadSessionId传递
   modelType: 'local' | 'volcano';
   conversationId?: string;
   userId: string;
@@ -16,6 +16,8 @@ export interface ChatRequestData {
   clientAssistantMessageId?: string; // 前端生成的 assistant 占位消息ID
   queueToken?: string; // 队列 token
   resumeFromRound?: number; // 断点续传：从指定轮次恢复
+  uploadSessionId?: string;  // ✅ 新增：上传会话ID（用于分片/压缩上传）
+  isCompressed?: boolean;    // ✅ 新增：是否压缩
   longTextMode?: 'off' | 'plan_review' | 'summarize_only' | 'summarize_then_qa';  // 超长文本处理模式
   longTextOptions?: {
     preferChunking?: boolean;      // 是否优先使用 chunking

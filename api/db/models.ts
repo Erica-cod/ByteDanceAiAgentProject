@@ -31,6 +31,8 @@ export interface Message {
   userId: string;           // Owner user ID
   role: 'user' | 'assistant';
   content: string;
+  contentPreview?: string;  // ✅ 新增：内容预览（前1000字符，用于快速加载）
+  contentLength?: number;   // ✅ 新增：完整内容长度
   thinking?: string;        // AI thinking process (for assistant only)
   sources?: Array<{title: string; url: string}>;  // 搜索来源链接 (for assistant only)
   modelType?: 'local' | 'volcano';
@@ -122,6 +124,52 @@ export interface UpdatePlanRequest {
 export interface PlanListResponse {
   plans: Plan[];
   total: number;
+}
+
+// ==================== 文件上传会话管理 ====================
+
+/**
+ * 上传会话（用于分片上传）
+ * 
+ * 设计说明：
+ * - 保存在内存或文件系统，也可以用MongoDB
+ * - 支持断点续传
+ * - TTL：1小时后自动清理
+ */
+export interface UploadSession {
+  _id?: string;
+  sessionId: string;              // 上传会话ID
+  userId: string;                 // 用户ID
+  totalChunks: number;            // 总分片数
+  chunkSize: number;              // 分片大小
+  fileSize: number;               // 文件总大小
+  uploadedChunks: number[];       // 已上传的分片索引
+  chunkHashes: Map<number, string>; // 分片hash映射（用于校验）
+  isComplete: boolean;            // 是否完成
+  isCompressed: boolean;          // 是否压缩
+  createdAt: Date;                // 创建时间
+  updatedAt: Date;                // 最后更新时间
+  expiresAt: Date;                // 过期时间
+}
+
+/**
+ * 创建上传会话请求
+ */
+export interface CreateUploadSessionRequest {
+  userId: string;
+  totalChunks: number;
+  chunkSize: number;
+  fileSize: number;
+}
+
+/**
+ * 上传分片请求
+ */
+export interface UploadChunkRequest {
+  sessionId: string;
+  chunkIndex: number;
+  chunk: Buffer;
+  hash: string;
 }
 
 // ==================== 多 Agent 会话状态管理 ====================

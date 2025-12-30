@@ -1,8 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../stores';
 import { getConversationDetails, type Conversation } from '../../utils/conversationAPI';
 import { isLongText } from '../../utils/textUtils';
 import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../components/MultiAgentDisplay';
+import { selectUploadStrategy } from '../../utils/uploadStrategy';
+import { compressText } from '../../utils/compression';
+import { ChunkUploader } from '../../utils/chunkUploader';
 
 interface UseSSEStreamOptions {
   onConversationCreated?: (convId: string) => void;
@@ -27,6 +30,28 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const modelType = useUIStore((s) => s.modelType);
   const chatMode = useUIStore((s) => s.chatMode);
 
+  /**
+   * 辅助函数：上传压缩的 blob（单次请求，无分片）
+   */
+  const uploadCompressedBlob = async (blob: Blob, userId: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('userId', userId);
+    formData.append('data', blob);
+    formData.append('isCompressed', 'true');
+
+    const response = await fetch('/api/upload/compressed', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`压缩上传失败: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.sessionId;
+  };
+
   const sendMessage = async (
     messageText: string,
     userMessageId: string,
@@ -39,6 +64,88 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     const MAX_RETRY_DELAY_MS = 5000;
 
     try {
+      // ✅ 第一步：选择上传策略
+      const uploadDecision = selectUploadStrategy(messageText);
+      console.log(`📦 [Upload] 策略: ${uploadDecision.strategy}`, uploadDecision);
+
+      // 如果文本太大，询问用户是否继续
+      if (uploadDecision.strategy === 'too-large' && uploadDecision.requiresConfirmation) {
+        const confirmed = window.confirm(
+          uploadDecision.warning + '\n\n是否继续发送？'
+        );
+        if (!confirmed) {
+          throw new Error('用户取消发送');
+        }
+      }
+
+      // 上传进度提示
+      if (uploadDecision.warning) {
+        updateMessage(assistantMessageId, {
+          thinking: uploadDecision.warning,
+        });
+      }
+
+      // ✅ 第二步：根据策略处理上传
+      let uploadPayload: {
+        message?: string;
+        uploadSessionId?: string;
+        isCompressed?: boolean;
+      } = {};
+
+      if (uploadDecision.strategy === 'direct' || uploadDecision.strategy === 'too-large') {
+        // 直接上传
+        uploadPayload.message = messageText;
+        
+      } else if (uploadDecision.strategy === 'compression') {
+        // 压缩上传
+        updateMessage(assistantMessageId, {
+          thinking: '正在压缩文本...',
+        });
+        
+        const compressedBlob = await compressText(messageText);
+        
+        // 发送压缩的 blob
+        uploadPayload = {
+          uploadSessionId: await uploadCompressedBlob(compressedBlob, userId),
+          isCompressed: true,
+        };
+        
+      } else if (uploadDecision.strategy === 'chunking') {
+        // 分片上传
+        const compressedBlob = await compressText(messageText);
+        
+        try {
+          const sessionId = await ChunkUploader.uploadLargeBlob(compressedBlob, {
+            userId,
+            onProgress: (percent, uploaded, total) => {
+              updateMessage(assistantMessageId, {
+                thinking: `上传中... ${percent}% (${uploaded}/${total} 个分片)`,
+              });
+            },
+            onError: (error, chunkIndex) => {
+              console.error(`分片 ${chunkIndex} 上传失败:`, error);
+            },
+          });
+          
+          uploadPayload = {
+            uploadSessionId: sessionId,
+            isCompressed: true,
+          };
+          
+          updateMessage(assistantMessageId, {
+            thinking: '上传完成，正在处理...',
+          });
+          
+        } catch (error: any) {
+          // 上传失败
+          markMessageFailed(assistantMessageId);
+          updateMessage(assistantMessageId, {
+            content: error.message || '上传失败，请重试',
+          });
+          throw error;
+        }
+      }
+
       // 🐛 调试：打印当前 chatMode
       console.log(`🎯 [SSE] 发送消息，当前 chatMode:`, chatMode);
       
@@ -95,7 +202,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         
         // ✅ 每次重试时动态构建请求体（因为 completedRounds 可能已更新）
         const requestBody = {
-          message: messageText,
+          // ✅ 支持不同的上传方式
+          ...uploadPayload,
           modelType: modelType,
           userId: userId,
           deviceId: deviceId || undefined,

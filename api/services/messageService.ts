@@ -3,6 +3,24 @@ import { getDatabase } from '../db/connection.js';
 import { Message } from '../db/models.js';
 
 export class MessageService {
+  // 预览长度常量
+  private static readonly PREVIEW_LENGTH = 1000;
+
+  /**
+   * 生成内容预览和长度信息
+   */
+  private static generatePreviewData(content: string): {
+    contentPreview: string;
+    contentLength: number;
+  } {
+    const contentLength = content.length;
+    const contentPreview = contentLength > this.PREVIEW_LENGTH
+      ? content.slice(0, this.PREVIEW_LENGTH)
+      : content;
+    
+    return { contentPreview, contentLength };
+  }
+
   /**
    * Add a message to conversation
    */
@@ -18,6 +36,9 @@ export class MessageService {
   ): Promise<Message> {
     const db = await getDatabase();
     const collection = db.collection<Message>('messages');
+
+    // ✅ 生成预览数据
+    const { contentPreview, contentLength } = this.generatePreviewData(content);
 
     // 如果带了 clientMessageId，就按 (conversationId, userId, clientMessageId) 做幂等写入
     // 目的：支持前端断线重连/重试，避免重复插入用户消息或 assistant 最终消息
@@ -44,6 +65,8 @@ export class MessageService {
           // 重试时允许覆盖内容（assistant 可能在重连后生成完整版本）
           $set: {
             content,
+            contentPreview,
+            contentLength,
             thinking,
             sources,
             modelType,
@@ -61,6 +84,8 @@ export class MessageService {
           userId,
           role,
           content,
+          contentPreview,
+          contentLength,
           thinking,
           sources,
           modelType,
@@ -80,6 +105,8 @@ export class MessageService {
       userId,
       role,
       content,
+      contentPreview,
+      contentLength,
       thinking,
       sources,
       modelType,
@@ -88,6 +115,8 @@ export class MessageService {
 
     console.log('💾 MessageService.addMessage - 保存消息:', {
       role,
+      contentLength,
+      hasPreview: contentLength > this.PREVIEW_LENGTH,
       hasSources: !!sources,
       sourcesCount: sources?.length || 0,
     });
@@ -98,18 +127,39 @@ export class MessageService {
 
   /**
    * Get conversation messages (with pagination)
+   * @param preview - 如果为true,只返回contentPreview而不是完整content（性能优化）
    */
   static async getConversationMessages(
     conversationId: string,
     userId: string,
     limit: number = 500,  // 增加默认限制到 500 条消息
-    skip: number = 0
+    skip: number = 0,
+    preview: boolean = false  // ✅ 新增：是否只返回预览
   ): Promise<{ messages: Message[]; total: number }> {
     const db = await getDatabase();
     const collection = db.collection<Message>('messages');
 
+    // ✅ 如果只需要预览，不查询完整 content 字段
+    const projection = preview
+      ? {
+          messageId: 1,
+          clientMessageId: 1,
+          conversationId: 1,
+          userId: 1,
+          role: 1,
+          contentPreview: 1,  // 只取预览
+          contentLength: 1,   // 取长度信息
+          thinking: 1,
+          sources: 1,
+          modelType: 1,
+          timestamp: 1,
+          metadata: 1,
+          content: 0,  // 明确排除 content
+        }
+      : undefined;  // undefined表示查询所有字段
+
     const messages = await collection
-      .find({ conversationId, userId })
+      .find({ conversationId, userId }, preview ? { projection } : {})
       .sort({ timestamp: 1 })
       .limit(limit)
       .skip(skip)
@@ -117,19 +167,28 @@ export class MessageService {
 
     const total = await collection.countDocuments({ conversationId, userId });
 
+    // ✅ 如果是预览模式，将 contentPreview 映射到 content 字段
+    const processedMessages = preview
+      ? messages.map(msg => ({
+          ...msg,
+          content: msg.contentPreview || '',  // 预览内容作为 content
+        }))
+      : messages;
+
     console.log('📖 MessageService.getConversationMessages - 读取消息:', {
-      count: messages.length,
-      messagesWithSources: messages.filter(m => m.sources && m.sources.length > 0).length
+      count: processedMessages.length,
+      previewMode: preview,
+      messagesWithSources: processedMessages.filter(m => m.sources && m.sources.length > 0).length
     });
     
     // 打印每条有 sources 的消息
-    messages.forEach((msg, index) => {
+    processedMessages.forEach((msg, index) => {
       if (msg.sources && msg.sources.length > 0) {
         console.log(`📎 消息 ${index + 1} 有 sources:`, msg.sources.length, '条');
       }
     });
 
-    return { messages, total };
+    return { messages: processedMessages, total };
   }
 
   /**
@@ -161,6 +220,66 @@ export class MessageService {
     const collection = db.collection<Message>('messages');
     
     return await collection.countDocuments({ userId });
+  }
+
+  /**
+   * 获取消息内容的指定范围（渐进式加载）
+   * @param messageId 消息ID
+   * @param userId 用户ID
+   * @param start 起始位置（字符索引）
+   * @param length 要获取的长度
+   * @returns 内容片段及元数据
+   */
+  static async getMessageContentRange(
+    messageId: string,
+    userId: string,
+    start: number,
+    length: number
+  ): Promise<{
+    content: string;
+    start: number;
+    length: number;
+    total: number;
+    hasMore: boolean;
+  } | null> {
+    const db = await getDatabase();
+    const collection = db.collection<Message>('messages');
+
+    // 查询完整消息
+    const message = await collection.findOne(
+      { messageId, userId },
+      { projection: { content: 1, contentLength: 1 } }
+    );
+
+    if (!message) {
+      return null;
+    }
+
+    const fullContent = message.content || '';
+    const totalLength = message.contentLength || fullContent.length;
+
+    // 提取指定范围的内容
+    const end = Math.min(start + length, fullContent.length);
+    const contentSlice = fullContent.slice(start, end);
+    const actualLength = contentSlice.length;
+    const hasMore = end < fullContent.length;
+
+    console.log(`📖 MessageService.getMessageContentRange - 分段读取:`, {
+      messageId,
+      start,
+      requestedLength: length,
+      actualLength,
+      totalLength,
+      hasMore,
+    });
+
+    return {
+      content: contentSlice,
+      start,
+      length: actualLength,
+      total: totalLength,
+      hasMore,
+    };
   }
 }
 
