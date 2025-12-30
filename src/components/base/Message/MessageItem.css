@@ -1,0 +1,62 @@
+/* MessageItem - 基础消息容器样式 */
+
+.message-item {
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  animation: messageSlideIn 0.3s ease-out;
+  min-height: 60px;
+}
+
+.message-item--user {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  margin-left: 20%;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+.message-item--assistant {
+  background: #f9fafb;
+  color: #1f2937;
+  margin-right: 20%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+}
+
+.message-item__content {
+  word-wrap: break-word;
+  line-height: 1.6;
+}
+
+/* 动画 */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .message-item--assistant {
+    background: rgba(45, 45, 45, 0.9);
+    color: #e5e7eb;
+    border-color: rgba(80, 80, 80, 0.5);
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .message-item--user {
+    margin-left: 10%;
+  }
+  
+  .message-item--assistant {
+    margin-right: 10%;
+  }
+}
+

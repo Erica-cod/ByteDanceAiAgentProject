@@ -1,0 +1,52 @@
+/* LoadStats - 加载统计样式 */
+
+.load-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.load-stats__icon {
+  font-size: 14px;
+}
+
+.load-stats__icon.success {
+  color: #10b981;
+}
+
+.load-stats__item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.load-stats__separator {
+  color: #d1d5db;
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .load-stats {
+    color: #9ca3af;
+  }
+  
+  .load-stats__separator {
+    color: #4b5563;
+  }
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .load-stats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .load-stats__separator {
+    display: none;
+  }
+}
+

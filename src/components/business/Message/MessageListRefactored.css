@@ -1,0 +1,123 @@
+/* MessageList - 消息列表（重构版）样式 */
+
+.message-list-refactored {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: transparent;
+}
+
+.message-list-refactored__mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  z-index: 100;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.message-list-refactored__load-more {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #6b7280;
+  background: rgba(249, 250, 251, 0.8);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.message-list-refactored__list {
+  padding: 16px;
+  outline: none;
+}
+
+.message-list-refactored__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9ca3af;
+  font-size: 16px;
+}
+
+.message-list-refactored__loading {
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin: 0 20% 12px 16px;
+}
+
+/* 打字指示器 */
+.typing-indicator {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+  animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+/* 重试按钮 */
+.retry-btn {
+  padding: 8px 16px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .message-list-refactored__mask {
+    background: rgba(26, 26, 26, 0.95);
+  }
+  
+  .message-list-refactored__load-more {
+    background: rgba(45, 45, 45, 0.8);
+    border-bottom-color: rgba(80, 80, 80, 0.5);
+    color: #9ca3af;
+  }
+  
+  .message-list-refactored__loading {
+    background: rgba(45, 45, 45, 0.9);
+    border-color: rgba(80, 80, 80, 0.5);
+  }
+}
+

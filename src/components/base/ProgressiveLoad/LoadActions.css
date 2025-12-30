@@ -1,0 +1,76 @@
+/* LoadActions - 加载操作按钮样式 */
+
+.load-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.load-actions__button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-actions__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.load-actions__button.primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.load-actions__button.primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.load-actions__button.secondary {
+  background-color: white;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.load-actions__button.secondary:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.load-actions__hint {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .load-actions__button.secondary {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #e5e7eb;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .load-actions__button.secondary:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .load-actions {
+    flex-direction: column;
+  }
+}
+

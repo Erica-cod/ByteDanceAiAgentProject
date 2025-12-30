@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
-import { useThrottle } from '../hooks'; // ✅ 使用统一导出
+import { useThrottle } from '../../hooks'; // ✅ 使用统一导出
 import './MultiAgentDisplay.css';
 
 /**

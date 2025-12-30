@@ -1,0 +1,45 @@
+/* AssistantMessage - 助手消息样式 */
+
+.assistant-message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assistant-message__thinking {
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.assistant-message__content {
+  /* 内容区域，由子组件定义样式 */
+}
+
+.assistant-message__sources {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.assistant-message__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .assistant-message__thinking {
+    background: rgba(59, 130, 246, 0.1);
+    color: #9ca3af;
+  }
+  
+  .assistant-message__sources {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+}
+

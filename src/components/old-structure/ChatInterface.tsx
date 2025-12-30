@@ -4,10 +4,10 @@ import ConversationList from './ConversationList';
 import MessageList, { type MessageListHandle } from './MessageList';
 import TextStatsIndicator from './TextStatsIndicator';
 import SettingsPanel from './SettingsPanel';
-import { initializeUser } from '../utils/userManager';
-import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../utils/privacyFirstFingerprint';
-import { useChatStore, useUIStore } from '../stores';
-import { useConversationManager, useMessageQueue, useMessageSender, useThrottle, useAutoResizeTextarea } from '../hooks';
+import { initializeUser } from '../../utils/userManager';
+import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../utils/privacyFirstFingerprint';
+import { useChatStore, useUIStore } from '../../stores';
+import { useConversationManager, useMessageQueue, useMessageSender, useThrottle, useAutoResizeTextarea } from '../../hooks';
 import './ChatInterface.css';
 
 const ChatInterface: React.FC = () => {

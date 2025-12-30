@@ -1,0 +1,72 @@
+/* ProgressiveMessage - 渐进式消息（重构版）样式 */
+
+.progressive-message-refactored {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progressive-message-refactored__content {
+  /* 内容区域，由StreamingMarkdown定义样式 */
+}
+
+.progressive-message-refactored__error {
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid #ef4444;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.progressive-message-refactored__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+  font-size: 14px;
+  color: #3b82f6;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.progressive-message-refactored__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .progressive-message-refactored__error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+  
+  .progressive-message-refactored__loading {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  
+  .progressive-message-refactored__controls {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+

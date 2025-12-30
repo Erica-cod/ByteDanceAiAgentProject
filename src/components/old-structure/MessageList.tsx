@@ -21,10 +21,10 @@ import type { ListRowProps } from 'react-virtualized';
 import StreamingMarkdown from './StreamingMarkdown';
 import MultiAgentDisplay from './MultiAgentDisplay';
 import { ProgressiveMessage } from './ProgressiveMessage';
-import type { Message } from '../stores/chatStore';
-import type { QueueItem } from '../stores/queueStore';
-import { useToggle } from '../hooks';
-import { useChatStore } from '../stores';
+import type { Message } from '../../stores/chatStore';
+import type { QueueItem } from '../../stores/queueStore';
+import { useToggle } from '../../hooks';
+import { useChatStore } from '../../stores';
 import 'react-virtualized/styles.css';
 import './ChatInterface.css';
 

@@ -1,0 +1,17 @@
+/* ChatInterface - 聊天界面（重构版）样式 */
+
+.chat-interface-refactored {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  min-width: 800px;
+  background: #ffffff;
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .chat-interface-refactored {
+    background: #1a1a1a;
+  }
+}
+

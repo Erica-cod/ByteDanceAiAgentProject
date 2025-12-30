@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useThemeStore } from '../stores/themeStore';
-import { useUIStore } from '../stores';
+import { useThemeStore } from '../../stores/themeStore';
+import { useUIStore } from '../../stores';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {

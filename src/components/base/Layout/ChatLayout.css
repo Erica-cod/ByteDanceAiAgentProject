@@ -1,0 +1,27 @@
+/* ChatLayout - 基础布局样式 */
+
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.chat-layout__header {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.chat-layout__content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-layout__footer {
+  flex-shrink: 0;
+  z-index: 5;
+}
+

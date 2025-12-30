@@ -1,0 +1,70 @@
+/* ThinkingSection - 思考过程样式 */
+
+.thinking-section {
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.thinking-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.thinking-section__header:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.thinking-section__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3b82f6;
+}
+
+.thinking-section__toggle {
+  font-size: 10px;
+  color: #6b7280;
+  transition: transform 0.2s;
+}
+
+.thinking-section__content {
+  padding: 0 12px 12px 12px;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .thinking-section {
+    background: rgba(59, 130, 246, 0.1);
+  }
+  
+  .thinking-section__header:hover {
+    background: rgba(59, 130, 246, 0.15);
+  }
+  
+  .thinking-section__content {
+    color: #9ca3af;
+  }
+}
+
