@@ -4,9 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Agent - 兴趣教练</title>
+    
+    <!-- ✅ DNS 预解析 - 加速外部资源 -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    
+    <!-- ✅ 预连接关键源 -->
+    <link rel="preconnect" href="//fonts.googleapis.com" crossorigin />
+    
+    <!-- ✅ 内联关键 CSS - 减少渲染阻塞 -->
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e3e9f2 50%, #f0f4f8 100%);
+        background-attachment: fixed;
+      }
+      #root { width: 100%; height: 100vh; }
+      .app { width: 100%; height: 100vh; display: flex; flex-direction: column; }
+      /* ✅ 防止 FOUT - 为首屏内容预留空间 */
+      .app-container { min-height: 100vh; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <!-- ✅ 脚本将自动注入 -->
   </body>
 </html>
 

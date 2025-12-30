@@ -17,6 +17,6 @@
       "@api/*": ["./api/*"]
     }
   },
-  "include": ["src", "api", "modern.config.ts"]
+  "include": ["src", "api", "modern.config.ts", "src/types"]
 }
 
