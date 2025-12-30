@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import ConversationList from './ConversationList';
 import MessageList, { type MessageListHandle } from './MessageList';
+import TextStatsIndicator from './TextStatsIndicator';
+import SettingsPanel from './SettingsPanel';
 import { initializeUser } from '../utils/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../utils/privacyFirstFingerprint';
 import { useChatStore, useUIStore } from '../stores';
@@ -8,6 +11,8 @@ import { useConversationManager, useMessageQueue, useMessageSender, useThrottle,
 import './ChatInterface.css';
 
 const ChatInterface: React.FC = () => {
+  const { t } = useTranslation();
+  
   // ===== Zustand Stores =====
   const messages = useChatStore((s) => s.messages);
   const conversationId = useChatStore((s) => s.conversationId);
@@ -27,6 +32,7 @@ const ChatInterface: React.FC = () => {
 
   // ===== 本地 UI 状态 =====
   const [inputValue, setInputValue] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const listRef = useRef<MessageListHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -154,40 +160,33 @@ const ChatInterface: React.FC = () => {
 
       <div className="chat-container">
         <div className="chat-header">
-          <h1>AI 兴趣教练</h1>
+          <h1>{t('app.title')}</h1>
           <div className="header-controls">
-            <label className="model-switch">
-              <span>模型选择：</span>
-              <select
-                value={modelType}
-                onChange={(e) => setModelType(e.target.value as 'local' | 'volcano')}
-                disabled={isLoading}
-              >
-                <option value="local">本地模型 (Ollama)</option>
-                <option value="volcano">火山云模型</option>
-              </select>
-            </label>
             <label className="mode-switch">
-              <span>模式：</span>
+              <span>{t('settings.chatMode')}：</span>
               <button
                 className={`mode-btn ${chatMode === 'single' ? 'active' : ''}`}
                 onClick={() => throttledSetChatMode('single')}
                 disabled={isLoading}
-                title="单Agent模式：快速响应"
+                title={t('settings.singleAgent')}
               >
-                普通
+                {t('settings.singleAgent')}
               </button>
               <button
                 className={`mode-btn ${chatMode === 'multi_agent' ? 'active' : ''}`}
                 onClick={() => throttledSetChatMode('multi_agent')}
                 disabled={isLoading}
-                title="多Agent协作模式：深度规划和分析"
+                title={t('settings.multiAgent')}
               >
-                🧠 Smart AI
+                🧠 {t('settings.multiAgent')}
               </button>
             </label>
-            <button onClick={throttledClearHistory} className="clear-btn">
-              清空历史
+            <button 
+              onClick={() => setIsSettingsOpen(true)} 
+              className="settings-btn"
+              title={t('settings.title')}
+            >
+              ⚙️
             </button>
           </div>
         </div>
@@ -221,22 +220,36 @@ const ChatInterface: React.FC = () => {
                   throttledSendMessage();
                 }
               }}
-              placeholder={isLoading ? '当前消息发送中，输入将加入队列...' : '输入你的问题...'}
+              placeholder={isLoading ? t('chat.generating') : t('chat.inputPlaceholder')}
               disabled={false}
               className="chat-input"
             />
             {isLoading ? (
               <button onClick={stopGeneration} className="send-btn stop-btn">
-                停止
+                {t('chat.abort')}
               </button>
             ) : (
               <button onClick={throttledSendMessage} className="send-btn" disabled={!inputValue.trim()}>
-                {messageQueue.queue.length > 0 ? `发送 (队列: ${messageQueue.queue.length})` : '发送'}
+                {messageQueue.queue.length > 0 ? `${t('chat.sendButton')} (${messageQueue.queue.length})` : t('chat.sendButton')}
               </button>
             )}
           </div>
+          
+          {/* 文本统计指示器 */}
+          {inputValue && (
+            <TextStatsIndicator 
+              text={inputValue}
+              onWarningClick={() => {
+                // TODO: 打开超长文本处理选项对话框
+                console.log('超长文本警告点击');
+              }}
+            />
+          )}
         </div>
       </div>
+      
+      {/* 设置面板 */}
+      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 };

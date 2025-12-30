@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "AI 智能助手"
+  },
+  "chat": {
+    "inputPlaceholder": "输入您的问题...",
+    "sendButton": "发送",
+    "thinking": "思考中...",
+    "generating": "生成中...",
+    "abort": "停止生成",
+    "retry": "重试",
+    "copy": "复制",
+    "copied": "已复制",
+    "newConversation": "新对话",
+    "conversationList": "对话列表",
+    "noMessages": "暂无消息，开始对话吧！",
+    "loadingMore": "加载更多...",
+    "noMoreMessages": "没有更多消息了",
+    "user": "用户",
+    "assistant": "助手"
+  },
+  "conversation": {
+    "title": "对话历史",
+    "search": "搜索对话...",
+    "noConversations": "暂无对话记录",
+    "delete": "删除",
+    "deleteConfirm": "确定要删除这个对话吗？",
+    "loadMore": "加载更多",
+    "creating": "创建中...",
+    "loading": "加载中...",
+    "messages": "条消息",
+    "collapse": "收起侧边栏",
+    "expand": "展开侧边栏"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "light": "浅色模式",
+    "dark": "深色模式",
+    "auto": "跟随系统",
+    "chinese": "中文",
+    "english": "English",
+    "model": "模型选择",
+    "chatMode": "对话模式",
+    "singleAgent": "单智能体",
+    "multiAgent": "多智能体"
+  },
+  "multiAgent": {
+    "title": "多智能体协作",
+    "host": "主持人",
+    "planner": "规划师",
+    "reporter": "报告员",
+    "critic": "评论家",
+    "thinking": "思考中",
+    "speaking": "发言中",
+    "waiting": "等待中",
+    "done": "完成",
+    "plan": "计划",
+    "steps": "步骤",
+    "progress": "进度"
+  },
+  "error": {
+    "networkError": "网络错误，请检查连接",
+    "serverError": "服务器错误，请稍后重试",
+    "timeout": "请求超时，请重试",
+    "unknown": "未知错误",
+    "retry": "重试"
+  },
+  "stats": {
+    "words": "字",
+    "chars": "字符",
+    "lines": "行"
+  }
+}
+

@@ -1,76 +1,92 @@
-/* 对话列表侧边栏样式 */
+/* 对话列表侧边栏样式 - 毛玻璃效果 */
 .conversation-sidebar {
-  background: #f8f9fa;
-  border-right: 1px solid #e0e0e0;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-right: 2px solid rgba(240, 240, 240, 0.8);
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
   position: relative;
   z-index: 100;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.05);
 }
 
 .conversation-sidebar.expanded {
-  width: 280px;
-  min-width: 280px;
+  width: 300px;
+  min-width: 300px;
 }
 
 .conversation-sidebar.collapsed {
-  width: 50px;
-  min-width: 50px;
+  width: 60px;
+  min-width: 60px;
 }
 
-/* 侧边栏头部 */
+/* 侧边栏头部 - 毛玻璃效果 */
 .sidebar-header {
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  padding: 20px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #1f2937;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  border-bottom: 2px solid rgba(240, 240, 240, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .sidebar-header h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   flex: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .toggle-sidebar-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  color: #6b7280;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  transition: background 0.2s;
+  font-size: 18px;
+  transition: all 0.2s;
 }
 
 .toggle-sidebar-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #e5e7eb;
+  border-color: #667eea;
+  color: #667eea;
+  transform: scale(1.05);
 }
 
 .new-conversation-btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
 .new-conversation-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .new-conversation-btn:disabled {
@@ -81,8 +97,8 @@
 /* 对话列表 */
 .conversations-list {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px;
+  overflow: hidden;
+  padding: 12px 10px;
 }
 
 .conversations-list::-webkit-scrollbar {
@@ -105,44 +121,61 @@
 /* 空状态 */
 .empty-conversations {
   text-align: center;
-  padding: 40px 20px;
-  color: #666;
+  padding: 60px 20px;
+  color: #6b7280;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .empty-conversations p {
-  margin: 8px 0;
+  margin: 10px 0;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .empty-conversations .hint {
   font-size: 13px;
-  color: #999;
+  color: #9ca3af;
+  line-height: 1.6;
+  font-weight: 400;
 }
 
-/* 对话项 */
+/* 对话项 - 毛玻璃效果 */
 .conversation-item {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid rgba(229, 231, 235, 0.8);
+  border-radius: 12px;
+  padding: 14px 12px;
+  margin-bottom: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .conversation-item:hover {
-  background: #f0f0f0;
+  background: rgba(249, 250, 251, 0.9);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   border-color: #667eea;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(4px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.2);
 }
 
 .conversation-item.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
   color: white;
-  border-color: #667eea;
+  border-color: rgba(102, 126, 234, 0.8);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
 }
 
 .conversation-info {
@@ -151,23 +184,30 @@
 }
 
 .conversation-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   margin-bottom: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #1f2937;
+}
+
+.conversation-item.active .conversation-title {
+  color: white;
 }
 
 .conversation-meta {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  opacity: 0.8;
+  opacity: 0.7;
+  color: #6b7280;
 }
 
 .conversation-item.active .conversation-meta {
   opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .message-count::before {
@@ -179,26 +219,42 @@
 }
 
 .delete-conversation-btn {
-  background: transparent;
-  border: none;
+  background: #fef2f2;
+  border: 2px solid #fecaca;
+  color: #dc2626;
   cursor: pointer;
   font-size: 16px;
-  padding: 4px;
+  padding: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   flex-shrink: 0;
 }
 
 .conversation-item:hover .delete-conversation-btn {
-  opacity: 0.6;
+  opacity: 1;
 }
 
 .delete-conversation-btn:hover {
-  opacity: 1 !important;
+  background: #fee2e2;
+  border-color: #f87171;
+  transform: scale(1.1);
 }
 
 .conversation-item.active .delete-conversation-btn {
-  filter: brightness(0) invert(1);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.conversation-item.active .delete-conversation-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* 响应式设计 */

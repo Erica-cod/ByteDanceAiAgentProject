@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Conversation } from '../utils/conversationAPI';
 import { useDateFormat, useThrottle } from '../hooks';
+import VirtualList, { VirtualListHandle } from './VirtualList';
 import './ConversationList.css';
 
 interface ConversationListProps {
@@ -28,7 +30,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
   isLoading = false,
   messageCountRefs,
 }) => {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(true);
+  const virtualListRef = useRef<VirtualListHandle>(null);
 
   // 🔧 节流：防止用户快速切换对话导致频繁加载数据
   const throttledSelectConversation = useThrottle(onSelectConversation, 500);
@@ -39,26 +43,75 @@ const ConversationList: React.FC<ConversationListProps> = ({
   // 🔧 节流：防止重复删除请求
   const throttledDeleteConversation = useThrottle(onDeleteConversation, 1000);
 
+  // ✅ 渲染单个对话项
+  const renderConversationItem = (conversation: Conversation, index: number) => (
+    <div
+      className={`conversation-item ${
+        conversation.conversationId === currentConversationId ? 'active' : ''
+      }`}
+      onClick={() => throttledSelectConversation(conversation.conversationId)}
+    >
+      <div className="conversation-info">
+        <div className="conversation-title">{conversation.title}</div>
+        <div className="conversation-meta">
+          <span className="message-count">
+            <span 
+              ref={(el) => {
+                if (el && messageCountRefs) {
+                  messageCountRefs.current.set(conversation.conversationId, el);
+                }
+              }}
+            >
+              {conversation.messageCount}
+            </span>
+            {' '}{t('conversation.messages', { count: conversation.messageCount })}
+          </span>
+          <ConversationTime updatedAt={conversation.updatedAt} />
+        </div>
+      </div>
+      <button
+        className="delete-conversation-btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (window.confirm(t('conversation.deleteConfirm'))) {
+            throttledDeleteConversation(conversation.conversationId);
+          }
+        }}
+        title={t('conversation.delete')}
+      >
+        🗑️
+      </button>
+    </div>
+  );
+
+  // ✅ 空状态渲染器
+  const renderEmptyState = () => (
+    <div className="empty-conversations">
+      <p>{t('conversation.noConversations')}</p>
+      <p className="hint">{t('chat.newConversation')}</p>
+    </div>
+  );
+
   return (
     <div className={`conversation-sidebar ${isExpanded ? 'expanded' : 'collapsed'}`}>
       <div className="sidebar-header">
         <button
           className="toggle-sidebar-btn"
           onClick={() => setIsExpanded(!isExpanded)}
-          title={isExpanded ? '收起侧边栏' : '展开侧边栏'}
+          title={isExpanded ? t('conversation.collapse') : t('conversation.expand')}
         >
           {isExpanded ? '◀' : '▶'}
         </button>
         {isExpanded && (
           <>
-            <h2>对话列表</h2>
+            <h2>{t('chat.conversationList')}</h2>
             <button
               className="new-conversation-btn"
               onClick={throttledNewConversation}
               disabled={isLoading}
-              title="新建对话"
+              title={t('chat.newConversation')}
             >
-              ➕ 新对话
+              ➕ {t('chat.newConversation')}
             </button>
           </>
         )}
@@ -66,53 +119,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
       {isExpanded && (
         <div className="conversations-list">
-          {conversations.length === 0 ? (
-            <div className="empty-conversations">
-              <p>暂无对话</p>
-              <p className="hint">点击上方按钮创建新对话</p>
-            </div>
-          ) : (
-            conversations.map((conversation) => (
-              <div
-                key={conversation.conversationId}
-                className={`conversation-item ${
-                  conversation.conversationId === currentConversationId ? 'active' : ''
-                }`}
-                onClick={() => throttledSelectConversation(conversation.conversationId)}
-              >
-                <div className="conversation-info">
-                  <div className="conversation-title">{conversation.title}</div>
-                  <div className="conversation-meta">
-                    <span className="message-count">
-                      <span 
-                        ref={(el) => {
-                          if (el && messageCountRefs) {
-                            messageCountRefs.current.set(conversation.conversationId, el);
-                          }
-                        }}
-                      >
-                        {conversation.messageCount}
-                      </span>
-                      {' 条消息'}
-                    </span>
-                    <ConversationTime updatedAt={conversation.updatedAt} />
-                  </div>
-                </div>
-                <button
-                  className="delete-conversation-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`确定删除对话"${conversation.title}"吗?`)) {
-                      throttledDeleteConversation(conversation.conversationId);
-                    }
-                  }}
-                  title="删除对话"
-                >
-                  🗑️
-                </button>
-              </div>
-            ))
-          )}
+          <VirtualList
+            ref={virtualListRef}
+            items={conversations}
+            renderItem={renderConversationItem}
+            estimatedItemHeight={90}
+            minItemHeight={80}
+            overscanRowCount={2}
+            // ✅ 性能优化：限制最多渲染约15个DOM节点
+            // 可视区域约8-10个 + 预渲染上下各2个 = 总计约12-14个
+            noItemsRenderer={renderEmptyState}
+            getItemKey={(conversation) => conversation.conversationId}
+          />
         </div>
       )}
     </div>
