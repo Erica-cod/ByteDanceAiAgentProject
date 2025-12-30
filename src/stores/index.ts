@@ -2,4 +2,5 @@
 export { useChatStore, type Message } from './chatStore';
 export { useQueueStore, type QueueItem } from './queueStore';
 export { useUIStore } from './uiStore';
+export { useThemeStore } from './themeStore';
 

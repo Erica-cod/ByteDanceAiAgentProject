@@ -10,7 +10,14 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e3e9f2 50%, #f0f4f8 100%);
+  background-attachment: fixed;
+  transition: background 0.3s ease;
+}
+
+/* 暗色主题背景 */
+[data-theme="dark"] body {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1f1f1f 100%);
 }
 
 #root {

@@ -1,0 +1,375 @@
+/* 暗色主题全局样式 */
+
+/* 定义暗色主题的 CSS 变量 */
+[data-theme="dark"] {
+  /* 主要背景色 */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3a3a3a;
+  --bg-hover: #404040;
+  --bg-active: #4a4a4a;
+  
+  /* 文本颜色 */
+  --text-primary: #f0f0f0;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #808080;
+  --text-disabled: #606060;
+  
+  /* 边框颜色 */
+  --border-color: #404040;
+  --border-hover: #505050;
+  
+  /* 主题色 */
+  --primary-color: #667eea;
+  --primary-hover: #5568d3;
+  --primary-active: #4451b8;
+  
+  /* 功能色 */
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --info-color: #3b82f6;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+  
+  /* 代码高亮 */
+  --code-bg: #2d2d2d;
+  --code-border: #404040;
+}
+
+/* 应用容器 */
+[data-theme="dark"] .app-container {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 聊天容器 */
+[data-theme="dark"] .chat-container {
+  background: var(--bg-primary);
+}
+
+/* 聊天头部 */
+[data-theme="dark"] .chat-header {
+  background: rgba(42, 42, 42, 0.95);
+  border-bottom: 2px solid var(--border-color);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .chat-header h1 {
+  background: linear-gradient(135deg, #667eea 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 按钮样式 */
+[data-theme="dark"] .settings-btn,
+[data-theme="dark"] .mode-btn {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-btn:hover,
+[data-theme="dark"] .mode-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .mode-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+/* 输入框 */
+[data-theme="dark"] .chat-input {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .chat-input:focus {
+  border-color: var(--primary-color);
+  background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .chat-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* 发送按钮 */
+[data-theme="dark"] .send-btn {
+  background: var(--primary-color);
+  color: white;
+}
+
+[data-theme="dark"] .send-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+[data-theme="dark"] .send-btn:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-disabled);
+}
+
+[data-theme="dark"] .stop-btn {
+  background: var(--error-color);
+}
+
+[data-theme="dark"] .stop-btn:hover {
+  background: #dc2626;
+}
+
+/* 消息列表 */
+[data-theme="dark"] .message {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .message.user {
+  background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .message.assistant {
+  background: var(--bg-secondary);
+}
+
+/* 代码块 */
+[data-theme="dark"] pre {
+  background: var(--code-bg) !important;
+  border: 1px solid var(--code-border);
+}
+
+[data-theme="dark"] code {
+  background: var(--code-bg);
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .hljs {
+  background: var(--code-bg) !important;
+  color: #e5e7eb !important;
+}
+
+/* 对话列表 */
+[data-theme="dark"] .conversation-list {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .conversation-item {
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .conversation-item:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .conversation-item.active {
+  background: var(--bg-active);
+  border-left: 3px solid var(--primary-color);
+}
+
+[data-theme="dark"] .conversation-item-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .conversation-item-preview {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .conversation-item-time {
+  color: var(--text-tertiary);
+}
+
+/* 新建对话按钮 */
+[data-theme="dark"] .new-conversation-btn {
+  background: var(--primary-color);
+  color: white;
+}
+
+[data-theme="dark"] .new-conversation-btn:hover {
+  background: var(--primary-hover);
+}
+
+/* 删除按钮 */
+[data-theme="dark"] .delete-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .delete-btn:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+/* 多智能体显示 */
+[data-theme="dark"] .multi-agent-container {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .agent-card {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .agent-card.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+[data-theme="dark"] .agent-name {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .agent-status {
+  color: var(--text-secondary);
+}
+
+/* 计划卡片 */
+[data-theme="dark"] .plan-card {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .plan-step {
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--border-color);
+}
+
+[data-theme="dark"] .plan-step.completed {
+  border-left-color: var(--success-color);
+}
+
+[data-theme="dark"] .plan-step.active {
+  border-left-color: var(--primary-color);
+}
+
+/* 加载指示器 */
+[data-theme="dark"] .loading-indicator {
+  color: var(--text-secondary);
+}
+
+/* 离线指示器 */
+[data-theme="dark"] .offline-indicator {
+  background: var(--bg-tertiary);
+  color: var(--warning-color);
+  border: 1px solid var(--warning-color);
+}
+
+/* 滚动条 */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
+/* 文本统计指示器 */
+[data-theme="dark"] .text-stats-indicator {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .text-stats-indicator.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+}
+
+/* Markdown 内容 */
+[data-theme="dark"] .markdown-content {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .markdown-content h1,
+[data-theme="dark"] .markdown-content h2,
+[data-theme="dark"] .markdown-content h3,
+[data-theme="dark"] .markdown-content h4,
+[data-theme="dark"] .markdown-content h5,
+[data-theme="dark"] .markdown-content h6 {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .markdown-content a {
+  color: var(--primary-color);
+}
+
+[data-theme="dark"] .markdown-content a:hover {
+  color: var(--primary-hover);
+}
+
+[data-theme="dark"] .markdown-content blockquote {
+  background: var(--bg-tertiary);
+  border-left-color: var(--border-hover);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .markdown-content table {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .markdown-content th {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .markdown-content td {
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .markdown-content tr:hover {
+  background: var(--bg-hover);
+}
+
+/* 输入容器 */
+[data-theme="dark"] .chat-input-container {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .chat-input-wrapper {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+/* 选择文本高亮 */
+[data-theme="dark"] ::selection {
+  background: rgba(102, 126, 234, 0.3);
+  color: var(--text-primary);
+}
+
+/* 焦点轮廓 */
+[data-theme="dark"] *:focus-visible {
+  outline-color: var(--primary-color);
+}
+
+/* 过渡动画 */
+[data-theme="dark"] * {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
