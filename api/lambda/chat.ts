@@ -23,6 +23,8 @@ import { callLocalModel, callVolcengineModel } from '../services/modelService.js
 import { volcengineService } from '../services/volcengineService.js';
 import { handleMultiAgentMode } from '../handlers/multiAgentHandler.js';
 import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentHandler.js';
+import { handleChunkingPlanReview } from '../services/chunkingPlanReviewService.js';
+import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 
 // 初始化数据库连接
@@ -142,6 +144,73 @@ export async function post({
         // 继续处理，不阻止 AI 回复
       }
 
+      // ==================== 超长文本 Chunking 模式 ====================
+      const { longTextMode, longTextOptions } = data;
+      
+      // 检测是否需要 chunking（基于文本长度和模式）
+      const shouldUseChunking = 
+        longTextMode === 'plan_review' || 
+        (longTextMode !== 'off' && (message.length > 12000 || message.split('\n').length > 1000));
+      
+      if (shouldUseChunking) {
+        console.log('📦 [Chunking] 启动超长文本智能分段处理...');
+        
+        // 创建 SSE 流
+        const { readable, writable } = new TransformStream();
+        const writer = writable.getWriter();
+        const sseWriter = new SSEStreamWriter(writer);
+        
+        handoffToStream = true;
+        
+        // 异步处理
+        (async () => {
+          try {
+            // 发送初始化事件
+            await sseWriter.sendEvent({
+              conversationId,
+              type: 'init',
+              mode: 'chunking',
+            });
+            
+            // 启动心跳
+            sseWriter.startHeartbeat(15000);
+            
+            // 执行 chunking 处理
+            await handleChunkingPlanReview(
+              message,
+              userId,
+              conversationId,
+              clientAssistantMessageId,
+              modelType,
+              sseWriter,
+              longTextOptions
+            );
+            
+            await sseWriter.close();
+          } catch (error: any) {
+            console.error('❌ [Chunking] 处理失败:', error);
+            
+            if (!sseWriter.isClosed()) {
+              await sseWriter.sendEvent({ 
+                error: error.message || '超长文本处理失败' 
+              });
+            }
+            
+            await sseWriter.close();
+          } finally {
+            slot.release();
+          }
+        })();
+        
+        return new Response(readable, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      }
+      
       // ==================== 多Agent模式 ====================
       if (mode === 'multi_agent') {
         console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
@@ -173,10 +242,14 @@ export async function post({
       
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
 
+      // ✅ 创建 AbortController（用于用户断连时中断上游请求）
+      // 注意：暂不实现，因为需要在更底层传递，留待后续优化
+      // const abortController = new AbortController();
+      
       // 调用模型
       if (modelType === 'local') {
         console.log('开始调用本地模型...');
-        const stream = await callLocalModel(messages);
+        const stream = await callLocalModel(messages /* , abortController.signal */);
         handoffToStream = true;
         return handleLocalStream(
           stream,
@@ -200,7 +273,7 @@ export async function post({
           return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
         }
 
-        const stream = await callVolcengineModel(messages);
+        const stream = await callVolcengineModel(messages /* , abortController.signal */);
         console.log('✅ 已收到火山引擎的流式响应');
         
         handoffToStream = true;

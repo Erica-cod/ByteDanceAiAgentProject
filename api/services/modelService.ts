@@ -8,8 +8,11 @@ import type { ChatMessage } from '../types/chat.js';
 
 /**
  * 调用本地 Ollama 模型
+ * 
+ * @param messages - 对话消息列表
+ * @param signal - 中断信号（可选）
  */
-export async function callLocalModel(messages: ChatMessage[]) {
+export async function callLocalModel(messages: ChatMessage[], signal?: AbortSignal) {
   const fetch = (await import('node-fetch')).default;
   const modelName = process.env.OLLAMA_MODEL || 'deepseek-r1:7b';
   const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
@@ -27,6 +30,7 @@ export async function callLocalModel(messages: ChatMessage[]) {
         num_gpu: 999,  // 强制所有层使用 GPU（999 表示尽可能多）
       }
     }),
+    signal: signal as any, // ✅ 传递中断信号
   });
 
   if (!response.ok) {
@@ -38,8 +42,11 @@ export async function callLocalModel(messages: ChatMessage[]) {
 
 /**
  * 调用火山引擎豆包大模型
+ * 
+ * @param messages - 对话消息列表
+ * @param signal - 中断信号（可选）
  */
-export async function callVolcengineModel(messages: ChatMessage[]) {
+export async function callVolcengineModel(messages: ChatMessage[], signal?: AbortSignal) {
   // 转换消息格式（保持兼容）
   const volcengineMessages: VolcengineMessage[] = messages.map(msg => ({
     role: msg.role,
@@ -51,6 +58,7 @@ export async function callVolcengineModel(messages: ChatMessage[]) {
     temperature: 0.7,
     maxTokens: 4000,
     topP: 0.95,
+    signal, // ✅ 传递中断信号
   });
 
   return stream;

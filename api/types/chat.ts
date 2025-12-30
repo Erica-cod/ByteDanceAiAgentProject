@@ -16,6 +16,12 @@ export interface ChatRequestData {
   clientAssistantMessageId?: string; // 前端生成的 assistant 占位消息ID
   queueToken?: string; // 队列 token
   resumeFromRound?: number; // 断点续传：从指定轮次恢复
+  longTextMode?: 'off' | 'plan_review' | 'summarize_only' | 'summarize_then_qa';  // 超长文本处理模式
+  longTextOptions?: {
+    preferChunking?: boolean;      // 是否优先使用 chunking
+    maxChunks?: number;            // 最大分段数
+    includeCitations?: boolean;    // 是否包含引用片段
+  };
 }
 
 /**

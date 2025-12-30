@@ -125,15 +125,24 @@ export async function streamVolcengineToSSEResponse(
               let continueLoop = true;
               let loopIteration = 0;
               const MAX_LOOP_ITERATIONS = 10;  // 额外的安全保护
+              const MAX_TOTAL_TIME_MS = 120000; // ✅ 新增：总时间限制120秒（防止死循环卡死用户）
+              const loopStartTime = Date.now();
               
               // 获取用户的原始问题（用于在工具结果反馈中提醒 AI）
               const originalUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
               
-              console.log(`🔄 [Workflow] 开始多工具调用循环，最多 ${MAX_LOOP_ITERATIONS} 次迭代`);
+              console.log(`🔄 [Workflow] 开始多工具调用循环，最多 ${MAX_LOOP_ITERATIONS} 次迭代，超时 ${MAX_TOTAL_TIME_MS/1000}s`);
               
               while (continueLoop && loopIteration < MAX_LOOP_ITERATIONS) {
+                // ✅ 检查总时间限制（防止死循环）
+                const elapsedTime = Date.now() - loopStartTime;
+                if (elapsedTime > MAX_TOTAL_TIME_MS) {
+                  console.warn(`⏰ [Workflow] 工具调用超时（${elapsedTime}ms），强制结束循环`);
+                  break;
+                }
+                
                 loopIteration++;
-                console.log(`\n🔁 [Workflow] === 循环迭代 ${loopIteration}/${MAX_LOOP_ITERATIONS} ===`);
+                console.log(`\n🔁 [Workflow] === 循环迭代 ${loopIteration}/${MAX_LOOP_ITERATIONS} (已用时${Math.round(elapsedTime/1000)}s) ===`);
                 console.log(`📝 [Workflow] 当前AI回复内容（前500字符）:\n${currentResponse.substring(0, 500)}...`);
                 
                 // 处理当前 AI 回复，检测并执行工具

@@ -6,6 +6,19 @@ let connecting: Promise<Db> | null = null;
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-agent';
 
+// ✅ MongoDB 连接池配置（针对200并发用户优化）
+const MONGO_OPTIONS = {
+  maxPoolSize: 300,           // 最大连接数：200用户 + 50%预留 = 300
+  minPoolSize: 20,            // 最小连接数：保持20个热连接
+  maxIdleTimeMS: 60000,       // 空闲连接60秒后回收
+  serverSelectionTimeoutMS: 5000,  // 服务器选择超时5秒
+  socketTimeoutMS: 45000,     // Socket超时45秒
+  connectTimeoutMS: 10000,    // 连接超时10秒
+  retryWrites: true,          // 自动重试写入
+  retryReads: true,           // 自动重试读取
+  // w 参数已在连接字符串中设置（w=majority），这里不重复设置避免类型冲突
+};
+
 export async function connectToDatabase(): Promise<Db> {
   if (db) {
     return db;
@@ -18,7 +31,7 @@ export async function connectToDatabase(): Promise<Db> {
 
   connecting = (async () => {
     try {
-      client = new MongoClient(MONGODB_URI);
+      client = new MongoClient(MONGODB_URI, MONGO_OPTIONS);
       await client.connect();
       db = client.db();
       

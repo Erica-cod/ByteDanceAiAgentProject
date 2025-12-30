@@ -48,6 +48,20 @@ export async function handleVolcanoStream(
       sseWriter.startHeartbeat(15000);
 
       for await (const chunk of stream) {
+        // ✅ 关键修复：检测连接断开，立即停止读取
+        if (sseWriter.isClosed()) {
+          console.log('⚠️  [Volcano] 客户端已断开，停止读取模型流');
+          // 主动中断上游流（Web Streams API）
+          try {
+            const readableStream = stream as any;
+            if (readableStream.cancel && typeof readableStream.cancel === 'function') {
+              await readableStream.cancel();
+            }
+          } catch (e) {
+            // 忽略取消错误
+          }
+          return;
+        }
         const chunkStr = chunk.toString();
         buffer += chunkStr;
         
@@ -72,12 +86,19 @@ export async function handleVolcanoStream(
             if (line.includes('[DONE]')) {
               console.log('✅ 火山引擎流式响应完成');
               
-              // 多工具调用工作流
+              // ✅ 在工具调用前检查连接
+              if (sseWriter.isClosed()) {
+                console.log('⚠️  [Volcano] 完成前客户端已断开，跳过工具调用');
+                return;
+              }
+              
+              // 多工具调用工作流（传递连接检查器）
               const workflowResult = await processToolCallWorkflow(
                 accumulatedText,
                 userId,
                 messages,
-                sseWriter
+                sseWriter,
+                () => !sseWriter.isClosed() // ✅ 连接检查器
               );
               
               if (workflowResult) {
@@ -203,6 +224,20 @@ export async function handleLocalStream(
       sseWriter.startHeartbeat(15000);
       
       for await (const chunk of stream) {
+        // ✅ 关键修复：检测连接断开，立即停止读取
+        if (sseWriter.isClosed()) {
+          console.log('⚠️  [Local] 客户端已断开，停止读取模型流');
+          // 主动中断上游流
+          try {
+            const readableStream = stream as any;
+            if (readableStream.cancel && typeof readableStream.cancel === 'function') {
+              await readableStream.cancel();
+            }
+          } catch (e) {
+            // 忽略取消错误
+          }
+          return;
+        }
         const chunkStr = chunk.toString();
         buffer += chunkStr;
         
@@ -233,9 +268,21 @@ export async function handleLocalStream(
                 if (toolCallResult) {
                   console.log('🔧 [本地模型] 检测到工具调用:', toolCallResult.data);
                   
+                  // ✅ 工具调用前检查连接
+                  if (sseWriter.isClosed()) {
+                    console.log('⚠️  [Local] 客户端已断开，跳过工具调用');
+                    return;
+                  }
+                  
                   // 执行工具调用
                   const { resultText, sources } = await executeToolCall(toolCallResult.data, userId);
                   searchSources = sources;
+                  
+                  // ✅ 工具执行后再次检查连接
+                  if (sseWriter.isClosed()) {
+                    console.log('⚠️  [Local] 工具执行期间客户端已断开，停止后续调用');
+                    return;
+                  }
                   
                   // 将工具结果添加到消息历史
                   messages.push(
@@ -243,7 +290,7 @@ export async function handleLocalStream(
                     { role: 'user', content: `以下是搜索结果，请基于这些搜索结果回答用户的问题：\n\n${resultText}\n\n请现在根据上述搜索结果，详细回答用户的问题。` }
                   );
                   
-                  // 重新调用模型
+                  // 重新调用模型（不传 signal，因为这里无法创建新的 AbortController）
                   const newStream = await callLocalModel(messages);
                   
                   // 重置累积文本
@@ -252,6 +299,20 @@ export async function handleLocalStream(
                   
                   // 继续处理新的流
                   for await (const newChunk of newStream) {
+                    // ✅ 二次调用中也要检查连接
+                    if (sseWriter.isClosed()) {
+                      console.log('⚠️  [Local] 二次调用期间客户端已断开');
+                      try {
+                        const readableStream = newStream as any;
+                        if (readableStream.cancel && typeof readableStream.cancel === 'function') {
+                          await readableStream.cancel();
+                        }
+                      } catch (e) {
+                        // 忽略取消错误
+                      }
+                      return;
+                    }
+                    
                     const newChunkStr = newChunk.toString();
                     buffer += newChunkStr;
                     
@@ -364,7 +425,8 @@ async function processToolCallWorkflow(
   initialResponse: string,
   userId: string,
   messages: ChatMessage[],
-  sseWriter: SSEStreamWriter
+  sseWriter: SSEStreamWriter,
+  connectionChecker?: () => boolean // ✅ 新增：连接检查器
 ): Promise<{ finalResponse: string; sources?: Array<{title: string; url: string}> } | null> {
   const workflowManager = new MultiToolCallManager(5);
   let currentResponse = initialResponse;
@@ -372,16 +434,37 @@ async function processToolCallWorkflow(
   let continueLoop = true;
   let loopIteration = 0;
   const MAX_LOOP_ITERATIONS = 10;
+  const MAX_TOTAL_TIME_MS = 120000; // 总时间限制120秒
+  const loopStartTime = Date.now();
   
   const originalUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
   
   while (continueLoop && loopIteration < MAX_LOOP_ITERATIONS) {
+    // ✅ 关键修复：检查连接状态
+    if (connectionChecker && !connectionChecker()) {
+      console.log('⚠️  [Workflow] 客户端已断开，停止工具调用循环');
+      return { finalResponse: currentResponse, sources: searchSources };
+    }
+    
+    // ✅ 检查总时间限制
+    const elapsedTime = Date.now() - loopStartTime;
+    if (elapsedTime > MAX_TOTAL_TIME_MS) {
+      console.warn(`⏰ [Workflow] 工具调用超时（${elapsedTime}ms），强制结束循环`);
+      break;
+    }
+    
     loopIteration++;
     
     const workflowResult = await workflowManager.processAIResponse(currentResponse, userId);
     
     if (!workflowResult.hasToolCall) {
       break;
+    }
+    
+    // ✅ 工具执行前再次检查连接
+    if (connectionChecker && !connectionChecker()) {
+      console.log('⚠️  [Workflow] 工具执行前客户端已断开');
+      return { finalResponse: currentResponse, sources: searchSources };
     }
     
     // 发送工具调用通知
@@ -413,7 +496,13 @@ async function processToolCallWorkflow(
       break;
     }
     
-    // 重新调用 AI 模型
+    // ✅ 二次调用前检查连接
+    if (connectionChecker && !connectionChecker()) {
+      console.log('⚠️  [Workflow] 二次调用前客户端已断开');
+      return { finalResponse: currentResponse, sources: searchSources };
+    }
+    
+    // 重新调用 AI 模型（不传 signal，因为无法共享 AbortController）
     const newStream = await callVolcengineModel(messages);
     
     // 重置累积文本
@@ -422,6 +511,20 @@ async function processToolCallWorkflow(
     
     // 继续处理新的流
     for await (const chunk of newStream) {
+      // ✅ 二次调用中也要检查连接
+      if (connectionChecker && !connectionChecker()) {
+        console.log('⚠️  [Workflow] 二次调用期间客户端已断开');
+        try {
+          const readableStream = newStream as any;
+          if (readableStream.cancel && typeof readableStream.cancel === 'function') {
+            await readableStream.cancel();
+          }
+        } catch (e) {
+          // 忽略取消错误
+        }
+        return { finalResponse: currentResponse, sources: searchSources };
+      }
+      
       const chunkStr = chunk.toString();
       buffer += chunkStr;
       

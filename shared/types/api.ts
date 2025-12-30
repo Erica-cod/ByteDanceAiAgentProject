@@ -34,7 +34,13 @@ export interface ChatRequest {
   modelType: 'local' | 'volcano';
   conversationId?: string;
   userId: string;
-  mode?: 'single' | 'multi_agent';  // 新增：聊天模式
+  mode?: 'single' | 'multi_agent';  // 聊天模式
+  longTextMode?: 'off' | 'plan_review' | 'summarize_only' | 'summarize_then_qa';  // 超长文本处理模式
+  longTextOptions?: {
+    preferChunking?: boolean;      // 是否优先使用 chunking
+    maxChunks?: number;            // 最大分段数
+    includeCitations?: boolean;    // 是否包含引用片段
+  };
 }
 
 export interface ConversationsListResponse {

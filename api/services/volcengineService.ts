@@ -75,6 +75,7 @@ export class VolcengineService {
       temperature?: number;
       maxTokens?: number;
       topP?: number;
+      signal?: AbortSignal; // ✅ 新增：支持中断信号
     }
   ): Promise<NodeJS.ReadableStream> {
     if (!this.apiKey) {
@@ -114,6 +115,7 @@ export class VolcengineService {
         'Authorization': `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(requestBody),
+      signal: options?.signal as any, // ✅ 传递中断信号
     });
 
     if (!response.ok) {
