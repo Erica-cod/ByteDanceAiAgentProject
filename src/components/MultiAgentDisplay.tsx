@@ -8,8 +8,9 @@
  * - 高亮最终报告
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
+import { useThrottle } from '../hooks'; // ✅ 使用统一导出
 import './MultiAgentDisplay.css';
 
 /**
@@ -95,9 +96,47 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
   streamingAgentContent = {}, // ✅ 新增：流式内容
   onHeightChange, // ✅ 新增：高度变化回调
 }) => {
-  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(
-    new Set([rounds.length]) // 默认展开最新一轮
-  );
+  // ✅ 调试：仅在rounds长度或内容变化时打印
+  const prevRoundsRef = useRef<string>('');
+  useEffect(() => {
+    const roundsSignature = rounds.map(r => `${r.round}:${r.outputs.length}`).join(',');
+    if (roundsSignature !== prevRoundsRef.current) {
+      prevRoundsRef.current = roundsSignature;
+      console.log(`[MultiAgentDisplay] 📦 接收到 ${rounds.length} 轮数据:`);
+      rounds.forEach((round) => {
+        console.log(`[MultiAgentDisplay]   第 ${round.round} 轮: ${round.outputs.length} 个agent输出 [${round.outputs.map(o => o.agent).join(', ')}]`);
+      });
+    }
+  }, [rounds]);
+  
+  // 🐛 调试：打印 streamingAgentContent
+  useEffect(() => {
+    const keys = Object.keys(streamingAgentContent);
+    if (keys.length > 0) {
+      console.log(`🎨 [MultiAgentDisplay] 收到 streamingAgentContent:`, keys, streamingAgentContent);
+    }
+  }, [streamingAgentContent]);
+  
+  // ✅ 默认只展开有流式内容的轮次，减少CLS
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(() => {
+    // 查找正在流式生成的轮次
+    const streamingRounds = rounds
+      .filter(r => r.outputs.some(output => {
+        const streamKey = `${output.agent}:${output.round}`;
+        return streamingAgentContent && streamKey in streamingAgentContent;
+      }))
+      .map(r => r.round);
+    
+    // 如果有流式轮次，只展开最新的；否则展开最后一轮
+    return new Set(streamingRounds.length > 0 ? [Math.max(...streamingRounds)] : [rounds.length]);
+  });
+
+  /**
+   * ✅ 节流的高度变化回调（600ms节流，减少CLS）
+   */
+  const throttledHeightChange = useThrottle(() => {
+    onHeightChange?.();
+  }, 600);
 
   /**
    * ✅ 自动展开正在流式生成的轮次
@@ -106,8 +145,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
     const roundsWithStreaming = rounds.map(r => r.round).filter(round => {
       return rounds.find(rd => rd.round === round)?.outputs.some(output => {
         const streamKey = `${output.agent}:${output.round}`;
-        return streamingAgentContent[streamKey] && 
-               streamingAgentContent[streamKey] !== output.content;
+        // ✅ 只要 streamingAgentContent 中存在该 key，就认为正在生成
+        return streamingAgentContent && streamKey in streamingAgentContent;
       });
     });
 
@@ -121,47 +160,69 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
             hasChanges = true;
           }
         });
-        // ✅ 只有在真正展开新轮次时才通知高度变化
-        if (hasChanges) {
-          setTimeout(() => onHeightChange?.(), 100);
-        }
+        
+        // ⚡ 完全禁用自动展开触发的高度重新计算（避免第3轮CLS飙升）
+        // 原因：自动展开会导致多个轮次同时渲染，引发大量布局偏移
+        // 解决：让预留空间自然适应内容，不主动触发重新计算
+        
+        // if (hasChanges && onHeightChange) {
+        //   if (heightChangeTimeoutRef.current) {
+        //     clearTimeout(heightChangeTimeoutRef.current);
+        //   }
+        //   heightChangeTimeoutRef.current = window.setTimeout(() => {
+        //     onHeightChange();
+        //   }, 800);
+        // }
+        
         return newSet;
       });
     }
   }, [streamingAgentContent, rounds, onHeightChange]);
 
   /**
-   * 切换轮次展开/收起
+   * 切换轮次展开/收起 - 使用 useThrottle 优化
    */
-  const toggleRound = (round: number) => {
+  const toggleRound = useCallback((round: number) => {
     const newExpanded = new Set(expandedRounds);
+    const isExpanding = !newExpanded.has(round); // 检测是展开还是收起
+    
     if (newExpanded.has(round)) {
       newExpanded.delete(round);
     } else {
       newExpanded.add(round);
     }
     setExpandedRounds(newExpanded);
-    // ✅ 通知父组件高度变化
-    setTimeout(() => onHeightChange?.(), 50);
-  };
+    
+    // ⚡ 只在收起时触发高度重新计算，展开时依赖预留空间（避免CLS）
+    if (!isExpanding) {
+      throttledHeightChange();
+    }
+  }, [expandedRounds, throttledHeightChange]);
 
   /**
-   * 展开所有轮次
+   * 展开所有轮次 - 节流优化
    */
-  const expandAll = () => {
+  const expandAll = useCallback(() => {
     setExpandedRounds(new Set(rounds.map((r) => r.round)));
-    // ✅ 通知父组件高度变化
-    setTimeout(() => onHeightChange?.(), 100);
-  };
+    
+    // ⚡ 禁用展开所有时的高度重新计算（避免巨大CLS）
+    // 让预留空间自然适应多轮次内容
+    
+    // if (heightChangeTimeoutRef.current) {
+    //   clearTimeout(heightChangeTimeoutRef.current);
+    // }
+    // heightChangeTimeoutRef.current = window.setTimeout(() => {
+    //   onHeightChange?.();
+    // }, 400);
+  }, [rounds, onHeightChange]);
 
   /**
-   * 收起所有轮次
+   * 收起所有轮次 - 使用 useThrottle 优化
    */
-  const collapseAll = () => {
+  const collapseAll = useCallback(() => {
     setExpandedRounds(new Set());
-    // ✅ 通知父组件高度变化
-    setTimeout(() => onHeightChange?.(), 50);
-  };
+    throttledHeightChange(); // ⚡ 使用节流的高度变化回调
+  }, [throttledHeightChange]);
 
   /**
    * 获取共识水平颜色
@@ -245,8 +306,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
           // ✅ 检查本轮是否有正在流式生成的agent
           const streamingAgentsInRound = roundData.outputs.filter(output => {
             const streamKey = `${output.agent}:${output.round}`;
-            return streamingAgentContent[streamKey] && 
-                   streamingAgentContent[streamKey] !== output.content;
+            // ✅ 只要 streamingAgentContent 中存在该 key，就认为正在生成
+            return streamingAgentContent && streamKey in streamingAgentContent;
           });
 
           return (
@@ -285,8 +346,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                 <div className="round-agents">
                   {roundData.outputs.map((output) => {
                     const streamKey = `${output.agent}:${output.round}`;
-                    const isStreaming = streamingAgentContent[streamKey] && 
-                                       streamingAgentContent[streamKey] !== output.content;
+                    // ✅ 只要 streamingAgentContent 中存在该 key，就认为正在生成
+                    const isStreaming = streamingAgentContent && streamKey in streamingAgentContent;
                     return (
                       <span key={output.agent} className="agent-badge" style={{
                         background: isStreaming ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : undefined,
@@ -310,9 +371,15 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                   {roundData.outputs.map((output, index) => {
                     // ✅ 优先使用流式内容（如果agent正在生成中）
                     const streamKey = `${output.agent}:${output.round}`; // ✅ 使用 agent:round 格式
-                    const displayContent = streamingAgentContent[streamKey] || output.content;
-                    const isStreaming = streamingAgentContent[streamKey] && 
-                                       streamingAgentContent[streamKey] !== output.content;
+                    const streamContent = streamingAgentContent?.[streamKey];
+                    const hasStreamKey = streamingAgentContent && streamKey in streamingAgentContent; // ✅ 检查是否存在该key
+                    const displayContent = streamContent !== undefined ? streamContent : output.content;
+                    const isStreaming = hasStreamKey; // ✅ 只要存在该key就认为正在流式生成
+                    
+                    // ✅ 如果内容为空且不在流式生成（即没有占位符），跳过显示
+                    if (!displayContent && !hasStreamKey) {
+                      return null;
+                    }
                     
                     return (
                       <div key={index} className={`agent-output agent-${output.agent}`}>
@@ -327,7 +394,25 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                           {isStreaming && <span className="streaming-indicator">⚡ 生成中...</span>}
                         </div>
                         <div className="agent-content">
-                          <StreamingMarkdown content={displayContent} />
+                          {displayContent && displayContent.trim() ? (
+                            <StreamingMarkdown content={displayContent} />
+                          ) : isStreaming ? (
+                            // ⚡ 流式生成中但内容为空（隐藏 JSON 阶段），显示友好提示
+                            <div className="streaming-placeholder">
+                              <div className="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                              </div>
+                              <span className="streaming-text">正在生成分析...</span>
+                            </div>
+                          ) : (
+                            <div className="typing-indicator">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

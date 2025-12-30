@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../stores';
 import { getConversationDetails, type Conversation } from '../../utils/conversationAPI';
+import { isLongText } from '../../utils/textUtils';
 import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../components/MultiAgentDisplay';
 
 interface UseSSEStreamOptions {
@@ -38,6 +39,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     const MAX_RETRY_DELAY_MS = 5000;
 
     try {
+      // 🐛 调试：打印当前 chatMode
+      console.log(`🎯 [SSE] 发送消息，当前 chatMode:`, chatMode);
+      
       // 多agent模式的状态
       let multiAgentRounds: RoundData[] = [];
       let multiAgentStatus: 'in_progress' | 'converged' | 'terminated' = 'in_progress';
@@ -50,6 +54,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
       let currentContent = '';
       let currentThinking = '';
+      
+      // Chunking 模式的状态
+      let chunkingTotalChunks = 0;
+      let chunkingCurrentChunk = 0;
+      let chunkingStage: 'split' | 'map' | 'reduce' | 'final' = 'split';
 
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const computeBackoff = (attempt: number) => {
@@ -58,7 +67,32 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         return exp + jitter;
       };
 
+      // ✅ Helper: 深拷贝rounds数据，避免React状态冻结问题
+      const cloneRoundsForReact = (rounds: RoundData[], currentRound: RoundData | null): RoundData[] => {
+        const result = rounds.map(r => ({
+          round: r.round,
+          outputs: r.outputs.map(o => ({ ...o })),
+          hostDecision: r.hostDecision ? { ...r.hostDecision } : undefined
+        }));
+        
+        if (currentRound) {
+          result.push({
+            round: currentRound.round,
+            outputs: currentRound.outputs.map(o => ({ ...o })),
+            hostDecision: currentRound.hostDecision ? { ...currentRound.hostDecision } : undefined
+          });
+        }
+        
+        return result;
+      };
+
       const runStreamOnce = async (): Promise<{ completed: boolean; aborted: boolean; retryAfterMs?: number }> => {
+        // ✅ 检测是否为超长文本
+        const longTextDetection = isLongText(messageText);
+        const longTextMode = longTextDetection.level === 'hard' || longTextDetection.level === 'soft' 
+          ? 'plan_review' 
+          : 'off';
+        
         // ✅ 每次重试时动态构建请求体（因为 completedRounds 可能已更新）
         const requestBody = {
           message: messageText,
@@ -72,6 +106,15 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
           queueToken: queueToken || undefined,
           // ✅ 断点续传：如果是多 agent 模式且有已完成的轮次，传递恢复参数
           ...(chatMode === 'multi_agent' && completedRounds > 0 ? { resumeFromRound: completedRounds + 1 } : {}),
+          // ✅ 超长文本处理
+          longTextMode,
+          ...(longTextMode !== 'off' ? {
+            longTextOptions: {
+              preferChunking: true,
+              maxChunks: 30,
+              includeCitations: false,
+            }
+          } : {}),
         };
 
         const signal = abortControllerRef.current?.signal;
@@ -137,6 +180,13 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
               try {
                 const parsed = JSON.parse(data);
 
+                // 🐛 调试：无条件打印所有 SSE 事件（用于诊断）
+                if (parsed.type) {
+                  console.log(`📡 [SSE] 收到事件: ${parsed.type}`, 
+                    parsed.agent ? `(agent: ${parsed.agent}, round: ${parsed.round})` : '',
+                    `chatMode: ${chatMode}`);
+                }
+
                 // init：同步 conversationId
                 if (parsed.type === 'init' && parsed.conversationId) {
                   if (!conversationId) {
@@ -146,6 +196,53 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   if (parsed.mode === 'multi_agent') {
                     multiAgentStatus = 'in_progress';
                   }
+                  continue;
+                }
+
+                // Chunking 模式事件处理
+                if (parsed.type === 'chunking_init') {
+                  chunkingTotalChunks = parsed.totalChunks || 0;
+                  console.log(`📦 [Chunking] 初始化：共 ${chunkingTotalChunks} 段`);
+                  
+                  updateMessage(assistantMessageId, {
+                    thinking: `检测到超长文本，将分 ${chunkingTotalChunks} 段智能处理...`,
+                  });
+                  continue;
+                }
+                
+                if (parsed.type === 'chunking_progress') {
+                  chunkingStage = parsed.stage || 'split';
+                  chunkingCurrentChunk = parsed.chunkIndex || 0;
+                  
+                  let thinkingText = '';
+                  if (chunkingStage === 'split') {
+                    thinkingText = '正在智能切分文本...';
+                  } else if (chunkingStage === 'map') {
+                    thinkingText = `正在分析第 ${chunkingCurrentChunk + 1}/${chunkingTotalChunks} 段...`;
+                  } else if (chunkingStage === 'reduce') {
+                    thinkingText = '正在合并分析结果...';
+                  } else if (chunkingStage === 'final') {
+                    thinkingText = '正在生成最终评审报告...';
+                  }
+                  
+                  console.log(`📊 [Chunking] ${thinkingText}`);
+                  
+                  updateMessage(assistantMessageId, {
+                    thinking: thinkingText,
+                  });
+                  continue;
+                }
+                
+                if (parsed.type === 'chunking_chunk') {
+                  const chunkIndex = parsed.chunkIndex || 0;
+                  const chunkSummary = parsed.chunkSummary || '';
+                  
+                  console.log(`✅ [Chunking] 第 ${chunkIndex + 1} 段完成`);
+                  
+                  // 可选：显示分段摘要（暂时只更新进度）
+                  updateMessage(assistantMessageId, {
+                    thinking: `已完成 ${chunkIndex + 1}/${chunkingTotalChunks} 段分析...`,
+                  });
                   continue;
                 }
 
@@ -161,9 +258,46 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     
                     console.log(`🚀 [MultiAgent] ${agentId} 开始生成 (第${round}轮)`);
                     
+                    // ✅ 关键修复：立即创建 agent 占位符输出，以便流式显示
+                    if (!currentRound || currentRound.round !== round) {
+                      if (currentRound) {
+                        console.log(`[MultiAgent] ✅ 保存第 ${currentRound.round} 轮到历史，包含 ${currentRound.outputs.length} 个agent输出`);
+                        multiAgentRounds.push(currentRound);
+                      }
+                      currentRound = { round: round, outputs: [] };
+                    }
+                    
+                    // 检查是否已经存在该agent的输出（避免重复）
+                    const existingOutputIndex = currentRound.outputs.findIndex(o => o.agent === agentId);
+                    
+                    if (existingOutputIndex === -1) {
+                      // 创建占位符输出（空内容，稍后通过 streamingAgentContent 显示）
+                      const placeholderOutput: MAAgentOutput = {
+                        agent: agentId,
+                        round: round,
+                        output_type: 'text',
+                        content: '',  // 空内容，通过 streamingAgentContent 显示流式内容
+                        metadata: {},
+                        timestamp: new Date().toISOString(),
+                      };
+                      
+                      currentRound = {
+                        ...currentRound,
+                        outputs: [...currentRound.outputs, placeholderOutput]
+                      };
+                      
+                      console.log(`[MultiAgent] 📝 第 ${round} 轮添加 ${agentId} 占位符，当前轮次共 ${currentRound.outputs.length} 个agent`);
+                    }
+                    
                     // 更新UI状态
                     updateMessage(assistantMessageId, {
                       thinking: `${agentId} 正在思考...`,
+                      streamingAgentContent: Object.fromEntries(agentStreamingContent),
+                      multiAgentData: {
+                        rounds: cloneRoundsForReact(multiAgentRounds, currentRound),
+                        status: multiAgentStatus,
+                        consensusTrend: [...multiAgentConsensusTrend],
+                      },
                     });
                     continue;
                   }
@@ -177,19 +311,31 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     const newContent = currentAgentContent + parsed.chunk;
                     agentStreamingContent.set(key, newContent);
                     
+                    console.log(`📝 [MultiAgent] ${agentId} 流式输出: ${newContent.length}字符`);
+                    
                     // 如果是reporter，更新主内容
                     if (agentId === 'reporter') {
                       currentContent = newContent;
                     }
                     
+                    // ✅ 确保 currentRound 存在且是当前轮次（但不创建新的占位符，agent_start已经创建）
+                    if (!currentRound || currentRound.round !== round) {
+                      console.warn(`[MultiAgent] ⚠️ agent_chunk 但当前轮次不匹配: 期望${round}, 实际${currentRound?.round}`);
+                      if (currentRound) multiAgentRounds.push(currentRound);
+                      currentRound = { round: round, outputs: [] };
+                    }
+                    
                     // 实时更新UI（显示流式内容）
+                    const streamingContentObj = Object.fromEntries(agentStreamingContent);
+                    console.log(`🎨 [MultiAgent] 更新UI，streamingAgentContent keys:`, Object.keys(streamingContentObj));
+                    
                     updateMessage(assistantMessageId, {
                       content: currentContent || '多Agent协作中...',
-                      streamingAgentContent: Object.fromEntries(agentStreamingContent),
+                      streamingAgentContent: streamingContentObj,
                       multiAgentData: {
-                        rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                        rounds: cloneRoundsForReact(multiAgentRounds, currentRound),
                         status: multiAgentStatus,
-                        consensusTrend: multiAgentConsensusTrend,
+                        consensusTrend: [...multiAgentConsensusTrend],
                       },
                     });
                     continue;
@@ -200,15 +346,23 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     const agentId = parsed.agent;
                     const round = parsed.round;
                     const key = `${agentId}:${round}`; // ✅ 使用 agent:round 格式
-                    // agent完成后，用完整内容替换流式内容
-                    agentStreamingContent.set(key, parsed.full_content);
+                    // ✅ agent完成后，删除流式内容标记（不再需要流式显示）
+                    agentStreamingContent.delete(key);
+                    console.log(`✅ [MultiAgent] ${agentId} 完成生成 (第${round}轮)，移除流式标记`);
                     
-                    // 添加到rounds
+                    // 确保当前轮次存在
                     if (!currentRound || currentRound.round !== round) {
-                      if (currentRound) multiAgentRounds.push(currentRound);
+                      console.log(`[MultiAgent] 🔄 切换到新轮次 ${round}，旧轮次 ${currentRound?.round}，输出数: ${currentRound?.outputs.length || 0}`);
+                      if (currentRound) {
+                        console.log(`[MultiAgent] ✅ 保存第 ${currentRound.round} 轮到历史，包含 ${currentRound.outputs.length} 个agent输出`);
+                        multiAgentRounds.push(currentRound);
+                      }
                       currentRound = { round: round, outputs: [] };
                     }
 
+                    // ✅ 关键修复：查找并更新已存在的占位符，而不是添加新的
+                    const existingOutputIndex = currentRound.outputs.findIndex(o => o.agent === agentId);
+                    
                     const agentOutput: MAAgentOutput = {
                       agent: agentId,
                       round: round,
@@ -217,19 +371,42 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                       metadata: parsed.metadata,
                       timestamp: parsed.timestamp,
                     };
-                    currentRound.outputs.push(agentOutput);
+                    
+                    if (existingOutputIndex >= 0) {
+                      // 更新已存在的输出
+                      const newOutputs = [...currentRound.outputs];
+                      newOutputs[existingOutputIndex] = agentOutput;
+                      currentRound = {
+                        ...currentRound,
+                        outputs: newOutputs
+                      };
+                      console.log(`[MultiAgent] 🔄 第 ${round} 轮更新 ${agentId} 输出（完成）`);
+                    } else {
+                      // 不存在则添加（兜底，理论上不应该走到这里）
+                      currentRound = {
+                        ...currentRound,
+                        outputs: [...currentRound.outputs, agentOutput]
+                      };
+                      console.log(`[MultiAgent] 📝 第 ${round} 轮添加 ${agentId} 输出（兜底逻辑）`);
+                    }
+                    
+                    console.log(`[MultiAgent] 📊 当前数据: ${currentRound.outputs.map(o => o.agent).join(' → ')}`);
 
                     if (agentId === 'reporter') {
                       currentContent = parsed.full_content;
                     }
 
+                    // ✅ 准备传递给React的数据
+                    const allRounds = cloneRoundsForReact(multiAgentRounds, currentRound);
+                    console.log(`[MultiAgent] 🚀 传递给React: ${allRounds.length}轮，当前轮${currentRound.round}有${currentRound.outputs.length}个outputs`);
+
                     updateMessage(assistantMessageId, {
                       content: currentContent || '多Agent协作中...',
                       streamingAgentContent: Object.fromEntries(agentStreamingContent),
                       multiAgentData: {
-                        rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                        rounds: allRounds,
                         status: multiAgentStatus,
-                        consensusTrend: multiAgentConsensusTrend,
+                        consensusTrend: [...multiAgentConsensusTrend],
                       },
                     });
                     continue;
@@ -250,7 +427,12 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                       metadata: parsed.metadata,
                       timestamp: parsed.timestamp,
                     };
-                    currentRound.outputs.push(agentOutput);
+                    
+                    // ✅ 关键修复：创建新的对象副本
+                    currentRound = {
+                      ...currentRound,
+                      outputs: [...currentRound.outputs, agentOutput]
+                    };
 
                     if (parsed.agent === 'reporter') {
                       currentContent = parsed.content;
@@ -259,9 +441,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     updateMessage(assistantMessageId, {
                       content: currentContent || '多Agent协作中...',
                       multiAgentData: {
-                        rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                        rounds: cloneRoundsForReact(multiAgentRounds, currentRound),
                         status: multiAgentStatus,
-                        consensusTrend: multiAgentConsensusTrend,
+                        consensusTrend: [...multiAgentConsensusTrend],
                       },
                     });
                     continue;
@@ -276,16 +458,38 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                         consensus_level: parsed.consensus_level,
                         timestamp: parsed.timestamp,
                       };
-                      currentRound.hostDecision = hostDecision;
+                      
+                      // ✅ 关键修复：创建新的对象副本，避免对象被冻结
+                      currentRound = {
+                        ...currentRound,
+                        hostDecision: hostDecision
+                      };
+                      
                       if (parsed.consensus_level !== undefined) {
                         multiAgentConsensusTrend.push(parsed.consensus_level);
                       }
+                      
+                      console.log(`[MultiAgent] 🎯 第 ${currentRound.round} 轮添加Host决策，共识: ${(parsed.consensus_level * 100).toFixed(1)}%`);
+
+                      // ✅ 准备传递给React的数据
+                      const allRounds = [
+                        ...multiAgentRounds.map(r => ({
+                          round: r.round,
+                          outputs: r.outputs.map(o => ({ ...o })),
+                          hostDecision: r.hostDecision ? { ...r.hostDecision } : undefined
+                        })),
+                        {
+                          round: currentRound.round,
+                          outputs: currentRound.outputs.map(o => ({ ...o })),
+                          hostDecision: currentRound.hostDecision ? { ...currentRound.hostDecision } : undefined
+                        }
+                      ];
 
                       updateMessage(assistantMessageId, {
                         multiAgentData: {
-                          rounds: [...multiAgentRounds, currentRound].filter(Boolean) as RoundData[],
+                          rounds: allRounds,
                           status: multiAgentStatus,
-                          consensusTrend: multiAgentConsensusTrend,
+                          consensusTrend: [...multiAgentConsensusTrend],
                         },
                       });
                     }
@@ -315,12 +519,15 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                       multiAgentRounds.push(currentRound);
                       currentRound = null;
                     }
+                    
+                    console.log(`[MultiAgent] ✅ 协作完成，共 ${multiAgentRounds.length} 轮`);
+                    
                     updateMessage(assistantMessageId, {
                       content: currentContent || '多Agent协作完成',
                       multiAgentData: {
-                        rounds: multiAgentRounds,
+                        rounds: cloneRoundsForReact(multiAgentRounds, null),
                         status: multiAgentStatus,
-                        consensusTrend: multiAgentConsensusTrend,
+                        consensusTrend: [...multiAgentConsensusTrend],
                       },
                     });
                     continue;
