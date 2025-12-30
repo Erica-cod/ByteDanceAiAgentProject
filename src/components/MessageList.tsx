@@ -92,12 +92,12 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
   const listRef = useRef<List>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // ✅ CellMeasurerCache：缓存每行的高度
+  // ✅ CellMeasurerCache：缓存每行的高度（优化 CLS）
   const cacheRef = useRef(
     new CellMeasurerCache({
-      defaultHeight: 800,  // ✅ 增大默认高度，适应超长 Markdown 内容
+      defaultHeight: 200,  // ✅ 减小默认高度，更接近实际平均高度，减少 CLS
       fixedWidth: true,
-      minHeight: 50,       // ✅ 最小高度
+      minHeight: 120,      // ✅ 最小高度与 CSS 一致，减少布局偏移
     })
   );
 
@@ -269,16 +269,26 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
         const thinkingLength = lastMessage.thinking?.length || 0;
         const messageId = lastMessage.id;
         
-        // ✅ 检测到新消息或内容/思考过程变化
+        // ⚡ 检测多agent流式阶段（关键优化：完全禁用流式阶段的高度重新计算）
+        const hasStreamingContent = lastMessage.streamingAgentContent && 
+          Object.keys(lastMessage.streamingAgentContent).length > 0;
+        
+        // ✅ 检测到新消息或内容/思考过程变化（⚡ 进一步增加阈值，减少CLS）
         const isNewMessage = messageId !== lastMessageIdRef.current;
-        const contentChanged = Math.abs(contentLength - lastContentLengthRef.current) > 150;
-        const thinkingChanged = Math.abs(thinkingLength - lastThinkingLengthRef.current) > 150;
+        const contentChanged = Math.abs(contentLength - lastContentLengthRef.current) > 1000; // ⚡ 从500增加到1000
+        const thinkingChanged = Math.abs(thinkingLength - lastThinkingLengthRef.current) > 1000; // ⚡ 从500增加到1000
         
         if (isNewMessage) {
           lastMessageIdRef.current = messageId;
           lastContentLengthRef.current = contentLength;
           lastThinkingLengthRef.current = thinkingLength;
           isUserNearBottomRef.current = true; // 新消息时重置为底部
+        }
+        
+        // ⚡ 关键优化：多agent流式阶段完全禁用高度重新计算，避免CLS
+        if (hasStreamingContent) {
+          console.log('⏸️  [MessageList] 多agent流式阶段，暂停高度重新计算');
+          return; // 直接返回，不触发任何高度重新计算
         }
         
         // ✅ 只有在用户在底部附近时才自动滚动
@@ -295,13 +305,14 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
           // ✅ 只清除最后一条消息的缓存，不影响其他消息
           cacheRef.current.clear(lastIndex, 0);
           
-          // ✅ 使用更大的防抖延迟，减少重新计算频率
+          // ✅ 使用更大的防抖延迟，减少重新计算频率（⚡ 性能优化：减少CLS）
           if (streamingScrollTimeoutRef.current) {
             clearTimeout(streamingScrollTimeoutRef.current);
           }
           
           streamingScrollTimeoutRef.current = window.setTimeout(() => {
             if (listRef.current) {
+              console.log('🔄 [MessageList] 触发高度重新计算');
               // ✅ 只重新计算最后一条消息，不触发整个列表重排
               listRef.current.recomputeRowHeights(lastIndex);
               
@@ -312,7 +323,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
                 }
               });
             }
-          }, 100);
+          }, 800); // ⚡ 从400ms增加到800ms，大幅减少触发频率
         }
       }
     }
@@ -341,18 +352,23 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>((props
               <div className="message-content">
                 {/* 多Agent模式展示 */}
                 {message.role === 'assistant' && message.multiAgentData && (
-                  <MultiAgentDisplay
-                    rounds={message.multiAgentData.rounds}
-                    status={message.multiAgentData.status}
-                    consensusTrend={message.multiAgentData.consensusTrend}
-                    streamingAgentContent={message.streamingAgentContent}
-                    onHeightChange={() => {
-                      // ✅ 展开/收起时重新测量高度
-                      cacheRef.current.clear(index, 0);
-                      measure();
-                      listRef.current?.recomputeRowHeights(index);
-                    }}
-                  />
+                  <>
+                    {/* 🐛 调试：打印 streamingAgentContent */}
+                    {message.streamingAgentContent && Object.keys(message.streamingAgentContent).length > 0 && 
+                      console.log(`🎨 [MessageList] 传递 streamingAgentContent 给 MultiAgentDisplay:`, message.streamingAgentContent)}
+                    <MultiAgentDisplay
+                      rounds={message.multiAgentData.rounds}
+                      status={message.multiAgentData.status}
+                      consensusTrend={message.multiAgentData.consensusTrend}
+                      streamingAgentContent={message.streamingAgentContent}
+                      onHeightChange={() => {
+                        // ✅ 展开/收起时重新测量高度
+                        cacheRef.current.clear(index, 0);
+                        measure();
+                        listRef.current?.recomputeRowHeights(index);
+                      }}
+                    />
+                  </>
                 )}
 
                 {/* 单Agent模式展示 */}

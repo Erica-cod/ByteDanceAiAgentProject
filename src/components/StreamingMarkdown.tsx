@@ -6,84 +6,126 @@ import PlanCard, { extractPlanData } from './PlanCard';
 import PlanListCard, { extractPlanListData } from './PlanListCard';
 import './StreamingMarkdown.css';
 
+// ✅ 导入新的 Markdown 样式（CLS 优化）
+
 interface StreamingMarkdownProps {
   content: string;
   className?: string;
 }
 
 /**
- * 从内容中移除 JSON 部分（辅助函数）
+ * ⚡ 实时隐藏 JSON 流式输出（性能优化 + 用户体验）
+ * 
+ * 策略：
+ * 1. 如果内容以 `{` 开头，立即隐藏（流式阶段）
+ * 2. 如果检测到完整 JSON，移除它
+ * 3. 避免用户看到 `{ "position": ...` 的流式输出
  */
 function removeJSONFromContent(content: string): string {
-  let displayContent = content;
+  const trimmedContent = content.trim();
   
-  // 查找并移除完整的 JSON 对象（包括可能的代码块标记）
-  const startIndex = content.indexOf('{');
-  if (startIndex !== -1) {
+  // ⚡ 关键优化：如果内容以 `{` 开头，认为是 JSON metadata 正在流式输出
+  // 直接返回空字符串，避免显示 JSON 字符
+  if (trimmedContent.startsWith('{')) {
+    // 检查是否有 JSON 之外的内容（换行后的文本）
+    const lines = content.split('\n');
+    let jsonEndLineIndex = -1;
     let braceCount = 0;
-    let jsonEndIndex = -1;
     let inString = false;
     let escapeNext = false;
     
-    for (let i = startIndex; i < content.length; i++) {
-      const char = content[i];
-      
-      if (escapeNext) {
-        escapeNext = false;
-        continue;
-      }
-      
-      if (char === '\\') {
-        escapeNext = true;
-        continue;
-      }
-      
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-      
-      if (!inString) {
-        if (char === '{') braceCount++;
-        if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            jsonEndIndex = i + 1;
-            break;
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const line = lines[lineIdx];
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        if (!inString) {
+          if (char === '{') braceCount++;
+          if (char === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              jsonEndLineIndex = lineIdx;
+              break;
+            }
           }
         }
       }
+      if (jsonEndLineIndex !== -1) break;
     }
     
-    if (jsonEndIndex !== -1) {
-      // 检查 JSON 前面是否有代码块标记
-      let actualStartIndex = startIndex;
-      const beforeJson = content.substring(0, startIndex);
-      const codeBlockMatch = beforeJson.match(/```[\w]*\s*$/);
-      if (codeBlockMatch) {
-        actualStartIndex = beforeJson.length - codeBlockMatch[0].length;
+    // 如果找到完整 JSON，返回 JSON 后面的内容
+    if (jsonEndLineIndex !== -1 && jsonEndLineIndex < lines.length - 1) {
+      return lines.slice(jsonEndLineIndex + 1).join('\n').trim();
+    }
+    
+    // 如果 JSON 未完成（流式阶段），返回空或等待图标
+    return ''; // ⚡ 关键：流式阶段不显示任何内容，避免 JSON 字符闪现
+  }
+  
+  // 如果不是以 `{` 开头，检查是否包含嵌入的 JSON
+  const startIndex = trimmedContent.indexOf('{');
+  if (startIndex === -1) {
+    return content; // 没有 JSON，直接返回
+  }
+  
+  // 尝试移除完整的 JSON 对象
+  let braceCount = 0;
+  let jsonEndIndex = -1;
+  let inString = false;
+  let escapeNext = false;
+  
+  for (let i = startIndex; i < trimmedContent.length; i++) {
+    const char = trimmedContent[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{') braceCount++;
+      if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          jsonEndIndex = i + 1;
+          break;
+        }
       }
-      
-      // 检查 JSON 后面是否有代码块结束标记
-      let actualEndIndex = jsonEndIndex;
-      const afterJson = content.substring(jsonEndIndex);
-      const endCodeBlockMatch = afterJson.match(/^\s*```/);
-      if (endCodeBlockMatch) {
-        actualEndIndex = jsonEndIndex + endCodeBlockMatch[0].length;
-      }
-      
-      // 移除 JSON 部分（包括代码块标记）
-      displayContent = content.substring(0, actualStartIndex) + content.substring(actualEndIndex);
-      
-      // 清理多余的空行和空的代码块
-      displayContent = displayContent
-        .replace(/```\s*```/g, '') // 移除空的代码块
-        .replace(/\n{3,}/g, '\n\n') // 移除多余空行
-        .trim();
     }
   }
   
-  return displayContent;
+  if (jsonEndIndex !== -1) {
+    // 移除 JSON 部分
+    const result = (trimmedContent.substring(0, startIndex) + trimmedContent.substring(jsonEndIndex)).trim();
+    return result;
+  }
+  
+  return content;
 }
 
 /**
@@ -100,6 +142,9 @@ function removeJSONFromContent(content: string): string {
 const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, className = '' }) => {
   // 检测计划数据（单个计划或计划列表）
   const { planData, planListData, displayContent } = useMemo(() => {
+    // ✅ 始终先移除 JSON（适用于所有 agent 输出）
+    const cleanContent = removeJSONFromContent(content);
+    
     // 优先检测计划列表（因为 list_plans 更常见）
     const listData = extractPlanListData(content);
     if (listData) {
@@ -107,7 +152,7 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, classNam
       return {
         planData: null,
         planListData: listData,
-        displayContent: removeJSONFromContent(content),
+        displayContent: cleanContent,
       };
     }
     
@@ -118,15 +163,15 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, classNam
       return {
         planData: singlePlan,
         planListData: null,
-        displayContent: removeJSONFromContent(content),
+        displayContent: cleanContent,
       };
     }
     
-    // 没有检测到计划数据
+    // 没有检测到计划数据，但仍使用清理后的内容（移除了 JSON）
     return {
       planData: null,
       planListData: null,
-      displayContent: content,
+      displayContent: cleanContent,
     };
   }, [content]);
 

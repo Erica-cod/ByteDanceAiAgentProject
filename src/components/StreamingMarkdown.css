@@ -1,323 +1,193 @@
-/* Markdown 内容样式 */
-.streaming-markdown {
-  line-height: 1.5;  /* 减小行高 */
-  color: #333;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+/* StreamingMarkdown 组件样式 */
+
+.markdown-container {
+  min-height: 100px; /* ✅ 预留最小高度，减少 CLS */
+  contain: layout style paint; /* ✅ CSS Containment */
+  content-visibility: auto; /* ✅ 优化渲染性能 */
 }
 
-/* 标题样式 - 进一步减小间距 */
-.streaming-markdown h1,
-.streaming-markdown h2,
-.streaming-markdown h3,
-.streaming-markdown h4,
-.streaming-markdown h5,
-.streaming-markdown h6 {
-  margin-top: 0.6em;  /* 从 0.8em 减到 0.6em */
-  margin-bottom: 0.3em;  /* 从 0.4em 减到 0.3em */
+/* Markdown 内容样式优化 */
+.markdown-content {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #374151;
+}
+
+/* 标题样式 - 设置固定高度，减少布局偏移 */
+.markdown-content h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem 0;
+  line-height: 2.25rem; /* ✅ 固定行高 */
+  min-height: 2.25rem;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.875rem 0;
+  line-height: 2rem; /* ✅ 固定行高 */
+  min-height: 2rem;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.375rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.25rem;
   font-weight: 600;
-  line-height: 1.3;
+  margin: 1rem 0 0.75rem 0;
+  line-height: 1.75rem; /* ✅ 固定行高 */
+  min-height: 1.75rem;
+  color: #374151;
 }
 
-.streaming-markdown h1 {
-  font-size: 1.8em;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 0.3em;
-}
-
-.streaming-markdown h2 {
-  font-size: 1.4em;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 0.3em;
-}
-
-.streaming-markdown h3 {
-  font-size: 1.2em;
-}
-
-/* 段落样式 - 进一步减小间距 */
-.streaming-markdown p {
-  margin-top: 0.25em;  /* 从 0.4em 减到 0.25em */
-  margin-bottom: 0.25em;  /* 从 0.4em 减到 0.25em */
-}
-
-/* 首段落不需要上边距 */
-.streaming-markdown p:first-child {
-  margin-top: 0;
-}
-
-/* 末段落不需要下边距 */
-.streaming-markdown p:last-child {
-  margin-bottom: 0;
-}
-
-/* 列表样式 - 进一步减小间距 */
-.streaming-markdown ul,
-.streaming-markdown ol {
-  margin-top: 0.3em;  /* 从 0.4em 减到 0.3em */
-  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
-  padding-left: 2em;  /* 恢复到 2em 确保足够空间 */
-}
-
-.streaming-markdown li {
-  margin-bottom: 0.3em;  /* 增加到 0.3em 给嵌套内容更多空间 */
-  line-height: 1.6;  /* 增加行高改善多行对齐 */
-  list-style-position: outside;  /* 标记在外部，不影响文本对齐 */
-}
-
-/* 列表标记样式优化 */
-.streaming-markdown ul {
-  list-style-type: disc;  /* 确保使用圆点 */
-}
-
-.streaming-markdown ol {
-  list-style-type: decimal;  /* 使用数字 */
-  padding-left: 2.2em;  /* 数字列表需要稍多空间 */
-}
-
-/* 确保列表项内的内容对齐 */
-.streaming-markdown li > * {
-  vertical-align: baseline;
-}
-
-/* 列表项内的段落不要额外边距 */
-.streaming-markdown li > p {
-  margin: 0;
-  display: inline;  /* 段落内联显示，避免换行 */
-}
-
-/* 列表项中的文本容器（span 替代 p） */
-.streaming-markdown .list-item-text {
-  display: inline;
-  margin: 0;
-  padding: 0;
-}
-
-/* 列表项内的加粗文本 */
-.streaming-markdown li > strong,
-.streaming-markdown li > p > strong {
+.markdown-content h4 {
+  font-size: 1.125rem;
   font-weight: 600;
+  margin: 0.875rem 0 0.625rem 0;
+  line-height: 1.5rem; /* ✅ 固定行高 */
+  min-height: 1.5rem;
+  color: #374151;
 }
 
-/* 嵌套列表间距调整 */
-.streaming-markdown li > ul,
-.streaming-markdown li > ol {
-  margin-top: 0.3em;  /* 增加上边距 */
-  margin-bottom: 0.2em;
-  padding-left: 1.5em;  /* 嵌套列表缩进 */
+/* 段落样式 */
+.markdown-content p {
+  margin: 0.75rem 0;
+  line-height: 1.7;
+  min-height: 1.7rem; /* ✅ 最小高度 */
 }
 
-/* 嵌套列表项样式 */
-.streaming-markdown li li {
-  line-height: 1.5;
-  margin-bottom: 0.2em;
+/* 列表样式 */
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+  min-height: 1.7rem; /* ✅ 最小高度 */
 }
 
-/* 代码块样式 - 进一步减小间距 */
-.streaming-markdown pre {
-  background-color: #f6f8fa;
-  border-radius: 6px;
-  padding: 10px;  /* 从 12px 减到 10px */
+.markdown-content li {
+  margin: 0.375rem 0;
+  line-height: 1.7;
+  min-height: 1.7rem; /* ✅ 最小高度 */
+}
+
+/* 代码块样式 */
+.markdown-content pre {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   overflow-x: auto;
-  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
-  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
-  border: 1px solid #e1e4e8;
+  min-height: 3rem; /* ✅ 预留空间 */
+  contain: layout style paint;
 }
 
-.streaming-markdown code {
+.markdown-content code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 0.9em;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
-.streaming-markdown pre code {
-  background-color: transparent;
-  padding: 0;
-  border: none;
+/* 行内代码 */
+.markdown-content p code,
+.markdown-content li code {
+  background: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  color: #ef4444;
+  font-size: 0.875rem;
 }
 
-/* 行内代码样式 */
-.streaming-markdown .inline-code {
-  background-color: #f6f8fa;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  border: 1px solid #e1e4e8;
-  color: #e83e8c;
-}
-
-/* 引用块样式 - 进一步减小间距 */
-.streaming-markdown blockquote {
-  border-left: 4px solid #ddd;
-  padding: 0.3em 0 0.3em 1em;  /* 添加上下内边距 */
-  margin-left: 0;
-  margin-right: 0;
-  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
-  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
-  color: #666;
-  font-style: italic;
-}
-
-/* 引用块内段落间距 */
-.streaming-markdown blockquote p {
-  margin: 0.2em 0;
-}
-
-/* 水平分割线 - 减小间距 */
-.streaming-markdown hr {
-  border: none;
-  border-top: 2px solid #eee;
-  margin: 1em 0;
-}
-
-/* 表格样式 - 进一步减小间距 */
-.streaming-markdown .table-wrapper {
-  overflow-x: auto;
-  margin-top: 0.4em;  /* 从 0.5em 减到 0.4em */
-  margin-bottom: 0.4em;  /* 从 0.6em 减到 0.4em */
-}
-
-.streaming-markdown table {
-  border-collapse: collapse;
+/* 表格样式 */
+.markdown-content table {
   width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  min-height: 3rem; /* ✅ 预留空间 */
 }
 
-.streaming-markdown th,
-.streaming-markdown td {
-  border: 1px solid #ddd;
-  padding: 8px 12px;
+.markdown-content th,
+.markdown-content td {
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
   text-align: left;
+  line-height: 1.5;
+  min-height: 2.5rem; /* ✅ 最小高度 */
 }
 
-.streaming-markdown th {
-  background-color: #f6f8fa;
+.markdown-content th {
+  background: #f9fafb;
   font-weight: 600;
 }
 
-.streaming-markdown tr:nth-child(even) {
-  background-color: #f9f9f9;
+/* 引用样式 */
+.markdown-content blockquote {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid #3b82f6;
+  background: #eff6ff;
+  color: #1e40af;
+  min-height: 3rem; /* ✅ 预留空间 */
+}
+
+/* 分隔线 */
+.markdown-content hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  height: 2px; /* ✅ 固定高度 */
+}
+
+/* 图片样式 - 防止 CLS */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1rem 0;
+  min-height: 200px; /* ✅ 预留空间，等待加载 */
+  background: #f3f4f6; /* ✅ 占位背景 */
+  display: block;
 }
 
 /* 链接样式 */
-.streaming-markdown a {
-  color: #0366d6;
-  text-decoration: none;
-}
-
-.streaming-markdown a:hover {
+.markdown-content a {
+  color: #3b82f6;
   text-decoration: underline;
+  transition: color 0.2s;
 }
 
-/* 图片样式 - 进一步减小间距 */
-.streaming-markdown img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 0.4em 0;  /* 从 0.6em 减到 0.4em */
+.markdown-content a:hover {
+  color: #2563eb;
 }
 
-/* 任务列表样式 */
-.streaming-markdown input[type="checkbox"] {
-  margin-right: 0.5em;
+/* 强调样式 */
+.markdown-content strong {
+  font-weight: 700;
+  color: #1f2937;
 }
 
-/* 删除线样式 */
-.streaming-markdown del {
-  color: #999;
-}
-
-/* 加粗样式 - 优化对齐 */
-.streaming-markdown strong {
-  font-weight: 600;
-  color: #000;
-  vertical-align: baseline;  /* 确保基线对齐 */
-  display: inline;  /* 确保是行内元素 */
-}
-
-/* 斜体样式 */
-.streaming-markdown em {
+.markdown-content em {
   font-style: italic;
+  color: #4b5563;
 }
 
-/* 代码高亮样式（基于 highlight.js） */
-.streaming-markdown .hljs {
-  background-color: #f6f8fa;
+/* 删除线 */
+.markdown-content del {
+  text-decoration: line-through;
+  color: #9ca3af;
 }
 
-.streaming-markdown .hljs-comment,
-.streaming-markdown .hljs-quote {
-  color: #6a737d;
-  font-style: italic;
+/* 复选框列表 */
+.markdown-content input[type="checkbox"] {
+  margin-right: 0.5rem;
 }
 
-.streaming-markdown .hljs-keyword,
-.streaming-markdown .hljs-selector-tag,
-.streaming-markdown .hljs-subst {
-  color: #d73a49;
+/* 性能优化 */
+.markdown-content * {
+  contain: layout; /* ✅ 限制布局影响范围 */
 }
-
-.streaming-markdown .hljs-number,
-.streaming-markdown .hljs-literal,
-.streaming-markdown .hljs-variable,
-.streaming-markdown .hljs-template-variable,
-.streaming-markdown .hljs-tag .hljs-attr {
-  color: #005cc5;
-}
-
-.streaming-markdown .hljs-string,
-.streaming-markdown .hljs-doctag {
-  color: #032f62;
-}
-
-.streaming-markdown .hljs-title,
-.streaming-markdown .hljs-section,
-.streaming-markdown .hljs-selector-id {
-  color: #6f42c1;
-  font-weight: bold;
-}
-
-.streaming-markdown .hljs-type,
-.streaming-markdown .hljs-class .hljs-title {
-  color: #6f42c1;
-}
-
-.streaming-markdown .hljs-tag,
-.streaming-markdown .hljs-name,
-.streaming-markdown .hljs-attribute {
-  color: #22863a;
-  font-weight: normal;
-}
-
-.streaming-markdown .hljs-regexp,
-.streaming-markdown .hljs-link {
-  color: #032f62;
-}
-
-.streaming-markdown .hljs-symbol,
-.streaming-markdown .hljs-bullet {
-  color: #e36209;
-}
-
-.streaming-markdown .hljs-built_in,
-.streaming-markdown .hljs-builtin-name {
-  color: #005cc5;
-}
-
-.streaming-markdown .hljs-meta {
-  color: #6a737d;
-}
-
-.streaming-markdown .hljs-deletion {
-  background: #ffeef0;
-}
-
-.streaming-markdown .hljs-addition {
-  background: #f0fff4;
-}
-
-.streaming-markdown .hljs-emphasis {
-  font-style: italic;
-}
-
-.streaming-markdown .hljs-strong {
-  font-weight: bold;
-}
-
