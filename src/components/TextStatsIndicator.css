@@ -1,0 +1,109 @@
+/* 文本统计指示器 */
+.text-stats-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+/* 统计信息行 */
+.stats-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-item {
+  font-weight: 600;
+}
+
+.stat-separator {
+  color: #d1d5db;
+}
+
+/* 警告状态 - 软提示 */
+.text-stats-indicator.warning-soft {
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+
+.text-stats-indicator.warning-soft .stats-info {
+  color: #92400e;
+}
+
+/* 警告状态 - 强提示 */
+.text-stats-indicator.warning-hard {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+.text-stats-indicator.warning-hard .stats-info {
+  color: #991b1b;
+}
+
+/* 警告信息 */
+.stats-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stats-warning:hover {
+  background: white;
+  transform: translateX(3px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.warning-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.warning-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.warning-soft .warning-text {
+  color: #92400e;
+  font-weight: 500;
+}
+
+.warning-hard .warning-text {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.warning-action {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 动画效果 */
+@keyframes warningPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.text-stats-indicator.warning-hard .warning-icon {
+  animation: warningPulse 2s infinite;
+}
+

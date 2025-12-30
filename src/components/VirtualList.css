@@ -1,0 +1,32 @@
+/* VirtualList 通用虚拟列表样式 */
+.virtual-list-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 覆盖 react-virtualized 默认样式 */
+.virtual-list-container .ReactVirtualized__List {
+  outline: none;
+}
+
+/* 自定义滚动条样式 */
+.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar {
+  width: 6px;
+}
+
+.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-thumb {
+  background: rgba(204, 204, 204, 0.6);
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-thumb:hover {
+  background: rgba(153, 153, 153, 0.8);
+}
+
