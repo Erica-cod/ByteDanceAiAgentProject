@@ -8,6 +8,7 @@ import {
 } from '../utils/conversationCache';
 import { getUserId } from '../utils/userManager';
 import { getConversationMessages, type Conversation } from '../utils/conversationAPI';
+import { createEventManager } from '../utils/eventManager';
 
 export interface Message {
   id: string;
@@ -64,6 +65,9 @@ interface ChatState {
   saveToCache: () => void;
 }
 
+// ⚠️ 内存保护：单个对话最多保留的消息数量
+const MAX_MESSAGES_IN_MEMORY = 200; // 约200条消息，防止内存溢出
+
 export const useChatStore = create<ChatState>()(
   immer((set, get) => ({
     // 初始状态
@@ -78,11 +82,26 @@ export const useChatStore = create<ChatState>()(
     isLoadingMore: false,
 
     // 同步 Actions
-    setMessages: (messages) => set({ messages }),
+    setMessages: (messages) => {
+      // ✅ 内存保护：限制消息数量
+      if (messages.length > MAX_MESSAGES_IN_MEMORY) {
+        console.warn(`⚠️ 消息数量超过限制 (${messages.length} > ${MAX_MESSAGES_IN_MEMORY})，保留最新的消息`);
+        const recentMessages = messages.slice(-MAX_MESSAGES_IN_MEMORY);
+        set({ messages: recentMessages });
+      } else {
+        set({ messages });
+      }
+    },
 
     addMessage: (message) =>
       set((state) => {
         state.messages.push(message);
+        
+        // ✅ 内存保护：如果消息过多，移除最早的消息
+        if (state.messages.length > MAX_MESSAGES_IN_MEMORY) {
+          const removed = state.messages.shift();
+          console.warn(`⚠️ 内存保护：移除最早的消息 (ID: ${removed?.id})`);
+        }
       }),
 
     updateMessage: (id, updates) =>
@@ -299,9 +318,11 @@ export const useChatStore = create<ChatState>()(
   }))
 );
 
-// 🔥 多窗口同步（监听 storage 事件）
+// ✅ 使用事件管理器处理多窗口同步
+const chatEventManager = createEventManager();
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
+  const handleStorageChange = (e: StorageEvent) => {
     if (e.key?.startsWith('conv_')) {
       const convId = e.key.replace('conv_', '');
 
@@ -321,12 +342,18 @@ if (typeof window !== 'undefined') {
             pendingSync: m.pendingSync,
           }));
           useChatStore.getState().setMessages(messagesForUI);
-          console.log('检测到其他标签页更新，已同步消息');
+          console.log('✅ 检测到其他标签页更新，已同步消息');
         } catch (err) {
-          console.error('同步消息失败:', err);
+          console.error('❌ 同步消息失败:', err);
         }
       }
     }
-  });
+  };
+  
+  // 使用事件管理器注册监听器（自动管理清理）
+  chatEventManager.addEventListener(window, 'storage', handleStorageChange);
 }
+
+// 导出事件管理器（用于测试或手动清理）
+export { chatEventManager };
 

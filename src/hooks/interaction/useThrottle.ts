@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 /**
  * 节流回调 Hook
@@ -23,6 +23,16 @@ export function useThrottle<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
   const lastRunRef = useRef<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ✅ 组件卸载时清理 timeout，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return useCallback(
     (...args: Parameters<T>) => {
