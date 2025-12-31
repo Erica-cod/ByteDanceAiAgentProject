@@ -80,6 +80,15 @@ import { CleanExpiredSessionsUseCase } from './application/use-cases/agent-sessi
 import { ProcessLongTextAnalysisUseCase } from './application/use-cases/text-analysis/process-long-text-analysis.use-case.js';
 import { GetSessionStatsUseCase } from './application/use-cases/agent-session/get-session-stats.use-case.js';
 
+// Import interfaces and implementations - Request Cache
+import type { IRequestCacheRepository } from './application/interfaces/repositories/request-cache.repository.interface.js';
+import { MongoRequestCacheRepository } from './infrastructure/repositories/request-cache.repository.js';
+import { FindSimilarCachedRequestUseCase } from './application/use-cases/request-cache/find-similar-cached-request.use-case.js';
+import { SaveRequestCacheUseCase } from './application/use-cases/request-cache/save-request-cache.use-case.js';
+import { GetCachedResponseUseCase } from './application/use-cases/request-cache/get-cached-response.use-case.js';
+import { CleanupExpiredCachesUseCase } from './application/use-cases/request-cache/cleanup-expired-caches.use-case.js';
+import { GetCacheStatsUseCase } from './application/use-cases/request-cache/get-cache-stats.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -487,6 +496,66 @@ class SimpleContainer {
    */
   getProcessLongTextAnalysisUseCase(): ProcessLongTextAnalysisUseCase {
     return new ProcessLongTextAnalysisUseCase();
+  }
+
+  // ====================== Request Cache Module ======================
+
+  /**
+   * 获取或创建 Request Cache Repository（单例）
+   */
+  getRequestCacheRepository(): IRequestCacheRepository {
+    if (!this.instances.has('RequestCacheRepository')) {
+      this.instances.set('RequestCacheRepository', new MongoRequestCacheRepository());
+    }
+    return this.instances.get('RequestCacheRepository');
+  }
+
+  /**
+   * 创建 FindSimilarCachedRequestUseCase（每次新实例）
+   */
+  getFindSimilarCachedRequestUseCase(): FindSimilarCachedRequestUseCase {
+    const repo = this.getRequestCacheRepository();
+    return new FindSimilarCachedRequestUseCase(repo);
+  }
+
+  /**
+   * 创建 SaveRequestCacheUseCase（每次新实例）
+   */
+  getSaveRequestCacheUseCase(): SaveRequestCacheUseCase {
+    const repo = this.getRequestCacheRepository();
+    return new SaveRequestCacheUseCase(repo);
+  }
+
+  /**
+   * 创建 GetCachedResponseUseCase（每次新实例）
+   */
+  getGetCachedResponseUseCase(): GetCachedResponseUseCase {
+    const repo = this.getRequestCacheRepository();
+    return new GetCachedResponseUseCase(repo);
+  }
+
+  /**
+   * 创建 CleanupExpiredCachesUseCase（每次新实例）
+   */
+  getCleanupExpiredCachesUseCase(): CleanupExpiredCachesUseCase {
+    const repo = this.getRequestCacheRepository();
+    return new CleanupExpiredCachesUseCase(repo);
+  }
+
+  /**
+   * 创建 GetCacheStatsUseCase（每次新实例）
+   */
+  getGetCacheStatsUseCase(): GetCacheStatsUseCase {
+    const repo = this.getRequestCacheRepository();
+    return new GetCacheStatsUseCase(repo);
+  }
+
+  /**
+   * 确保 Request Cache 索引存在（初始化时调用）
+   */
+  async ensureRequestCacheIndexes(): Promise<void> {
+    const repo = this.getRequestCacheRepository();
+    await repo.ensureIndexes();
   }
 }
 

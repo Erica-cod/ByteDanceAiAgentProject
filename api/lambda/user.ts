@@ -38,6 +38,11 @@ export async function post({
   data,
 }: RequestOption<any, CreateUserData>) {
   try {
+    // ✅ 类型检查：确保 data 存在
+    if (!data) {
+      return errorResponse('请求数据不能为空');
+    }
+    
     const { userId, metadata } = data;
 
     // 参数验证
@@ -72,6 +77,11 @@ export async function get({
   query,
 }: RequestOption<GetUserQuery, any>) {
   try {
+    // ✅ 类型检查：确保 query 存在
+    if (!query) {
+      return errorResponse('查询参数不能为空');
+    }
+    
     const { userId } = query;
 
     // 参数验证

@@ -24,6 +24,7 @@ import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
+import { requestCacheService } from '../_clean/infrastructure/cache/request-cache.service.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -63,6 +64,11 @@ export async function post({
 }: RequestOption<any, ChatRequestData>) {
   try {
     console.log('=== 收到聊天请求 ===');
+    
+    // ✅ 类型检查：确保 data 存在
+    if (!data) {
+      return errorResponse('请求数据不能为空');
+    }
     
     let {
       message,
@@ -194,8 +200,116 @@ export async function post({
         // 继续处理，不阻止 AI 回复
       }
 
+      // ==================== 缓存检查 ====================
+      // 在处理请求前，先检查是否有缓存的响应（仅对单Agent模式）
+      if (mode !== 'multi_agent' && requestCacheService.isAvailable()) {
+        console.log('🔍 [Cache] 检查缓存...');
+        
+        try {
+          const cachedResponse = await requestCacheService.findCachedResponse(
+            message,
+            userId,
+            {
+              modelType,
+              mode: mode || 'single',
+              similarityThreshold: 0.95, // 95% 相似度阈值
+            }
+          );
+
+          if (cachedResponse) {
+            console.log('🎯 [Cache] 缓存命中！直接返回缓存的响应');
+            
+            // 创建 SSE 流返回缓存内容
+            const { readable, writable } = new TransformStream();
+            const writer = writable.getWriter();
+            const sseWriter = new SSEStreamWriter(writer);
+            
+            handoffToStream = true;
+            
+            // 异步发送缓存内容
+            (async () => {
+              try {
+                await sseWriter.sendEvent({
+                  conversationId,
+                  type: 'init',
+                  mode: 'cached',
+                  cached: true,
+                  cacheHitCount: cachedResponse.hitCount,
+                });
+                
+                // 发送缓存的内容（模拟流式返回）
+                const content = cachedResponse.content;
+                const chunkSize = 50; // 每次发送50个字符，模拟流式效果
+                
+                for (let i = 0; i < content.length; i += chunkSize) {
+                  const chunk = content.slice(i, i + chunkSize);
+                  await sseWriter.sendEvent({
+                    content: content.slice(0, i + chunk.length),
+                    thinking: cachedResponse.thinking,
+                  });
+                  
+                  // 稍微延迟，模拟流式效果
+                  await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                // 保存助手消息到数据库
+                try {
+                  const createMessageUseCase = container.getCreateMessageUseCase();
+                  const updateConversationUseCase = container.getUpdateConversationUseCase();
+                  
+                  await createMessageUseCase.execute(
+                    conversationId,
+                    userId,
+                    'assistant',
+                    cachedResponse.content,
+                    clientAssistantMessageId,
+                    modelType,
+                    cachedResponse.thinking
+                  );
+                  
+                  const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+                  if (conversation) {
+                    await updateConversationUseCase.execute(
+                      conversationId,
+                      userId,
+                      { messageCount: conversation.messageCount + 1 }
+                    );
+                  }
+                  
+                  console.log('✅ [Cache] 缓存的消息已保存到数据库');
+                } catch (dbError) {
+                  console.error('❌ [Cache] 保存缓存消息失败:', dbError);
+                }
+                
+                await sseWriter.close();
+              } catch (error: any) {
+                console.error('❌ [Cache] 发送缓存内容失败:', error);
+                await sseWriter.close();
+              } finally {
+                slot.release();
+              }
+            })();
+            
+            return new Response(readable, {
+              headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Cache-Hit': 'true',
+                'X-Cache-Hit-Count': String(cachedResponse.hitCount),
+              },
+            });
+          } else {
+            console.log('📭 [Cache] 没有找到缓存，继续正常处理');
+          }
+        } catch (error: any) {
+          console.error('⚠️  [Cache] 缓存查找失败，继续正常处理:', error);
+          // 缓存失败不影响主流程
+        }
+      }
+
       // ==================== 超长文本 Chunking 模式 ====================
-      const { longTextMode, longTextOptions } = data;
+      const { longTextMode, longTextOptions } = data!; // data 已在上面检查过
       
       // 检测是否需要 chunking（基于文本长度和模式）
       const shouldUseChunking = 
@@ -272,7 +386,7 @@ export async function post({
           conversationId, 
           clientAssistantMessageId, 
           slot.release,
-          data.resumeFromRound
+          data!.resumeFromRound // data 已在上面检查过
         );
       }
 
@@ -312,7 +426,8 @@ export async function post({
           modelType,
           messages,
           clientAssistantMessageId,
-          slot.release
+          slot.release,
+          message // 传递原始请求文本用于缓存
         );
       } else if (modelType === 'volcano') {
         console.log('==========================================');
@@ -338,7 +453,8 @@ export async function post({
           modelType,
           messages,
           clientAssistantMessageId,
-          slot.release
+          slot.release,
+          message // 传递原始请求文本用于缓存
         );
       } else {
         return errorResponse('不支持的模型类型');

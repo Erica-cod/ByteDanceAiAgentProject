@@ -12,6 +12,7 @@ import { executeToolCall } from '../tools/toolExecutor.js';
 import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
 import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
 import type { ChatMessage } from '../types/chat.js';
+import { requestCacheService } from '../_clean/infrastructure/cache/request-cache.service.js';
 
 /**
  * 处理火山引擎流式响应并转换为 SSE 格式
@@ -23,7 +24,8 @@ export async function handleVolcanoStream(
   modelType: 'local' | 'volcano',
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
-  onFinally?: () => void
+  onFinally?: () => void,
+  requestText?: string // 新增：用于缓存的原始请求文本
 ): Promise<Response> {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -114,7 +116,7 @@ export async function handleVolcanoStream(
                   sources: searchSources || undefined,
                 });
                 
-                // 保存到数据库
+                // 保存到数据库和缓存
                 await saveMessage(
                   conversationId,
                   userId,
@@ -122,7 +124,8 @@ export async function handleVolcanoStream(
                   clientAssistantMessageId,
                   thinking,
                   modelType,
-                  searchSources
+                  searchSources,
+                  requestText // 传递请求文本用于缓存
                 );
                 messageSaved = true;
               }
@@ -199,7 +202,8 @@ export async function handleLocalStream(
   modelType: 'local' | 'volcano',
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
-  onFinally?: () => void
+  onFinally?: () => void,
+  requestText?: string // 新增：用于缓存的原始请求文本
 ): Promise<Response> {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -209,6 +213,7 @@ export async function handleLocalStream(
   let accumulatedText = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
+  const originalRequestText = requestText; // 保存原始请求文本
 
   // 异步处理流
   (async () => {
@@ -353,7 +358,7 @@ export async function handleLocalStream(
                     sources: searchSources || undefined,
                   });
                   
-                  // 保存到数据库
+                  // 保存到数据库和缓存
                   await saveMessage(
                     conversationId,
                     userId,
@@ -361,7 +366,8 @@ export async function handleLocalStream(
                     clientAssistantMessageId,
                     thinking,
                     modelType,
-                    searchSources
+                    searchSources,
+                    originalRequestText // 传递请求文本用于缓存
                   );
                   messageSaved = true;
                 }
@@ -397,7 +403,8 @@ export async function handleLocalStream(
             clientAssistantMessageId,
             thinking,
             modelType,
-            searchSources
+            searchSources,
+            originalRequestText // 传递请求文本用于缓存
           );
         } catch (dbError) {
           console.error('❌ [Finally] 保存不完整回答失败:', dbError);
@@ -609,7 +616,8 @@ async function saveMessage(
   clientAssistantMessageId?: string,
   thinking?: string,
   modelType?: 'local' | 'volcano',
-  sources?: Array<{title: string; url: string}>
+  sources?: Array<{title: string; url: string}>,
+  requestText?: string // 新增：用于缓存的请求文本
 ): Promise<void> {
   const container = getContainer();
   const createMessageUseCase = container.getCreateMessageUseCase();
@@ -636,5 +644,29 @@ async function saveMessage(
     );
   }
   console.log('✅ 消息已保存到数据库');
+  
+  // 保存到缓存（如果有请求文本）
+  if (requestText && modelType) {
+    try {
+      await requestCacheService.saveToCache(
+        requestText,
+        content,
+        userId,
+        {
+          modelType,
+          mode: 'single',
+          responseThinking: thinking,
+          metadata: {
+            hasSources: !!sources,
+            sourcesCount: sources?.length || 0,
+            conversationId,
+          },
+        }
+      );
+      console.log('✅ 响应已保存到缓存');
+    } catch (error) {
+      console.error('⚠️  保存缓存失败（不影响主流程）:', error);
+    }
+  }
 }
 

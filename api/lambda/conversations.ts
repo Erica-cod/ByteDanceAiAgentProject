@@ -44,6 +44,11 @@ export async function post({
   data,
 }: RequestOption<any, CreateConversationData>) {
   try {
+    // ✅ 类型检查：确保 data 存在
+    if (!data) {
+      return errorResponse('请求数据不能为空');
+    }
+    
     const { userId, title } = data;
 
     // 参数验证
@@ -74,6 +79,11 @@ export async function get({
   query,
 }: RequestOption<GetConversationsQuery, any>) {
   try {
+    // ✅ 类型检查：确保 query 存在
+    if (!query) {
+      return errorResponse('查询参数不能为空');
+    }
+    
     const { userId, limit = '20', skip = '0' } = query;
 
     // 参数验证
