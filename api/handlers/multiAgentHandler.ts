@@ -6,10 +6,12 @@
 import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/multiAgentOrchestrator.js';
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
-import { MultiAgentSessionService } from '../services/multiAgentSessionService.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
+
+// ✅ Clean Architecture: 使用 Agent Session Use Cases
+import { getContainer } from '../_clean/di-container.js';
 
 // =====================================================================
 // 已弃用 Redis 版本（保留用于参考）
@@ -48,27 +50,30 @@ export async function handleMultiAgentMode(
       // 启动心跳
       sseWriter.startHeartbeat(15000);
 
-      // ✅ 尝试从 MongoDB 恢复状态（断点续传）
+      // ✅ 尝试从 MongoDB 恢复状态（断点续传）- 使用 Clean Architecture
       let initialState: any = undefined;
       let actualResumeFromRound: number | undefined = resumeFromRound;
       
       if (resumeFromRound && resumeFromRound > 1 && clientAssistantMessageId) {
         try {
-          const cachedState = await MultiAgentSessionService.loadState(
+          const container = getContainer();
+          const loadSessionUseCase = container.getLoadSessionUseCase();
+          
+          const result = await loadSessionUseCase.execute({
             conversationId,
             userId,
-            clientAssistantMessageId
-          );
+            assistantMessageId: clientAssistantMessageId,
+          });
           
-          if (cachedState && cachedState.completedRounds >= resumeFromRound - 1) {
-            initialState = cachedState.sessionState;
-            actualResumeFromRound = cachedState.completedRounds + 1;
+          if (result.found && result.data && result.data.completedRounds >= resumeFromRound - 1) {
+            initialState = result.data.sessionState;
+            actualResumeFromRound = result.data.completedRounds + 1;
             console.log(`🔄 [MultiAgent] 从 MongoDB 恢复状态，将从第 ${actualResumeFromRound} 轮继续`);
             
             // 通知前端恢复状态
             await sseWriter.sendEvent({
               type: 'resume',
-              resumedFromRound: cachedState.completedRounds,
+              resumedFromRound: result.data.completedRounds,
               continueFromRound: actualResumeFromRound,
               timestamp: new Date().toISOString(),
             });
@@ -157,21 +162,22 @@ export async function handleMultiAgentMode(
           onRoundComplete: async (round: number) => {
             console.log(`📤 [SSE] 第 ${round} 轮完成`);
             
-            // ✅ 保存当前状态到 MongoDB（断点续传）
+            // ✅ 保存当前状态到 MongoDB（断点续传）- 使用 Clean Architecture
             // 🔴 关键修复：即使客户端断开连接，也要保存状态！
             if (clientAssistantMessageId) {
               try {
+                const container = getContainer();
+                const saveSessionUseCase = container.getSaveSessionUseCase();
                 const currentSession = orchestrator.getSession();
-                await MultiAgentSessionService.saveState(
+                
+                await saveSessionUseCase.execute({
                   conversationId,
                   userId,
-                  clientAssistantMessageId,
-                  {
-                    completedRounds: round,
-                    sessionState: currentSession,
-                    userQuery: userQuery,
-                  }
-                );
+                  assistantMessageId: clientAssistantMessageId,
+                  completedRounds: round,
+                  sessionState: currentSession,
+                  userQuery: userQuery,
+                });
               } catch (error) {
                 console.error('❌ [MultiAgent] 保存状态到 MongoDB 失败:', error);
               }
@@ -215,14 +221,17 @@ export async function handleMultiAgentMode(
               console.error('❌ 保存多Agent报告失败:', dbError);
             }
 
-            // ✅ 删除 MongoDB 中的状态（会话已完成）
+            // ✅ 删除 MongoDB 中的状态（会话已完成）- 使用 Clean Architecture
             if (clientAssistantMessageId) {
               try {
-                await MultiAgentSessionService.deleteState(
+                const container = getContainer();
+                const deleteSessionUseCase = container.getDeleteSessionUseCase();
+                
+                await deleteSessionUseCase.execute({
                   conversationId,
                   userId,
-                  clientAssistantMessageId
-                );
+                  assistantMessageId: clientAssistantMessageId,
+                });
               } catch (error) {
                 console.error('❌ [MultiAgent] 删除 MongoDB 状态失败:', error);
               }

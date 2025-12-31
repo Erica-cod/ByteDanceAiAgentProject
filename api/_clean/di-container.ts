@@ -67,6 +67,15 @@ import { GetPlanUseCase } from './application/use-cases/plan/get-plan.use-case.j
 import { ListPlansUseCase } from './application/use-cases/plan/list-plans.use-case.js';
 import { DeletePlanUseCase } from './application/use-cases/plan/delete-plan.use-case.js';
 
+// Import interfaces and implementations - Agent Session
+import type { IAgentSessionRepository } from './application/interfaces/repositories/agent-session.repository.interface.js';
+import { MongoAgentSessionRepository } from './infrastructure/repositories/agent-session.repository.js';
+import { SaveSessionUseCase } from './application/use-cases/agent-session/save-session.use-case.js';
+import { LoadSessionUseCase } from './application/use-cases/agent-session/load-session.use-case.js';
+import { DeleteSessionUseCase } from './application/use-cases/agent-session/delete-session.use-case.js';
+import { CleanExpiredSessionsUseCase } from './application/use-cases/agent-session/clean-expired-sessions.use-case.js';
+import { GetSessionStatsUseCase } from './application/use-cases/agent-session/get-session-stats.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -397,6 +406,66 @@ class SimpleContainer {
   getDeletePlanUseCase(): DeletePlanUseCase {
     const repo = this.getPlanRepository();
     return new DeletePlanUseCase(repo);
+  }
+
+  // ==================== Agent Session ====================
+
+  /**
+   * 获取或创建 Agent Session Repository（单例）
+   */
+  getAgentSessionRepository(): IAgentSessionRepository {
+    if (!this.instances.has('AgentSessionRepository')) {
+      this.instances.set('AgentSessionRepository', new MongoAgentSessionRepository());
+    }
+    return this.instances.get('AgentSessionRepository');
+  }
+
+  /**
+   * 创建 SaveSessionUseCase（每次新实例）
+   */
+  getSaveSessionUseCase(): SaveSessionUseCase {
+    const repo = this.getAgentSessionRepository();
+    return new SaveSessionUseCase(repo);
+  }
+
+  /**
+   * 创建 LoadSessionUseCase（每次新实例）
+   */
+  getLoadSessionUseCase(): LoadSessionUseCase {
+    const repo = this.getAgentSessionRepository();
+    return new LoadSessionUseCase(repo);
+  }
+
+  /**
+   * 创建 DeleteSessionUseCase（每次新实例）
+   */
+  getDeleteSessionUseCase(): DeleteSessionUseCase {
+    const repo = this.getAgentSessionRepository();
+    return new DeleteSessionUseCase(repo);
+  }
+
+  /**
+   * 创建 CleanExpiredSessionsUseCase（每次新实例）
+   */
+  getCleanExpiredSessionsUseCase(): CleanExpiredSessionsUseCase {
+    const repo = this.getAgentSessionRepository();
+    return new CleanExpiredSessionsUseCase(repo);
+  }
+
+  /**
+   * 创建 GetSessionStatsUseCase（每次新实例）
+   */
+  getGetSessionStatsUseCase(): GetSessionStatsUseCase {
+    const repo = this.getAgentSessionRepository();
+    return new GetSessionStatsUseCase(repo);
+  }
+
+  /**
+   * 确保 Agent Session TTL 索引存在（初始化时调用）
+   */
+  async ensureAgentSessionIndexes(): Promise<void> {
+    const repo = this.getAgentSessionRepository();
+    await repo.ensureTTLIndex();
   }
 }
 
