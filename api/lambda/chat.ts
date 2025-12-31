@@ -217,19 +217,30 @@ export async function post({
           );
 
           if (cachedResponse) {
-            console.log('🎯 [Cache] 缓存命中！直接返回缓存的响应');
+            console.log('🎯 [Cache] 缓存命中！使用打字机效果返回缓存的响应');
             
             // 创建 SSE 流返回缓存内容
             const { readable, writable } = new TransformStream();
             const writer = writable.getWriter();
             const sseWriter = new SSEStreamWriter(writer);
             
+            // ✅ 使用受控 SSE Writer（根据模型类型选择配置）
+            const { 
+              createLocalControlledWriter, 
+              createRemoteControlledWriter 
+            } = await import('../_clean/infrastructure/streaming/controlled-sse-writer.js');
+            
+            const controlledWriter = modelType === 'local'
+              ? createLocalControlledWriter(sseWriter)  // 本地：20ms/字符
+              : createRemoteControlledWriter(sseWriter); // 远程：40ms/字符
+            
             handoffToStream = true;
             
             // 异步发送缓存内容
             (async () => {
               try {
-                await sseWriter.sendEvent({
+                // 发送初始化事件（直接发送）
+                await controlledWriter.sendDirect({
                   conversationId,
                   type: 'init',
                   mode: 'cached',
@@ -237,20 +248,38 @@ export async function post({
                   cacheHitCount: cachedResponse.hitCount,
                 });
                 
-                // 发送缓存的内容（模拟流式返回）
-                const content = cachedResponse.content;
-                const chunkSize = 50; // 每次发送50个字符，模拟流式效果
+                // 启动心跳
+                sseWriter.startHeartbeat(15000);
                 
-                for (let i = 0; i < content.length; i += chunkSize) {
-                  const chunk = content.slice(i, i + chunkSize);
-                  await sseWriter.sendEvent({
-                    content: content.slice(0, i + chunk.length),
+                // ✅ 使用打字机效果逐步推送缓存内容
+                const content = cachedResponse.content;
+                const chunkSize = 10; // 每次增加10个字符
+                
+                for (let i = chunkSize; i <= content.length; i += chunkSize) {
+                  // 检查连接是否关闭
+                  if (controlledWriter.isClosed()) {
+                    console.warn('⚠️  [Cache] 客户端已断开');
+                    break;
+                  }
+                  
+                  // 使用 sendEvent 发送内容（带打字机效果和背压检测）
+                  await controlledWriter.sendEvent(
+                    content.slice(0, i),
+                    {
+                      thinking: cachedResponse.thinking,
+                    }
+                  );
+                }
+                
+                // 发送最后的完整内容（确保没有遗漏）
+                if (!controlledWriter.isClosed()) {
+                  await controlledWriter.sendEvent(content, {
                     thinking: cachedResponse.thinking,
                   });
-                  
-                  // 稍微延迟，模拟流式效果
-                  await new Promise(resolve => setTimeout(resolve, 10));
                 }
+                
+                // 输出统计信息
+                controlledWriter.logStats();
                 
                 // 保存助手消息到数据库
                 try {
