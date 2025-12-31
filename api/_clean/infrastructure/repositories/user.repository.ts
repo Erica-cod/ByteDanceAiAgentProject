@@ -50,7 +50,10 @@ export class MongoUserRepository implements IUserRepository {
         username: userData.username ?? undefined, // null 转为 undefined
         createdAt: userData.createdAt,
         lastActiveAt: userData.lastActiveAt,
-        metadata: userData.metadata ?? undefined,
+        metadata: userData.metadata ? {
+          userAgent: userData.metadata.userAgent ?? undefined,
+          firstIp: userData.metadata.firstIp ?? undefined,
+        } : undefined,
       };
 
       // 使用 upsert 操作（如果存在则更新，否则创建）
