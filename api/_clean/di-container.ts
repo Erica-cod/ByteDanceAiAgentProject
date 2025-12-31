@@ -37,6 +37,14 @@ import { GetSessionStatusUseCase } from './application/use-cases/upload/get-sess
 import { AssembleChunksUseCase } from './application/use-cases/upload/assemble-chunks.use-case.js';
 import { CleanupSessionUseCase } from './application/use-cases/upload/cleanup-session.use-case.js';
 
+// Import interfaces and implementations - Device
+import { IDeviceRepository } from './application/interfaces/repositories/device.repository.interface.js';
+import { InMemoryDeviceRepository } from './infrastructure/repositories/device.repository.js';
+import { TrackDeviceUseCase } from './application/use-cases/device/track-device.use-case.js';
+import { GetDeviceStatsUseCase } from './application/use-cases/device/get-device-stats.use-case.js';
+import { DeleteDeviceUseCase } from './application/use-cases/device/delete-device.use-case.js';
+import { CleanupExpiredDevicesUseCase } from './application/use-cases/device/cleanup-expired-devices.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -207,6 +215,50 @@ class SimpleContainer {
   getCleanupSessionUseCase(): CleanupSessionUseCase {
     const repo = this.getUploadRepository();
     return new CleanupSessionUseCase(repo);
+  }
+
+  // ==================== Device Module ====================
+
+  /**
+   * 获取或创建 Device Repository（单例）
+   */
+  getDeviceRepository(): IDeviceRepository {
+    if (!this.instances.has('DeviceRepository')) {
+      this.instances.set('DeviceRepository', new InMemoryDeviceRepository());
+    }
+    return this.instances.get('DeviceRepository');
+  }
+
+  /**
+   * 创建 TrackDeviceUseCase（每次新实例）
+   */
+  getTrackDeviceUseCase(): TrackDeviceUseCase {
+    const repo = this.getDeviceRepository();
+    return new TrackDeviceUseCase(repo);
+  }
+
+  /**
+   * 创建 GetDeviceStatsUseCase（每次新实例）
+   */
+  getGetDeviceStatsUseCase(): GetDeviceStatsUseCase {
+    const repo = this.getDeviceRepository();
+    return new GetDeviceStatsUseCase(repo);
+  }
+
+  /**
+   * 创建 DeleteDeviceUseCase（每次新实例）
+   */
+  getDeleteDeviceUseCase(): DeleteDeviceUseCase {
+    const repo = this.getDeviceRepository();
+    return new DeleteDeviceUseCase(repo);
+  }
+
+  /**
+   * 创建 CleanupExpiredDevicesUseCase（每次新实例）
+   */
+  getCleanupExpiredDevicesUseCase(): CleanupExpiredDevicesUseCase {
+    const repo = this.getDeviceRepository();
+    return new CleanupExpiredDevicesUseCase(repo);
   }
 }
 
