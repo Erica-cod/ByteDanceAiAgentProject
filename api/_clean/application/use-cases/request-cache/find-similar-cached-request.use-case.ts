@@ -6,7 +6,7 @@
 
 import type { IRequestCacheRepository } from '../../interfaces/repositories/request-cache.repository.interface.js';
 import type { RequestCacheEntity } from '../../../domain/entities/request-cache.entity.js';
-import { cosineSimilarity } from '../../../../tools/similarityTools.js';
+import { cosineSimilarity } from '../../../shared/utils/similarity-calculator.js';
 
 export interface FindSimilarCachedRequestParams {
   /**

@@ -2,78 +2,15 @@
  * 请求缓存服务
  * 
  * 封装 embedding 计算和缓存查找逻辑，提供高级缓存功能
+ * 
+ * ✅ 已重构：使用共享的 embedding 服务
  */
 
 import { getContainer } from '../../di-container.js';
 import type { FindSimilarCachedRequestParams } from '../../application/use-cases/request-cache/find-similar-cached-request.use-case.js';
 import type { CreateRequestCacheParams } from '../../domain/entities/request-cache.entity.js';
 import type { CachedResponse } from '../../application/use-cases/request-cache/get-cached-response.use-case.js';
-
-/**
- * Embedding 服务接口（用于依赖注入）
- */
-export interface IEmbeddingService {
-  getEmbedding(text: string): Promise<number[]>;
-  isConfigured(): boolean;
-}
-
-/**
- * 使用火山引擎 Embedding 服务
- */
-class VolcengineEmbeddingServiceAdapter implements IEmbeddingService {
-  private apiKey: string;
-  private apiUrl: string;
-  private model: string;
-
-  constructor() {
-    this.apiKey = process.env.ARK_API_KEY || '';
-    this.apiUrl = process.env.ARK_EMBEDDING_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
-    this.model = process.env.ARK_EMBEDDING_MODEL || 'doubao-embedding-text-240715';
-  }
-
-  async getEmbedding(text: string): Promise<number[]> {
-    if (!this.apiKey) {
-      throw new Error('ARK_API_KEY 未配置，无法使用 embedding 功能');
-    }
-
-    try {
-      const fetch = (await import('node-fetch')).default;
-      
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          input: text,
-          encoding_format: 'float',
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Embedding API 错误 (${response.status}): ${errorText}`);
-      }
-
-      const data: any = await response.json();
-      
-      if (data.data && data.data[0] && data.data[0].embedding) {
-        return data.data[0].embedding;
-      }
-
-      throw new Error('Embedding API 返回格式错误');
-    } catch (error: any) {
-      console.error('❌ [Cache Service] 获取 embedding 失败:', error);
-      throw error;
-    }
-  }
-
-  isConfigured(): boolean {
-    return !!this.apiKey;
-  }
-}
+import { embeddingService, type IEmbeddingService } from '../llm/embedding.service.js';
 
 /**
  * 请求缓存服务
@@ -81,8 +18,9 @@ class VolcengineEmbeddingServiceAdapter implements IEmbeddingService {
 export class RequestCacheService {
   private embeddingService: IEmbeddingService;
 
-  constructor(embeddingService?: IEmbeddingService) {
-    this.embeddingService = embeddingService || new VolcengineEmbeddingServiceAdapter();
+  constructor(embeddingServiceInstance?: IEmbeddingService) {
+    // ✅ 使用共享的 embedding 服务单例
+    this.embeddingService = embeddingServiceInstance || embeddingService;
   }
 
   /**

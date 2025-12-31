@@ -6,9 +6,17 @@
  * - 计算余弦相似度
  * - 生成相似度矩阵
  * - 检测最不相似的配对
+ * 
+ * ✅ 已重构：使用共享的 embedding 服务和相似度计算工具
  */
 
-import fetch from 'node-fetch';
+import { embeddingService } from '../_clean/infrastructure/llm/embedding.service.js';
+import { 
+  cosineSimilarity, 
+  calculateSimilarityMatrix,
+  simpleTextSimilarity,
+  simpleComparePositions
+} from '../_clean/shared/utils/similarity-calculator.js';
 
 /**
  * 向量接口
@@ -29,211 +37,8 @@ export interface SimilarityResult {
   most_different_similarity: number;
 }
 
-/**
- * 火山引擎 Embedding 服务
- */
-class VolcengineEmbeddingService {
-  private apiKey: string;
-  private apiUrl: string;
-  private model: string;
-
-  constructor() {
-    this.apiKey = process.env.ARK_API_KEY || '';
-    // 火山引擎的embedding endpoint
-    // 注意：这是纯文本embedding，不是multimodal
-    this.apiUrl = process.env.ARK_EMBEDDING_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
-    // 使用火山引擎的文本embedding模型
-    // 正确的模型名称：doubao-embedding-text-240715
-    // 也可以使用 ep-xxxxx (endpoint模型，需要在火山引擎创建)
-    this.model = process.env.ARK_EMBEDDING_MODEL || 'doubao-embedding-text-240715';
-    
-    if (!this.apiKey) {
-      console.warn('⚠️  [Embedding] ARK_API_KEY 未配置，embedding功能将不可用');
-      console.warn('⚠️  [Embedding] 系统将自动使用简单文本相似度作为fallback');
-    } else {
-      console.log(`✅ [Embedding] 配置完成: ${this.model}`);
-      console.log(`   API URL: ${this.apiUrl}`);
-    }
-  }
-
-  /**
-   * 获取文本的embedding向量
-   */
-  async getEmbedding(text: string): Promise<number[]> {
-    if (!this.apiKey) {
-      throw new Error('ARK_API_KEY 未配置，无法使用embedding功能');
-    }
-
-    try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          input: text,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Embedding API 错误 (${response.status}): ${errorText}`);
-      }
-
-      const data: any = await response.json();
-      
-      // 火山引擎返回格式: { data: [{ embedding: [...] }] }
-      if (data.data && data.data[0] && data.data[0].embedding) {
-        return data.data[0].embedding;
-      }
-
-      throw new Error('Embedding API 返回格式错误');
-    } catch (error: any) {
-      console.error('❌ 获取embedding失败:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 批量获取embedding（提高效率）
-   */
-  async getBatchEmbeddings(texts: string[]): Promise<number[][]> {
-    if (!this.apiKey) {
-      throw new Error('ARK_API_KEY 未配置，无法使用embedding功能');
-    }
-
-    try {
-      console.log(`🔍 [Embedding] 批量获取 ${texts.length} 个文本的embedding...`);
-      console.log(`   模型: ${this.model}`);
-      console.log(`   端点: ${this.apiUrl}`);
-      
-      const requestBody = {
-        model: this.model,
-        input: texts,
-        encoding_format: 'float', // 明确指定返回浮点数格式
-      };
-      
-      console.log(`   请求体预览: ${JSON.stringify({
-        ...requestBody,
-        input: texts.map(t => t.substring(0, 50) + '...')
-      })}`);
-      
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [Embedding] API返回错误 (${response.status})`);
-        console.error(`   错误详情: ${errorText}`);
-        
-        // 解析错误信息，提供有用的提示
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.error?.code === 'InvalidEndpointOrModel.NotFound') {
-            throw new Error(
-              `模型 "${this.model}" 不存在或无权限访问。\n` +
-              `请检查：\n` +
-              `1. 在火山引擎控制台确认模型名称\n` +
-              `2. 确保API Key有权限访问embedding模型\n` +
-              `3. 或设置 ARK_EMBEDDING_MODEL 环境变量为正确的模型名`
-            );
-          }
-        } catch (parseError) {
-          // 如果不是JSON，直接抛出原始错误
-        }
-        
-        throw new Error(`Embedding API 错误 (${response.status}): ${errorText}`);
-      }
-
-      const data: any = await response.json();
-      
-      // 火山引擎批量返回格式: { data: [{ embedding: [...] }, { embedding: [...] }] }
-      if (data.data && Array.isArray(data.data)) {
-        const embeddings = data.data.map((item: any) => item.embedding);
-        console.log(`✅ [Embedding] 成功获取 ${embeddings.length} 个向量 (维度: ${embeddings[0]?.length || 'unknown'})`);
-        return embeddings;
-      }
-
-      console.error(`❌ [Embedding] API返回格式错误:`, JSON.stringify(data).substring(0, 200));
-      throw new Error('Embedding API 返回格式错误');
-    } catch (error: any) {
-      console.error('❌ [Embedding] 批量获取失败:', error.message);
-      throw error;
-    }
-  }
-
-  isConfigured(): boolean {
-    return !!this.apiKey;
-  }
-}
-
-// 导出单例
-const embeddingService = new VolcengineEmbeddingService();
-
-/**
- * 计算余弦相似度
- * 
- * @param vecA - 向量A
- * @param vecB - 向量B
- * @returns 相似度 (0-1)
- */
-export function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (vecA.length !== vecB.length) {
-    throw new Error('向量维度不匹配');
-  }
-
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-
-  normA = Math.sqrt(normA);
-  normB = Math.sqrt(normB);
-
-  if (normA === 0 || normB === 0) {
-    return 0;
-  }
-
-  return dotProduct / (normA * normB);
-}
-
-/**
- * 计算相似度矩阵
- * 
- * @param embeddings - embedding向量数组
- * @returns 相似度矩阵（对称矩阵）
- */
-export function calculateSimilarityMatrix(embeddings: number[][]): number[][] {
-  const n = embeddings.length;
-  const matrix: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
-
-  for (let i = 0; i < n; i++) {
-    for (let j = i; j < n; j++) {
-      if (i === j) {
-        matrix[i][j] = 1.0; // 自己和自己的相似度为1
-      } else {
-        const similarity = cosineSimilarity(embeddings[i], embeddings[j]);
-        matrix[i][j] = similarity;
-        matrix[j][i] = similarity; // 对称矩阵
-      }
-    }
-  }
-
-  return matrix;
-}
+// ✅ 导出共享工具函数（保持向后兼容）
+export { cosineSimilarity, calculateSimilarityMatrix, simpleTextSimilarity, simpleComparePositions };
 
 /**
  * 比较多个立场的相似度
@@ -330,89 +135,5 @@ export async function compareSelfSimilarity(
     console.error('❌ 自相似度计算失败:', error);
     throw new Error(`自相似度计算失败: ${error.message}`);
   }
-}
-
-/**
- * 简化版相似度比较（用于规则判断，不依赖embedding）
- * 基于关键词重叠度
- */
-export function simpleTextSimilarity(textA: string, textB: string): number {
-  // 分词（简单按空格和标点分割）
-  const tokensA = new Set(
-    textA.toLowerCase()
-      .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ')
-      .split(/\s+/)
-      .filter(t => t.length > 1)
-  );
-  
-  const tokensB = new Set(
-    textB.toLowerCase()
-      .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ')
-      .split(/\s+/)
-      .filter(t => t.length > 1)
-  );
-
-  // 计算交集
-  const intersection = new Set([...tokensA].filter(x => tokensB.has(x)));
-  
-  // Jaccard相似度
-  const union = new Set([...tokensA, ...tokensB]);
-  const similarity = union.size > 0 ? intersection.size / union.size : 0;
-
-  return similarity;
-}
-
-/**
- * 简化版批量相似度比较（fallback方案）
- */
-export function simpleComparePositions(texts: string[]): {
-  similarity_matrix: number[][];
-  mean_similarity: number;
-  most_different_pair: [number, number];
-} {
-  const n = texts.length;
-  const matrix: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
-
-  // 计算相似度矩阵
-  for (let i = 0; i < n; i++) {
-    for (let j = i; j < n; j++) {
-      if (i === j) {
-        matrix[i][j] = 1.0;
-      } else {
-        const similarity = simpleTextSimilarity(texts[i], texts[j]);
-        matrix[i][j] = similarity;
-        matrix[j][i] = similarity;
-      }
-    }
-  }
-
-  // 计算平均相似度
-  let sum = 0;
-  let count = 0;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      sum += matrix[i][j];
-      count++;
-    }
-  }
-  const mean_similarity = count > 0 ? sum / count : 0;
-
-  // 找最不相似配对
-  let minSimilarity = 1.0;
-  let most_different_pair: [number, number] = [0, 1];
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      if (matrix[i][j] < minSimilarity) {
-        minSimilarity = matrix[i][j];
-        most_different_pair = [i, j];
-      }
-    }
-  }
-
-  return {
-    similarity_matrix: matrix,
-    mean_similarity,
-    most_different_pair,
-  };
 }
 
