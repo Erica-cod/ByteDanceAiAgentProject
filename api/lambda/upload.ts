@@ -1,10 +1,10 @@
 /**
  * POST /api/upload/session
  * 创建上传会话
+ * 
+ * ✅ 使用 Clean Architecture
  */
 
-import { UploadService } from '../services/uploadService.js';
-import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
 import { getContainer } from '../_clean/di-container.js';
 
 export async function post({ data }: { data: any }) {
@@ -18,30 +18,17 @@ export async function post({ data }: { data: any }) {
   }
   
   try {
-    let sessionId: string;
-
-    if (USE_CLEAN_ARCH) {
-      console.log('🆕 Using Clean Architecture for create upload session');
-      const container = getContainer();
-      const createSessionUseCase = container.getCreateSessionUseCase();
-      
-      sessionId = await createSessionUseCase.execute(
-        userId,
-        totalChunks,
-        chunkSize,
-        fileSize,
-        isCompressed || false
-      );
-    } else {
-      console.log('🔧 Using legacy service for create upload session');
-      sessionId = await UploadService.createSession(
-        userId,
-        totalChunks,
-        chunkSize,
-        fileSize,
-        isCompressed || false
-      );
-    }
+    // ✅ Clean Architecture: 创建上传会话
+    const container = getContainer();
+    const createSessionUseCase = container.getCreateSessionUseCase();
+    
+    const sessionId = await createSessionUseCase.execute(
+      userId,
+      totalChunks,
+      chunkSize,
+      fileSize,
+      isCompressed || false
+    );
     
     return {
       status: 200,
