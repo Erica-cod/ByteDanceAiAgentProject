@@ -3,10 +3,10 @@
  * 处理火山引擎模型的流式响应并转换为 SSE 格式
  */
 
-import { volcengineService } from '../services/volcengineService.js';
+import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import { processMultiToolWorkflow } from './workflowProcessor.js';
 import {
   createSafeSSEWriter,

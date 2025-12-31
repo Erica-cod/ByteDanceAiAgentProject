@@ -4,14 +4,14 @@
  */
 
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
-import { volcengineService } from '../services/volcengineService.js';
+import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
 import { executeToolCall } from '../tools/toolExecutor.js';
-import { extractToolCallWithRemainder } from '../utils/jsonExtractor.js';
-import { callLocalModel, callVolcengineModel } from '../services/modelService.js';
+import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
+import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
 import type { ChatMessage } from '../types/chat.js';
 
 /**

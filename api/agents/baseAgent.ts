@@ -4,8 +4,8 @@
  * 定义了Agent的基本接口和通用功能
  */
 
-import { volcengineService, type VolcengineMessage } from '../services/volcengineService.js';
-import { extractJSON } from '../utils/jsonExtractor.js';
+import { volcengineService, type VolcengineMessage } from '../_clean/infrastructure/llm/volcengine-service.js';
+import { extractJSON } from '../_clean/shared/utils/json-extractor.js';
 
 /**
  * 位置摘要 - 用于相似度比较

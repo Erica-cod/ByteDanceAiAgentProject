@@ -4,9 +4,9 @@
  */
 
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
-import { callVolcengineModel } from '../utils/llmCaller.js';
-import { volcengineService } from '../services/volcengineService.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
+import { callVolcengineModel } from '../_clean/infrastructure/llm/llm-caller.js';
+import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import type { ChatMessage } from '../types/chat.js';
 
 /**
