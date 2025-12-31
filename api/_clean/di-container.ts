@@ -52,6 +52,12 @@ import { RecordMetricUseCase } from './application/use-cases/metrics/record-metr
 import { GetMetricsSnapshotUseCase } from './application/use-cases/metrics/get-metrics-snapshot.use-case.js';
 import { ResetMetricsUseCase } from './application/use-cases/metrics/reset-metrics.use-case.js';
 
+// Import interfaces and implementations - Memory
+import { IMemoryRepository } from './application/interfaces/repositories/memory.repository.interface.js';
+import { MongoMemoryRepository } from './infrastructure/repositories/memory.repository.js';
+import { GetConversationContextUseCase } from './application/use-cases/memory/get-conversation-context.use-case.js';
+import { GetMemoryStatsUseCase } from './application/use-cases/memory/get-memory-stats.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -302,6 +308,34 @@ class SimpleContainer {
   getResetMetricsUseCase(): ResetMetricsUseCase {
     const repo = this.getMetricsRepository();
     return new ResetMetricsUseCase(repo);
+  }
+
+  // ==================== Memory Module ====================
+
+  /**
+   * 获取或创建 Memory Repository（单例）
+   */
+  getMemoryRepository(): IMemoryRepository {
+    if (!this.instances.has('MemoryRepository')) {
+      this.instances.set('MemoryRepository', new MongoMemoryRepository());
+    }
+    return this.instances.get('MemoryRepository');
+  }
+
+  /**
+   * 创建 GetConversationContextUseCase（每次新实例）
+   */
+  getGetConversationContextUseCase(): GetConversationContextUseCase {
+    const repo = this.getMemoryRepository();
+    return new GetConversationContextUseCase(repo);
+  }
+
+  /**
+   * 创建 GetMemoryStatsUseCase（每次新实例）
+   */
+  getGetMemoryStatsUseCase(): GetMemoryStatsUseCase {
+    const repo = this.getMemoryRepository();
+    return new GetMemoryStatsUseCase(repo);
   }
 }
 
