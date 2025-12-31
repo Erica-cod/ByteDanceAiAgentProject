@@ -1,101 +1,141 @@
-# ⚠️ DEPRECATED - Phase 1 旧服务文件
+# ⚠️ DEPRECATED: Legacy Service Layer
 
-## 🚨 重要通知
+此目录下的服务文件已被迁移到 Clean Architecture。
 
-**此目录下的部分服务文件已被 Clean Architecture 替代，标记为废弃。**
+## 🎯 迁移状态
 
----
+### ✅ 已完成迁移的模块 (Phase 1 & Phase 2)
 
-## ❌ 已废弃的文件（请勿在新代码中使用）
+| 旧服务文件 | 新架构模块 | 迁移阶段 | 状态 |
+|-----------|-----------|---------|-----|
+| `conversationService.ts` | Conversation Module | Phase 1 | ✅ 完成 |
+| `messageService.ts` | Message Module | Phase 1 | ✅ 完成 |
+| `userService.ts` | User Module | Phase 1 | ✅ 完成 |
+| `uploadService.ts` | Upload Module | Phase 1 | ✅ 完成 |
+| `deviceTracker.ts` | Device Module | Phase 1 | ✅ 完成 |
+| `metricsCollector.ts` | Metrics Module | Phase 1 | ✅ 完成 |
+| `conversationMemoryService.ts` | Memory Module | Phase 2.2 | ✅ 完成 |
+| `planService.ts` | Plan Module | Phase 2.3 | ✅ 完成 |
+| `multiAgentSessionService.ts` | Agent Session Module | Phase 2.4 | ✅ 完成 |
 
-### Phase 1 已迁移模块
+### 🔧 已移动的基础设施服务 (Phase 2.1)
 
-以下文件已被新架构替代，保留仅用于参考和回滚：
+| 旧服务文件 | 新位置 | 状态 |
+|-----------|-------|-----|
+| `modelService.ts` | `api/_clean/infrastructure/llm/model-service.ts` | ✅ 已移动 |
+| `volcengineService.ts` | `api/_clean/infrastructure/llm/volcengine-service.ts` | ✅ 已移动 |
+| `redisClient.ts` | `api/_clean/infrastructure/cache/redis-client.ts` | ⚠️ 已移动 (deprecated) |
+| `queueManager.ts` | `api/_clean/infrastructure/queue/queue-manager.ts` | ✅ 已移动 |
+| `sseLimiter.ts` | `api/_clean/infrastructure/streaming/sse-limiter.ts` | ✅ 已移动 |
 
-| 废弃文件 | 替代实现 | 迁移日期 |
-|---------|---------|----------|
-| `conversationService.ts` | `api/_clean/infrastructure/repositories/conversation.repository.ts` | 2025-12-31 |
-| `messageService.ts` | `api/_clean/infrastructure/repositories/message.repository.ts` | 2025-12-31 |
-| `userService.ts` | `api/_clean/infrastructure/repositories/user.repository.ts` | 2025-12-31 |
-| `uploadService.ts` | `api/_clean/infrastructure/repositories/upload.repository.ts` | 2025-12-31 |
-| `deviceTracker.ts` | `api/_clean/infrastructure/repositories/device.repository.ts` | 2025-12-31 |
-| `metricsCollector.ts` | `api/_clean/infrastructure/repositories/metrics.repository.ts` | 2025-12-31 |
+### 📦 特殊服务
 
-### 如何使用新架构
+| 服务文件 | 说明 | 状态 |
+|---------|------|-----|
+| `chunkingPlanReviewService.ts` | 超长文本分段分析服务（Map-Reduce） | 🟡 保留（特殊用途） |
+
+## 📚 新架构使用方式
+
+### 基本用法
 
 ```typescript
-// ❌ 旧方式（已废弃）
-import { ConversationService } from '../../services/conversationService';
-const conversation = await ConversationService.createConversation(...);
+import { getContainer } from '../_clean/di-container.js';
 
-// ✅ 新方式（Clean Architecture）
-import { getContainer } from '../../_clean/di-container';
+// 获取容器实例
 const container = getContainer();
+
+// 获取并使用 Use Case
 const createConversationUseCase = container.getCreateConversationUseCase();
-const conversation = await createConversationUseCase.execute(...);
+const result = await createConversationUseCase.execute({ userId, title });
 ```
 
----
+### 各模块 Use Cases
 
-## ✅ 仍在使用的文件（Phase 2 待迁移）
+#### Conversation Module
+```typescript
+const container = getContainer();
+const createConversation = container.getCreateConversationUseCase();
+const getConversations = container.getGetConversationsUseCase();
+const getConversation = container.getGetConversationUseCase();
+const updateConversation = container.getUpdateConversationUseCase();
+const deleteConversation = container.getDeleteConversationUseCase();
+```
 
-以下文件仍在使用中，将在 Phase 2 重构：
+#### Message Module
+```typescript
+const addMessage = container.getAddMessageUseCase();
+const getMessages = container.getGetMessagesUseCase();
+const updateMessage = container.getUpdateMessageUseCase();
+const deleteMessage = container.getDeleteMessageUseCase();
+```
 
-| 文件 | 用途 | Phase 2 迁移计划 |
-|------|------|------------------|
-| `conversationMemoryService.ts` | 对话记忆管理 | → Memory 模块 |
-| `multiAgentSessionService.ts` | 多代理会话管理 | → Agent 模块 |
-| `chunkingPlanReviewService.ts` | 分块计划审查 | → Chunking 模块 |
-| `planService.ts` | 计划服务 | → Plan 模块 |
-| `queueManager.ts` | 队列管理 | → Infrastructure/queue |
-| `sseLimiter.ts` | SSE 限流 | → Infrastructure/streaming |
-| `redisClient.ts` | Redis 客户端 | → Infrastructure/cache |
-| `modelService.ts` | 模型服务 | → Infrastructure/llm |
-| `volcengineService.ts` | 火山引擎服务 | → Infrastructure/llm |
+#### User Module
+```typescript
+const getOrCreateUser = container.getGetOrCreateUserUseCase();
+const getUserById = container.getGetUserByIdUseCase();
+const updateUser = container.getUpdateUserUseCase();
+```
 
-**⚠️ 这些文件仍然是活跃的，请继续使用直到 Phase 2 完成迁移。**
+#### Upload Module
+```typescript
+const createSession = container.getCreateSessionUseCase();
+const saveChunk = container.getSaveChunkUseCase();
+const getSessionStatus = container.getGetSessionStatusUseCase();
+```
 
----
+#### Device Module
+```typescript
+const trackDevice = container.getTrackDeviceUseCase();
+const getDeviceStats = container.getGetDeviceStatsUseCase();
+const deleteDevice = container.getDeleteDeviceUseCase();
+const cleanupExpiredDevices = container.getCleanupExpiredDevicesUseCase();
+```
 
-## 📅 预计清理时间表
+#### Metrics Module
+```typescript
+const getMetricsSnapshot = container.getGetMetricsSnapshotUseCase();
+```
 
-| 时间 | 行动 | 状态 |
-|------|------|------|
-| 2025-12-31 | 标记 Phase 1 文件为废弃 | ✅ 完成 |
-| 2026-01-31 | 如果新架构稳定，删除废弃文件 | ⏳ 待定 |
-| 2026-03-31 | Phase 2 完成后，删除剩余旧文件 | 🔮 计划中 |
+#### Memory Module (Phase 2.2)
+```typescript
+const getConversationContext = container.getGetConversationContextUseCase();
+const getMemoryStats = container.getGetMemoryStatsUseCase();
+```
 
----
+#### Plan Module (Phase 2.3)
+```typescript
+const createPlan = container.getCreatePlanUseCase();
+const updatePlan = container.getUpdatePlanUseCase();
+const getPlan = container.getGetPlanUseCase();
+const listPlans = container.getListPlansUseCase();
+const deletePlan = container.getDeletePlanUseCase();
+```
 
-## 🔄 回滚指南
+#### Agent Session Module (Phase 2.4)
+```typescript
+const saveSession = container.getSaveSessionUseCase();
+const loadSession = container.getLoadSessionUseCase();
+const deleteSession = container.getDeleteSessionUseCase();
+const cleanExpiredSessions = container.getCleanExpiredSessionsUseCase();
+const getSessionStats = container.getGetSessionStatsUseCase();
+```
 
-如果新架构出现严重问题需要回滚：
+## 📖 文档参考
 
-1. **修改特性开关**:
-   ```typescript
-   // api/lambda/_utils/arch-switch.ts
-   export const USE_CLEAN_ARCH = false; // 切换回旧架构
-   ```
+- 完整架构说明: `docs/CLEAN_ARCHITECTURE_INDEX.md`
+- Phase 1 总结: `docs/CLEAN_ARCHITECTURE_MIGRATION_COMPLETE.md`
+- Phase 2 计划: `docs/PHASE_2_HANDLERS_SERVICES_REFACTORING_PLAN.md`
 
-2. **重启服务**:
-   ```bash
-   npm run dev
-   ```
+## ⚠️ 重要提示
 
-3. **验证旧架构是否正常工作**
+1. **请勿在新代码中使用这些服务！**
+2. 这些文件保留用于：
+   - 向后兼容（逐步迁移）
+   - 参考旧实现
+   - 对比新旧架构差异
+3. 所有新功能应使用 Clean Architecture 实现
+4. 旧代码迁移时应逐步替换为新 Use Cases
 
-**⚠️ 注意**: 由于当前 `USE_CLEAN_ARCH` 强制为 `true`，需要手动修改代码才能回滚。
+## 🗑️ 未来计划
 
----
-
-## 📞 相关文档
-
-- **Phase 1 清理总结**: `docs/PHASE_1_CLEANUP_SUMMARY.md`
-- **Phase 1 迁移完成报告**: `docs/CLEAN_ARCHITECTURE_MIGRATION_COMPLETE.md`
-- **Phase 2 重构计划**: `docs/PHASE_2_HANDLERS_SERVICES_REFACTORING_PLAN.md`
-
----
-
-**最后更新**: 2025年12月31日  
-**维护者**: Backend Team
-
+待所有使用旧服务的代码迁移完成后，这些文件将被彻底删除。
