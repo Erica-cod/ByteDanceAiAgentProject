@@ -3,14 +3,14 @@
  * 处理单Agent模式的SSE流式响应（本地模型和火山引擎模型）
  */
 
-import { volcengineService } from '../services/volcengineService.js';
+import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
-import { extractToolCallWithRemainder } from '../utils/jsonExtractor.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
-import { executeToolCall } from '../utils/toolExecutor.js';
-import { callLocalModel, callVolcengineModel } from '../utils/llmCaller.js';
+import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
+import { executeToolCall } from '../_clean/infrastructure/tools/tool-executor.js';
+import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/llm-caller.js';
 import type { ChatMessage } from '../types/chat.js';
 
 /**

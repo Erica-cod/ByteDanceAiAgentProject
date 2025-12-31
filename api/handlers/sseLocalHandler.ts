@@ -5,10 +5,10 @@
 
 import { MessageService } from '../services/messageService.js';
 import { ConversationService } from '../services/conversationService.js';
-import { extractToolCallWithRemainder } from '../utils/jsonExtractor.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
-import { executeToolCall } from '../utils/toolExecutor.js';
-import { callLocalModel } from '../utils/llmCaller.js';
+import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
+import { executeToolCall } from '../_clean/infrastructure/tools/tool-executor.js';
+import { callLocalModel } from '../_clean/infrastructure/llm/llm-caller.js';
 import {
   createSafeSSEWriter,
   createHeartbeat,

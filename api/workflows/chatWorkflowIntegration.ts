@@ -7,7 +7,7 @@
 import { validateToolCall } from '../tools/toolValidator.js';
 import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/tavilySearch.js';
 import { routePlanningTool } from '../tools/planningTools.js';
-import { extractToolCall } from '../utils/jsonExtractor.js';
+import { extractToolCall } from '../_clean/shared/utils/json-extractor.js';
 
 /**
  * 工具调用历史

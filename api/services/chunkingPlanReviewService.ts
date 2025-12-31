@@ -10,7 +10,7 @@ import { callVolcengineModel } from './modelService.js';
 import { volcengineService } from './volcengineService.js';
 import { MessageService } from './messageService.js';
 import { ConversationService } from './conversationService.js';
-import { extractThinkingAndContent } from '../utils/contentExtractor.js';
+import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import type { ChatMessage } from '../types/chat.js';
 
 interface ChunkingOptions {
