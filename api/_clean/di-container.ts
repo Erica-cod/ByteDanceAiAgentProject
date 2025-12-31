@@ -28,6 +28,15 @@ import { GetUserByIdUseCase } from './application/use-cases/user/get-user-by-id.
 import { UpdateUserUseCase } from './application/use-cases/user/update-user.use-case.js';
 import { getDatabase } from '../db/connection.js';
 
+// Import interfaces and implementations - Upload
+import { IUploadRepository } from './application/interfaces/repositories/upload.repository.interface.js';
+import { FileSystemUploadRepository } from './infrastructure/repositories/upload.repository.js';
+import { CreateSessionUseCase } from './application/use-cases/upload/create-session.use-case.js';
+import { SaveChunkUseCase } from './application/use-cases/upload/save-chunk.use-case.js';
+import { GetSessionStatusUseCase } from './application/use-cases/upload/get-session-status.use-case.js';
+import { AssembleChunksUseCase } from './application/use-cases/upload/assemble-chunks.use-case.js';
+import { CleanupSessionUseCase } from './application/use-cases/upload/cleanup-session.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -146,6 +155,58 @@ class SimpleContainer {
   getUpdateUserUseCase(): UpdateUserUseCase {
     const repo = this.getUserRepository();
     return new UpdateUserUseCase(repo);
+  }
+
+  // ==================== Upload Module ====================
+
+  /**
+   * 获取或创建 Upload Repository（单例）
+   */
+  getUploadRepository(): IUploadRepository {
+    if (!this.instances.has('UploadRepository')) {
+      this.instances.set('UploadRepository', new FileSystemUploadRepository());
+    }
+    return this.instances.get('UploadRepository');
+  }
+
+  /**
+   * 创建 CreateSessionUseCase（每次新实例）
+   */
+  getCreateSessionUseCase(): CreateSessionUseCase {
+    const repo = this.getUploadRepository();
+    return new CreateSessionUseCase(repo);
+  }
+
+  /**
+   * 创建 SaveChunkUseCase（每次新实例）
+   */
+  getSaveChunkUseCase(): SaveChunkUseCase {
+    const repo = this.getUploadRepository();
+    return new SaveChunkUseCase(repo);
+  }
+
+  /**
+   * 创建 GetSessionStatusUseCase（每次新实例）
+   */
+  getGetSessionStatusUseCase(): GetSessionStatusUseCase {
+    const repo = this.getUploadRepository();
+    return new GetSessionStatusUseCase(repo);
+  }
+
+  /**
+   * 创建 AssembleChunksUseCase（每次新实例）
+   */
+  getAssembleChunksUseCase(): AssembleChunksUseCase {
+    const repo = this.getUploadRepository();
+    return new AssembleChunksUseCase(repo);
+  }
+
+  /**
+   * 创建 CleanupSessionUseCase（每次新实例）
+   */
+  getCleanupSessionUseCase(): CleanupSessionUseCase {
+    const repo = this.getUploadRepository();
+    return new CleanupSessionUseCase(repo);
   }
 }
 
