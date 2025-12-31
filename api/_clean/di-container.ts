@@ -58,6 +58,15 @@ import { MongoMemoryRepository } from './infrastructure/repositories/memory.repo
 import { GetConversationContextUseCase } from './application/use-cases/memory/get-conversation-context.use-case.js';
 import { GetMemoryStatsUseCase } from './application/use-cases/memory/get-memory-stats.use-case.js';
 
+// Import interfaces and implementations - Plan
+import { IPlanRepository } from './application/interfaces/repositories/plan.repository.interface.js';
+import { MongoPlanRepository } from './infrastructure/repositories/plan.repository.js';
+import { CreatePlanUseCase } from './application/use-cases/plan/create-plan.use-case.js';
+import { UpdatePlanUseCase } from './application/use-cases/plan/update-plan.use-case.js';
+import { GetPlanUseCase } from './application/use-cases/plan/get-plan.use-case.js';
+import { ListPlansUseCase } from './application/use-cases/plan/list-plans.use-case.js';
+import { DeletePlanUseCase } from './application/use-cases/plan/delete-plan.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -336,6 +345,58 @@ class SimpleContainer {
   getGetMemoryStatsUseCase(): GetMemoryStatsUseCase {
     const repo = this.getMemoryRepository();
     return new GetMemoryStatsUseCase(repo);
+  }
+
+  // ==================== Plan Module ====================
+
+  /**
+   * 获取或创建 Plan Repository（单例）
+   */
+  getPlanRepository(): IPlanRepository {
+    if (!this.instances.has('PlanRepository')) {
+      this.instances.set('PlanRepository', new MongoPlanRepository());
+    }
+    return this.instances.get('PlanRepository');
+  }
+
+  /**
+   * 创建 CreatePlanUseCase（每次新实例）
+   */
+  getCreatePlanUseCase(): CreatePlanUseCase {
+    const repo = this.getPlanRepository();
+    return new CreatePlanUseCase(repo);
+  }
+
+  /**
+   * 创建 UpdatePlanUseCase（每次新实例）
+   */
+  getUpdatePlanUseCase(): UpdatePlanUseCase {
+    const repo = this.getPlanRepository();
+    return new UpdatePlanUseCase(repo);
+  }
+
+  /**
+   * 创建 GetPlanUseCase（每次新实例）
+   */
+  getGetPlanUseCase(): GetPlanUseCase {
+    const repo = this.getPlanRepository();
+    return new GetPlanUseCase(repo);
+  }
+
+  /**
+   * 创建 ListPlansUseCase（每次新实例）
+   */
+  getListPlansUseCase(): ListPlansUseCase {
+    const repo = this.getPlanRepository();
+    return new ListPlansUseCase(repo);
+  }
+
+  /**
+   * 创建 DeletePlanUseCase（每次新实例）
+   */
+  getDeletePlanUseCase(): DeletePlanUseCase {
+    const repo = this.getPlanRepository();
+    return new DeletePlanUseCase(repo);
   }
 }
 

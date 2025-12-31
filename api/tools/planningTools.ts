@@ -1,14 +1,11 @@
 /**
  * 计划管理工具 - 为 AI Agent 提供计划 CRUD 能力
+ * 
+ * 🆕 使用 Clean Architecture - Plan Module
  */
 
-import {
-  createPlan,
-  updatePlan,
-  getPlan,
-  listPlans,
-} from '../services/planService.js';
-import { Task } from '../db/models.js';
+import { getContainer } from '../_clean/di-container.js';
+import type { Task } from '../_clean/domain/entities/plan.entity.js';
 
 /**
  * 工具调用结果接口
@@ -57,7 +54,11 @@ export async function handleCreatePlan(
       }
     }
 
-    const plan = await createPlan({
+    // 🆕 使用 Clean Architecture Use Case
+    const container = getContainer();
+    const createPlanUseCase = container.getCreatePlanUseCase();
+
+    const plan = await createPlanUseCase.execute({
       userId,
       title: params.title,
       goal: params.goal,
@@ -113,7 +114,11 @@ export async function handleUpdatePlan(
       };
     }
 
-    const plan = await updatePlan({
+    // 🆕 使用 Clean Architecture Use Case
+    const container = getContainer();
+    const updatePlanUseCase = container.getUpdatePlanUseCase();
+
+    const plan = await updatePlanUseCase.execute({
       planId: params.plan_id,
       userId,
       title: params.title,
@@ -166,7 +171,14 @@ export async function handleGetPlan(
       };
     }
 
-    const plan = await getPlan(params.plan_id, userId);
+    // 🆕 使用 Clean Architecture Use Case
+    const container = getContainer();
+    const getPlanUseCase = container.getGetPlanUseCase();
+
+    const plan = await getPlanUseCase.execute({
+      planId: params.plan_id,
+      userId,
+    });
 
     if (!plan) {
       return {
@@ -211,7 +223,14 @@ export async function handleListPlans(
     // 限制最大返回数量
     const safeLimit = Math.min(limit, 50);
 
-    const result = await listPlans(userId, safeLimit);
+    // 🆕 使用 Clean Architecture Use Case
+    const container = getContainer();
+    const listPlansUseCase = container.getListPlansUseCase();
+
+    const result = await listPlansUseCase.execute({
+      userId,
+      limit: safeLimit,
+    });
 
     if (result.plans.length === 0) {
       return {
