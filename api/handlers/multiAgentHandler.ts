@@ -18,7 +18,7 @@ import { getContainer } from '../_clean/di-container.js';
 // 原因：MongoDB 更适合多 Agent 状态保存（低频、持久化、查询能力）
 // 详见：docs/ARCHITECTURE_DECISION.md
 // =====================================================================
-// import { isRedisAvailable, saveMultiAgentState, loadMultiAgentState, deleteMultiAgentState } from '../services/redisClient.js';
+// Redis 相关代码已移除，现在使用 MongoDB 存储 Agent Session 状态
 
 /**
  * 处理多Agent协作并转换为SSE流式响应

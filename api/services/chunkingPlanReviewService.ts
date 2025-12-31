@@ -6,12 +6,13 @@
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import { splitTextIntoChunks, type TextChunk } from '../utils/textChunker.js';
 import { buildMapPrompt, buildReducePrompt } from '../config/chunkingPrompts.js';
-import { callVolcengineModel } from './modelService.js';
-import { volcengineService } from './volcengineService.js';
-import { MessageService } from './messageService.js';
-import { ConversationService } from './conversationService.js';
+import { callVolcengineModel } from '../_clean/infrastructure/llm/llm-caller.js';
+import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import type { ChatMessage } from '../types/chat.js';
+
+// ✅ Clean Architecture: 使用 Use Cases
+import { getContainer } from '../_clean/di-container.js';
 
 interface ChunkingOptions {
   maxChunks?: number;
@@ -155,16 +156,31 @@ export async function handleChunkingPlanReview(
     // 保存到数据库
     if (accumulatedText) {
       const { thinking, content } = extractThinkingAndContent(accumulatedText);
-      await MessageService.addMessage(
+      
+      // ✅ Clean Architecture: 使用 Use Cases
+      const container = getContainer();
+      const createMessageUseCase = container.getCreateMessageUseCase();
+      const updateConversationUseCase = container.getUpdateConversationUseCase();
+      
+      await createMessageUseCase.execute(
         conversationId,
         userId,
         'assistant',
         content || accumulatedText,
         clientAssistantMessageId,
-        thinking,
-        modelType
+        modelType,
+        thinking
       );
-      await ConversationService.incrementMessageCount(conversationId, userId);
+      
+      const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+      if (conversation) {
+        await updateConversationUseCase.execute(
+          conversationId,
+          userId,
+          { messageCount: conversation.messageCount + 1 }
+        );
+      }
+      
       console.log('✅ [Chunking] 消息已保存到数据库');
     }
     
