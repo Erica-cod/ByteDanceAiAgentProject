@@ -16,7 +16,8 @@ import { MessageService } from '../services/messageService.js';
 import { UserService } from '../services/userService.js';
 import { errorResponse } from './_utils/response.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';
-import { ConversationMemoryService } from '../services/conversationMemoryService.js';
+// import { ConversationMemoryService } from '../services/conversationMemoryService.js'; // ❌ 已废弃
+import { getContainer } from '../_clean/di-container.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
 import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
@@ -262,21 +263,25 @@ export async function post({
       }
 
       // ==================== 单Agent模式 ====================
-      // 初始化记忆服务（使用滑动窗口）
+      // 🆕 使用新的 Clean Architecture - Memory 模块
       const memoryConfig = getRecommendedConfig(modelType);
-      const memoryService = new ConversationMemoryService(memoryConfig);
+      const container = getContainer();
+      const getConversationContextUseCase = container.getGetConversationContextUseCase();
       
       console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
 
       // 构建消息历史（带上下文记忆）
-      const messages = await memoryService.getConversationContext(
+      const contextResult = await getConversationContextUseCase.execute({
         conversationId,
         userId,
-        message,
-        SYSTEM_PROMPT
-      );
+        currentMessage: message,
+        systemPrompt: SYSTEM_PROMPT,
+        config: memoryConfig,
+      });
       
+      const messages = contextResult.context;
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
+      console.log(`📊 记忆统计: ${contextResult.stats.uniqueMessages} 条唯一消息, 预估 ${contextResult.stats.estimatedTokens} tokens`);
 
       // ✅ 创建 AbortController（用于用户断连时中断上游请求）
       // 注意：暂不实现，因为需要在更底层传递，留待后续优化
