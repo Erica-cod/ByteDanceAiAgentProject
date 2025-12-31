@@ -45,6 +45,13 @@ import { GetDeviceStatsUseCase } from './application/use-cases/device/get-device
 import { DeleteDeviceUseCase } from './application/use-cases/device/delete-device.use-case.js';
 import { CleanupExpiredDevicesUseCase } from './application/use-cases/device/cleanup-expired-devices.use-case.js';
 
+// Import interfaces and implementations - Metrics
+import { IMetricsRepository } from './application/interfaces/repositories/metrics.repository.interface.js';
+import { InMemoryMetricsRepository } from './infrastructure/repositories/metrics.repository.js';
+import { RecordMetricUseCase } from './application/use-cases/metrics/record-metric.use-case.js';
+import { GetMetricsSnapshotUseCase } from './application/use-cases/metrics/get-metrics-snapshot.use-case.js';
+import { ResetMetricsUseCase } from './application/use-cases/metrics/reset-metrics.use-case.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -259,6 +266,42 @@ class SimpleContainer {
   getCleanupExpiredDevicesUseCase(): CleanupExpiredDevicesUseCase {
     const repo = this.getDeviceRepository();
     return new CleanupExpiredDevicesUseCase(repo);
+  }
+
+  // ==================== Metrics Module ====================
+
+  /**
+   * 获取或创建 Metrics Repository（单例）
+   */
+  getMetricsRepository(): IMetricsRepository {
+    if (!this.instances.has('MetricsRepository')) {
+      this.instances.set('MetricsRepository', new InMemoryMetricsRepository());
+    }
+    return this.instances.get('MetricsRepository');
+  }
+
+  /**
+   * 创建 RecordMetricUseCase（每次新实例）
+   */
+  getRecordMetricUseCase(): RecordMetricUseCase {
+    const repo = this.getMetricsRepository();
+    return new RecordMetricUseCase(repo);
+  }
+
+  /**
+   * 创建 GetMetricsSnapshotUseCase（每次新实例）
+   */
+  getGetMetricsSnapshotUseCase(): GetMetricsSnapshotUseCase {
+    const repo = this.getMetricsRepository();
+    return new GetMetricsSnapshotUseCase(repo);
+  }
+
+  /**
+   * 创建 ResetMetricsUseCase（每次新实例）
+   */
+  getResetMetricsUseCase(): ResetMetricsUseCase {
+    const repo = this.getMetricsRepository();
+    return new ResetMetricsUseCase(repo);
   }
 }
 
