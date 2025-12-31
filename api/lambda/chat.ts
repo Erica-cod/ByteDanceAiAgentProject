@@ -20,7 +20,6 @@ import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/ll
 import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { handleMultiAgentMode } from '../handlers/multiAgentHandler.js';
 import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentHandler.js';
-import { handleChunkingPlanReview } from '../services/chunkingPlanReviewService.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
@@ -226,8 +225,9 @@ export async function post({
             // 启动心跳
             sseWriter.startHeartbeat(15000);
             
-            // 执行 chunking 处理
-            await handleChunkingPlanReview(
+            // ✅ Clean Architecture: 执行长文本分析
+            const processLongTextAnalysisUseCase = container.getProcessLongTextAnalysisUseCase();
+            await processLongTextAnalysisUseCase.execute(
               message,
               userId,
               conversationId,

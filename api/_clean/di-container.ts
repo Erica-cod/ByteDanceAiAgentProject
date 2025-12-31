@@ -75,6 +75,9 @@ import { SaveSessionUseCase } from './application/use-cases/agent-session/save-s
 import { LoadSessionUseCase } from './application/use-cases/agent-session/load-session.use-case.js';
 import { DeleteSessionUseCase } from './application/use-cases/agent-session/delete-session.use-case.js';
 import { CleanExpiredSessionsUseCase } from './application/use-cases/agent-session/clean-expired-sessions.use-case.js';
+
+// Import Use Cases - Text Analysis
+import { ProcessLongTextAnalysisUseCase } from './application/use-cases/text-analysis/process-long-text-analysis.use-case.js';
 import { GetSessionStatsUseCase } from './application/use-cases/agent-session/get-session-stats.use-case.js';
 
 /**
@@ -475,6 +478,15 @@ class SimpleContainer {
   async ensureAgentSessionIndexes(): Promise<void> {
     const repo = this.getAgentSessionRepository();
     await repo.ensureTTLIndex();
+  }
+
+  // ====================== Text Analysis Use Cases ======================
+
+  /**
+   * 创建 ProcessLongTextAnalysisUseCase（每次新实例）
+   */
+  getProcessLongTextAnalysisUseCase(): ProcessLongTextAnalysisUseCase {
+    return new ProcessLongTextAnalysisUseCase();
   }
 }
 
