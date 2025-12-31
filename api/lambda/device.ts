@@ -2,20 +2,16 @@
  * 设备追踪 API
  * 
  * 路由: /api/device/*
+ * 
+ * ✅ 使用 Clean Architecture
  */
 
-import { trackDevice, startDeviceCleanup, getDeviceStats, deleteDevice } from '../services/deviceTracker.js';
-import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
 import { getContainer } from '../_clean/di-container.js';
 
-// 启动定期清理
-if (USE_CLEAN_ARCH) {
-  const container = getContainer();
-  const cleanupUseCase = container.getCleanupExpiredDevicesUseCase();
-  cleanupUseCase.startPeriodicCleanup();
-} else {
-  startDeviceCleanup();
-}
+// ✅ Clean Architecture: 启动定期清理
+const container = getContainer();
+const cleanupUseCase = container.getCleanupExpiredDevicesUseCase();
+cleanupUseCase.startPeriodicCleanup();
 
 interface RequestOption<D = any> {
   data?: D;
@@ -56,15 +52,10 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
   }
   
   try {
-    if (USE_CLEAN_ARCH) {
-      console.log('🆕 Using Clean Architecture for track device');
-      const container = getContainer();
-      const trackDeviceUseCase = container.getTrackDeviceUseCase();
-      await trackDeviceUseCase.execute(deviceIdHash);
-    } else {
-      console.log('🔧 Using legacy service for track device');
-      trackDevice(deviceIdHash);
-    }
+    // ✅ Clean Architecture
+    const container = getContainer();
+    const trackDeviceUseCase = container.getTrackDeviceUseCase();
+    await trackDeviceUseCase.execute(deviceIdHash);
     
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
@@ -88,17 +79,10 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
  */
 export async function get(req: RequestOption) {
   try {
-    let stats;
-    
-    if (USE_CLEAN_ARCH) {
-      console.log('🆕 Using Clean Architecture for get device stats');
-      const container = getContainer();
-      const getDeviceStatsUseCase = container.getGetDeviceStatsUseCase();
-      stats = await getDeviceStatsUseCase.execute();
-    } else {
-      console.log('🔧 Using legacy service for get device stats');
-      stats = getDeviceStats();
-    }
+    // ✅ Clean Architecture
+    const container = getContainer();
+    const getDeviceStatsUseCase = container.getGetDeviceStatsUseCase();
+    const stats = await getDeviceStatsUseCase.execute();
     
     return new Response(JSON.stringify({ 
       success: true, 
@@ -137,17 +121,10 @@ export async function del(req: RequestOption<TrackDeviceRequest>) {
   }
   
   try {
-    let deleted;
-    
-    if (USE_CLEAN_ARCH) {
-      console.log('🆕 Using Clean Architecture for delete device');
-      const container = getContainer();
-      const deleteDeviceUseCase = container.getDeleteDeviceUseCase();
-      deleted = await deleteDeviceUseCase.execute(deviceIdHash);
-    } else {
-      console.log('🔧 Using legacy service for delete device');
-      deleted = deleteDevice(deviceIdHash);
-    }
+    // ✅ Clean Architecture
+    const container = getContainer();
+    const deleteDeviceUseCase = container.getDeleteDeviceUseCase();
+    const deleted = await deleteDeviceUseCase.execute(deviceIdHash);
     
     return new Response(JSON.stringify({ 
       success: true,

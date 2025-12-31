@@ -2,29 +2,22 @@
  * 指标查询端点
  * 路由: /api/metrics
  * 
+ * ✅ 使用 Clean Architecture
+ * 
  * 用途：
  * - 查看实时性能指标
  * - 监控系统运行状态
  * - 调试性能问题
  */
 
-import { metricsCollector } from '../services/metricsCollector.js';
-import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
 import { getContainer } from '../_clean/di-container.js';
 
 export async function get() {
   try {
-    let snapshot;
-
-    if (USE_CLEAN_ARCH) {
-      console.log('🆕 Using Clean Architecture for get metrics');
-      const container = getContainer();
-      const getMetricsSnapshotUseCase = container.getGetMetricsSnapshotUseCase();
-      snapshot = await getMetricsSnapshotUseCase.execute();
-    } else {
-      console.log('🔧 Using legacy service for get metrics');
-      snapshot = metricsCollector.getSnapshot();
-    }
+    // ✅ Clean Architecture
+    const container = getContainer();
+    const getMetricsSnapshotUseCase = container.getGetMetricsSnapshotUseCase();
+    const snapshot = await getMetricsSnapshotUseCase.execute();
     
     return {
       status: 'ok',
