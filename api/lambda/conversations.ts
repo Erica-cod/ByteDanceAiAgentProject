@@ -1,14 +1,26 @@
 /**
  * Conversations API - 符合 Modern.js BFF 规范
  * 路由: /api/conversations
+ * 
+ * 🔄 重构策略：双轨并行
+ * - 默认使用旧架构（ConversationService）
+ * - 通过 USE_CLEAN_ARCH=true 切换到新架构（Clean Architecture）
  */
 
 // 加载环境变量
 import '../config/env.js';
 import type { RequestOption } from '../types/chat.js';
 import { connectToDatabase } from '../db/connection.js';
+
+// 旧架构
 import { ConversationService } from '../services/conversationService.js';
+
+// 新架构（Clean Architecture）
+import { getContainer } from '../_clean/di-container.js';
+
+// 工具
 import { successResponse, errorResponse } from './_utils/response.js';
+import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -45,8 +57,20 @@ export async function post({
       return errorResponse('userId is required');
     }
 
-    // 创建对话
-    const conversation = await ConversationService.createConversation(userId, title);
+    let conversation;
+
+    if (USE_CLEAN_ARCH) {
+      // 🆕 使用新的 Clean Architecture
+      console.log('🆕 Using Clean Architecture for create conversation');
+      const container = getContainer();
+      const useCase = container.getCreateConversationUseCase();
+      const entity = await useCase.execute(userId, title);
+      conversation = entity.toPersistence();
+    } else {
+      // ✅ 使用旧的 Service（默认）
+      console.log('✅ Using Legacy Service for create conversation');
+      conversation = await ConversationService.createConversation(userId, title);
+    }
 
     return successResponse({ conversation });
   } catch (error: any) {
@@ -72,12 +96,33 @@ export async function get({
       return errorResponse('userId is required');
     }
 
-    // 查询对话列表
-    const result = await ConversationService.getUserConversations(
-      userId,
-      parseInt(limit, 10),
-      parseInt(skip, 10)
-    );
+    let result;
+
+    if (USE_CLEAN_ARCH) {
+      // 🆕 使用新的 Clean Architecture
+      console.log('🆕 Using Clean Architecture for get conversations');
+      const container = getContainer();
+      const useCase = container.getGetConversationsUseCase();
+      const useCaseResult = await useCase.execute(
+        userId,
+        parseInt(limit, 10),
+        parseInt(skip, 10)
+      );
+      
+      // 转换为旧格式（保持 API 兼容性）
+      result = {
+        conversations: useCaseResult.conversations.map(entity => entity.toPersistence()),
+        total: useCaseResult.total
+      };
+    } else {
+      // ✅ 使用旧的 Service（默认）
+      console.log('✅ Using Legacy Service for get conversations');
+      result = await ConversationService.getUserConversations(
+        userId,
+        parseInt(limit, 10),
+        parseInt(skip, 10)
+      );
+    }
 
     return successResponse({
       conversations: result.conversations,

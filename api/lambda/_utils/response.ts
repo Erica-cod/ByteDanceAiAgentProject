@@ -1,6 +1,6 @@
 /**
  * 统一的 API 响应格式
- * 文件名以 _ 开头，不会被解析为 API 路由
+ * 文件名以 _ 开头，不会被 Modern.js BFF 解析为 API 路由
  */
 
 export interface ApiResponse<T = any> {
@@ -31,4 +31,3 @@ export function messageResponse(message: string): ApiResponse {
     message,
   };
 }
-
