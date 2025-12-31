@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 // 定义消息属性的 Schema
 const MessagePropsSchema = z.object({
   messageId: z.string().uuid(),
-  clientMessageId: z.string().uuid().optional().nullable(),
+  clientMessageId: z.string().optional().nullable(), // 不强制 UUID 格式，因为可能是任意字符串
   conversationId: z.string().uuid(),
   userId: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
