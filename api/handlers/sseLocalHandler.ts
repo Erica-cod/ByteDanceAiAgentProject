@@ -3,10 +3,9 @@
  * 处理本地 Ollama 模型的流式响应并转换为 SSE 格式
  */
 
-import { MessageService } from '../services/messageService.js';
-import { ConversationService } from '../services/conversationService.js';
 import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
+import { getContainer } from '../_clean/di-container.js';
 import { executeToolCall } from '../_clean/infrastructure/tools/tool-executor.js';
 import { callLocalModel } from '../_clean/infrastructure/llm/llm-caller.js';
 import {
@@ -186,17 +185,30 @@ export async function streamToSSEResponse(
                   // 保存 AI 回复到数据库
                   try {
                     console.log('💾 准备保存消息到数据库，searchSources:', searchSources);
-                    await MessageService.addMessage(
+                    const container = getContainer();
+                    const createMessageUseCase = container.getCreateMessageUseCase();
+                    const updateConversationUseCase = container.getUpdateConversationUseCase();
+                    
+                    await createMessageUseCase.execute(
                       conversationId,
                       userId,
                       'assistant',
                       content || accumulatedText,
                       clientAssistantMessageId,
-                      thinking || undefined,
                       modelType,
+                      thinking || undefined,
                       searchSources || undefined
                     );
-                    await ConversationService.incrementMessageCount(conversationId, userId);
+                    
+                    // 增加消息计数
+                    const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+                    if (conversation) {
+                      await updateConversationUseCase.execute(
+                        conversationId,
+                        userId,
+                        { messageCount: conversation.messageCount + 1 }
+                      );
+                    }
                     messageSaved = true;
                     console.log(
                       '✅ AI message saved to database with sources:',
@@ -269,17 +281,30 @@ export async function streamToSSEResponse(
           console.log('💾 [Finally] 保存不完整的回答到数据库，长度:', accumulatedText.length);
           const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-          await MessageService.addMessage(
+          const container = getContainer();
+          const createMessageUseCase = container.getCreateMessageUseCase();
+          const updateConversationUseCase = container.getUpdateConversationUseCase();
+          
+          await createMessageUseCase.execute(
             conversationId,
             userId,
             'assistant',
             content || accumulatedText,
             clientAssistantMessageId,
-            thinking || undefined,
             modelType,
+            thinking || undefined,
             searchSources || undefined
           );
-          await ConversationService.incrementMessageCount(conversationId, userId);
+          
+          // 增加消息计数
+          const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+          if (conversation) {
+            await updateConversationUseCase.execute(
+              conversationId,
+              userId,
+              { messageCount: conversation.messageCount + 1 }
+            );
+          }
           console.log('✅ [Finally] 不完整的回答已保存到数据库');
         } catch (dbError) {
           console.error('❌ [Finally] 保存不完整回答失败:', dbError);

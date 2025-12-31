@@ -19,6 +19,7 @@ import { IMessageRepository } from './application/interfaces/repositories/messag
 import { MessageRepository } from './infrastructure/repositories/message.repository.js';
 import { CreateMessageUseCase } from './application/use-cases/message/create-message.use-case.js';
 import { GetMessagesUseCase } from './application/use-cases/message/get-messages.use-case.js';
+import { GetMessageContentRangeUseCase } from './application/use-cases/message/get-message-content-range.use-case.js';
 
 // Import interfaces and implementations - User
 import { IUserRepository } from './application/interfaces/repositories/user.repository.interface.js';
@@ -158,6 +159,14 @@ class SimpleContainer {
   getGetMessagesUseCase(): GetMessagesUseCase {
     const repo = this.getMessageRepository();
     return new GetMessagesUseCase(repo);
+  }
+
+  /**
+   * 创建 GetMessageContentRangeUseCase（每次新实例）
+   */
+  getGetMessageContentRangeUseCase(): GetMessageContentRangeUseCase {
+    const repo = this.getMessageRepository();
+    return new GetMessageContentRangeUseCase(repo);
   }
 
   // ==================== User Module ====================

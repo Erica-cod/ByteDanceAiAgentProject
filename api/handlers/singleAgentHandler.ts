@@ -5,9 +5,8 @@
 
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
-import { MessageService } from '../services/messageService.js';
-import { ConversationService } from '../services/conversationService.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
+import { getContainer } from '../_clean/di-container.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
 import { executeToolCall } from '../tools/toolExecutor.js';
 import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
@@ -612,17 +611,30 @@ async function saveMessage(
   modelType?: 'local' | 'volcano',
   sources?: Array<{title: string; url: string}>
 ): Promise<void> {
-  await MessageService.addMessage(
+  const container = getContainer();
+  const createMessageUseCase = container.getCreateMessageUseCase();
+  const updateConversationUseCase = container.getUpdateConversationUseCase();
+  
+  await createMessageUseCase.execute(
     conversationId,
     userId,
     'assistant',
     content,
     clientAssistantMessageId,
-    thinking,
     modelType,
+    thinking,
     sources
   );
-  await ConversationService.incrementMessageCount(conversationId, userId);
+  
+  // 增加消息计数
+  const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+  if (conversation) {
+    await updateConversationUseCase.execute(
+      conversationId,
+      userId,
+      { messageCount: conversation.messageCount + 1 }
+    );
+  }
   console.log('✅ 消息已保存到数据库');
 }
 
