@@ -44,10 +44,19 @@ export class MongoUserRepository implements IUserRepository {
       const collection = db.collection<User>('users');
       const userData = user.toPersistence();
 
+      // 转换数据以匹配 MongoDB User 类型（null -> undefined）
+      const dbUserData: Partial<User> = {
+        userId: userData.userId,
+        username: userData.username ?? undefined, // null 转为 undefined
+        createdAt: userData.createdAt,
+        lastActiveAt: userData.lastActiveAt,
+        metadata: userData.metadata ?? undefined,
+      };
+
       // 使用 upsert 操作（如果存在则更新，否则创建）
       await collection.updateOne(
-        { userId: userData.userId },
-        { $set: userData },
+        { userId: dbUserData.userId },
+        { $set: dbUserData },
         { upsert: true }
       );
 
