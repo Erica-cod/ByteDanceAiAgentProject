@@ -1,5 +1,5 @@
 import React from 'react';
-import { isLongText, type TextStats } from '../utils/textUtils';
+import { isLongText, type TextStats } from '../../utils/textUtils';
 import './TextStatsIndicator.css';
 
 interface TextStatsIndicatorProps {

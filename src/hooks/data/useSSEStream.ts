@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../stores';
 import { getConversationDetails, type Conversation } from '../../utils/conversationAPI';
 import { isLongText } from '../../utils/textUtils';
-import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../components/MultiAgentDisplay';
+import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../components/old-structure/MultiAgentDisplay';
 import { selectUploadStrategy } from '../../utils/uploadStrategy';
 import { compressText } from '../../utils/compression';
 import { ChunkUploader } from '../../utils/chunkUploader';
@@ -176,16 +176,16 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
       // ✅ Helper: 深拷贝rounds数据，避免React状态冻结问题
       const cloneRoundsForReact = (rounds: RoundData[], currentRound: RoundData | null): RoundData[] => {
-        const result = rounds.map(r => ({
+        const result = rounds.map((r: RoundData) => ({
           round: r.round,
-          outputs: r.outputs.map(o => ({ ...o })),
+          outputs: r.outputs.map((o: MAAgentOutput) => ({ ...o })),
           hostDecision: r.hostDecision ? { ...r.hostDecision } : undefined
         }));
         
         if (currentRound) {
           result.push({
             round: currentRound.round,
-            outputs: currentRound.outputs.map(o => ({ ...o })),
+            outputs: currentRound.outputs.map((o: MAAgentOutput) => ({ ...o })),
             hostDecision: currentRound.hostDecision ? { ...currentRound.hostDecision } : undefined
           });
         }
@@ -376,7 +376,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     }
                     
                     // 检查是否已经存在该agent的输出（避免重复）
-                    const existingOutputIndex = currentRound.outputs.findIndex(o => o.agent === agentId);
+                    const existingOutputIndex = currentRound.outputs.findIndex((o: MAAgentOutput) => o.agent === agentId);
                     
                     if (existingOutputIndex === -1) {
                       // 创建占位符输出（空内容，稍后通过 streamingAgentContent 显示）
@@ -469,7 +469,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     }
 
                     // ✅ 关键修复：查找并更新已存在的占位符，而不是添加新的
-                    const existingOutputIndex = currentRound.outputs.findIndex(o => o.agent === agentId);
+                    const existingOutputIndex = currentRound.outputs.findIndex((o: MAAgentOutput) => o.agent === agentId);
                     
                     const agentOutput: MAAgentOutput = {
                       agent: agentId,
@@ -498,7 +498,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                       console.log(`[MultiAgent] 📝 第 ${round} 轮添加 ${agentId} 输出（兜底逻辑）`);
                     }
                     
-                    console.log(`[MultiAgent] 📊 当前数据: ${currentRound.outputs.map(o => o.agent).join(' → ')}`);
+                    console.log(`[MultiAgent] 📊 当前数据: ${currentRound.outputs.map((o: MAAgentOutput) => o.agent).join(' → ')}`);
 
                     if (agentId === 'reporter') {
                       currentContent = parsed.full_content;
@@ -581,14 +581,14 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
                       // ✅ 准备传递给React的数据
                       const allRounds = [
-                        ...multiAgentRounds.map(r => ({
+                        ...multiAgentRounds.map((r: RoundData) => ({
                           round: r.round,
-                          outputs: r.outputs.map(o => ({ ...o })),
+                          outputs: r.outputs.map((o: MAAgentOutput) => ({ ...o })),
                           hostDecision: r.hostDecision ? { ...r.hostDecision } : undefined
                         })),
                         {
                           round: currentRound.round,
-                          outputs: currentRound.outputs.map(o => ({ ...o })),
+                          outputs: currentRound.outputs.map((o: MAAgentOutput) => ({ ...o })),
                           hostDecision: currentRound.hostDecision ? { ...currentRound.hostDecision } : undefined
                         }
                       ];

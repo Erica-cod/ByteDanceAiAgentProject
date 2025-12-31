@@ -5,6 +5,8 @@
   border-left: 3px solid #3b82f6;
   border-radius: 6px;
   overflow: hidden;
+  /* ⚡ 性能优化：使用 contain 隔离布局影响 */
+  contain: layout style paint;
 }
 
 .thinking-section__header {
@@ -15,6 +17,8 @@
   cursor: pointer;
   user-select: none;
   transition: background 0.2s;
+  /* ⚡ 性能优化：使用 will-change 提示hover优化 */
+  will-change: background;
 }
 
 .thinking-section__header:hover {
@@ -39,17 +43,21 @@
   color: #4b5563;
   line-height: 1.6;
   white-space: pre-wrap;
-  animation: slideDown 0.2s ease-out;
+  /* ⚡ 性能优化：使用 transform 和 opacity，避免触发布局重计算 */
+  animation: fadeIn 0.15s ease-out;
+  /* 使用 will-change 提示浏览器优化 */
+  will-change: opacity;
+  /* 使用 GPU 加速 */
+  transform: translateZ(0);
 }
 
-@keyframes slideDown {
+/* ⚡ 性能优化：只使用 opacity 动画，不影响布局 */
+@keyframes fadeIn {
   from {
     opacity: 0;
-    max-height: 0;
   }
   to {
     opacity: 1;
-    max-height: 500px;
   }
 }
 

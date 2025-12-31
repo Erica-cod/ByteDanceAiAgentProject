@@ -11,7 +11,7 @@
 import React from 'react';
 import { useProgressiveLoad } from '../../../hooks/data/useProgressiveLoad';
 import { ProgressBar, LoadStats, LoadActions } from '../../base/ProgressiveLoad';
-import StreamingMarkdown from '../../StreamingMarkdown';
+import StreamingMarkdown from '../../old-structure/StreamingMarkdown';
 import './ProgressiveMessageRefactored.css';
 
 export interface ProgressiveMessageRefactoredProps {

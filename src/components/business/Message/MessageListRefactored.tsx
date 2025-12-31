@@ -32,6 +32,8 @@ interface MessageListRefactoredProps {
 
 export interface MessageListRefactoredHandle {
   scrollToRow: (index: number) => void;
+  scrollToBottom: () => void;
+  recomputeRowHeights: (index?: number) => void;
 }
 
 const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageListRefactoredProps>((props, ref) => {
@@ -96,6 +98,20 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
     scrollToRow: (index: number) => {
       listRef.current?.scrollToRow(index);
     },
+    scrollToBottom: () => {
+      if (messages.length > 0) {
+        listRef.current?.scrollToRow(messages.length - 1);
+      }
+    },
+    recomputeRowHeights: (index?: number) => {
+      if (index !== undefined) {
+        cacheRef.current.clear(index, 0);
+        listRef.current?.recomputeRowHeights(index);
+      } else {
+        cacheRef.current.clearAll();
+        listRef.current?.recomputeRowHeights();
+      }
+    },
   }));
 
   // 滚动到底部
@@ -149,9 +165,12 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
                   }
                 }}
                 onHeightChange={() => {
-                  cacheRef.current.clear(index, 0);
-                  measure();
-                  listRef.current?.recomputeRowHeights(index);
+                  // ⚡ 性能优化：使用 RAF 批量处理布局更新
+                  requestAnimationFrame(() => {
+                    cacheRef.current.clear(index, 0);
+                    measure();
+                    listRef.current?.recomputeRowHeights(index);
+                  });
                 }}
               />
             </div>
@@ -188,22 +207,26 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
 
       {/* 虚拟列表 */}
       <AutoSizer>
-        {({ height, width }) => (
-          <List
-            ref={listRef}
-            height={height - (isLoadingMore || hasMoreMessages || messages.length > 0 ? 40 : 0)}
-            width={width}
-            rowCount={messages.length}
-            rowHeight={cacheRef.current.rowHeight}
-            rowRenderer={rowRenderer}
-            overscanRowCount={10}
-            noRowsRenderer={noRowsRenderer}
-            onScroll={handleScroll}
-            scrollToAlignment="end"
-            className="message-list-refactored__list"
-            estimatedRowSize={800}
-          />
-        )}
+        {({ height, width }) => {
+          const loadMoreHeight = (isLoadingMore || hasMoreMessages) && messages.length > 0 ? 40 : 0;
+          const listHeight = height - loadMoreHeight;
+          return (
+            <List
+              ref={listRef}
+              height={listHeight}
+              width={width}
+              rowCount={messages.length}
+              rowHeight={cacheRef.current.rowHeight}
+              rowRenderer={rowRenderer}
+              overscanRowCount={10}
+              noRowsRenderer={noRowsRenderer}
+              onScroll={handleScroll}
+              scrollToAlignment="end"
+              className="message-list-refactored__list"
+              estimatedRowSize={800}
+            />
+          );
+        }}
       </AutoSizer>
 
       {/* 正在生成提示 */}

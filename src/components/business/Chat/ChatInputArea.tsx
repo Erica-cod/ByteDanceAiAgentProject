@@ -12,7 +12,7 @@
 import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAutoResizeTextarea } from '../../../hooks';
-import TextStatsIndicator from '../../TextStatsIndicator';
+import TextStatsIndicator from '../../old-structure/TextStatsIndicator';
 import './ChatInputArea.css';
 
 export interface ChatInputAreaProps {
@@ -53,7 +53,8 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isLoading && value.trim()) {
+      // ✅ 移除 isLoading 判断，允许在加载时发送（会加入队列）
+      if (value.trim()) {
         onSend();
       }
     }

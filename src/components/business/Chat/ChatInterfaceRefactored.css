@@ -8,6 +8,12 @@
   background: #ffffff;
 }
 
+/* ChatLayout 需要占据剩余空间 */
+.chat-interface-refactored > .chat-layout {
+  flex: 1;
+  min-width: 0; /* 防止flex子元素溢出 */
+}
+
 /* 暗色模式 */
 @media (prefers-color-scheme: dark) {
   .chat-interface-refactored {

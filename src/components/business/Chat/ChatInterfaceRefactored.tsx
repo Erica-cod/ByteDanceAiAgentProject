@@ -11,16 +11,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import ConversationList from '../../ConversationList';
-import MessageList, { type MessageListHandle } from '../../MessageList';
-import SettingsPanel from '../../SettingsPanel';
+import ConversationList from '../../old-structure/ConversationList';
+import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
+import SettingsPanel from '../../old-structure/SettingsPanel';
 import { ChatLayout } from '../../base/Layout';
 import { ChatHeader } from '../../base/Layout';
 import { HeaderControls } from './HeaderControls';
 import { ChatInputArea } from './ChatInputArea';
 import { initializeUser } from '../../../utils/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/privacyFirstFingerprint';
-import { useChatStore, useUIStore } from '../../../stores';
+import { useChatStore, useUIStore, useQueueStore } from '../../../stores';
 import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
 import './ChatInterfaceRefactored.css';
 
@@ -46,7 +46,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   // ===== 本地 UI 状态 =====
   const [inputValue, setInputValue] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const listRef = useRef<MessageListHandle>(null);
+  const listRef = useRef<MessageListRefactoredHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
 
@@ -66,15 +66,10 @@ const ChatInterfaceRefactored: React.FC = () => {
     setLoading(false);
   });
 
-  const processQueue = async () => {
-    await messageQueue.processMessageQueue(sendMessageInternal);
-    if (messageQueue.queue.length > 0) {
-      setTimeout(() => processQueue(), 500);
-    }
-  };
+  const processQueueRef = useRef<(() => Promise<void>) | null>(null);
 
   const messageQueue = useMessageQueue({
-    onProcessQueue: processQueue,
+    onProcessQueue: async () => {}, // 空实现，队列处理由 useEffect 监听 isLoading 自动触发
   });
 
   // ===== 初始化 =====
@@ -93,18 +88,55 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   useEffect(() => {
     conversationManager.loadConversations().catch(console.error);
-  }, [conversationManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]); // 只在 userId 变化时重新加载
+
+  // ✅ 监听 isLoading 状态，自动处理队列
+  useEffect(() => {
+    if (!isLoading && messageQueue.queue.length > 0) {
+      console.log('📤 检测到队列有消息，开始处理...');
+      const processQueue = async () => {
+        await messageQueue.processMessageQueue(sendMessageInternal);
+      };
+      
+      // 延迟500ms，确保 UI 状态稳定
+      const timer = setTimeout(() => {
+        processQueue();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, messageQueue.queue.length]); // 依赖队列长度和加载状态
 
   // ===== 业务逻辑 =====
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
-    messageQueue.addToQueue(inputValue);
+    
+    // 如果正在加载，加入队列
+    if (isLoading) {
+      messageQueue.addToQueue(inputValue);
+      setInputValue('');
+      return;
+    }
+    
+    // 否则，立即发送
+    const messageText = inputValue;
     setInputValue('');
+    sendMessageInternal(messageText);
   };
 
   const handleStopGeneration = () => {
+    console.log('🛑 停止生成');
     abort();
     setLoading(false);
+    
+    // ✅ 停止后如果有队列，继续处理
+    if (messageQueue.queue.length > 0) {
+      console.log('📤 停止后检查队列...');
+      setTimeout(async () => {
+        await messageQueue.processMessageQueue(sendMessageInternal);
+      }, 500);
+    }
   };
 
   const throttledSendMessage = useThrottle(handleSendMessage, 300);
@@ -129,7 +161,7 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // 主内容
   const mainContent = (
-    <MessageList
+    <MessageListRefactored
       key={conversationId || 'new'}
       ref={listRef}
       messages={messages}
@@ -165,11 +197,10 @@ const ChatInterfaceRefactored: React.FC = () => {
       <ConversationList
         conversations={conversationManager.conversations}
         currentConversationId={conversationId}
-        onSelectConversation={conversationManager.switchConversation}
-        onCreateConversation={conversationManager.createNewConversation}
-        onDeleteConversation={conversationManager.deleteConversation}
-        onUpdateTitle={conversationManager.updateTitle}
-        isLoadingConversations={conversationManager.isLoading}
+        onSelectConversation={conversationManager.handleSelectConversation}
+        onNewConversation={conversationManager.handleNewConversation}
+        onDeleteConversation={conversationManager.handleDeleteConversation}
+        isLoading={conversationManager.isLoadingConversations}
         messageCountRefs={messageCountRefs}
       />
 

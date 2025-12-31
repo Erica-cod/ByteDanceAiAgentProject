@@ -1,8 +1,8 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { useThemeStore } from './stores/themeStore';
 
-// ✅ 懒加载 ChatInterface（代码分割）
-const ChatInterface = lazy(() => import('./components/ChatInterface'));
+// ✅ 懒加载 ChatInterface（代码分割）- 使用重构版
+const ChatInterface = lazy(() => import('./components/business/Chat/ChatInterfaceRefactored'));
 
 // ✅ 加载中占位符（优化 LCP）
 const LoadingFallback = () => (

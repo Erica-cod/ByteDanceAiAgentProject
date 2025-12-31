@@ -10,8 +10,8 @@
 
 import React from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
-import StreamingMarkdown from '../../StreamingMarkdown';
-import MultiAgentDisplay from '../../MultiAgentDisplay';
+import StreamingMarkdown from '../../old-structure/StreamingMarkdown';
+import MultiAgentDisplay from '../../old-structure/MultiAgentDisplay';
 import { ProgressiveMessageRefactored } from './ProgressiveMessageRefactored';
 import type { Message } from '../../../stores/chatStore';
 
@@ -67,7 +67,15 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
 
     // 单Agent模式
     const thinkingContent = message.thinking ? (
-      <ThinkingSection content={message.thinking} />
+      <ThinkingSection 
+        content={message.thinking}
+        onToggle={() => {
+          // ⚡ 思考框展开时，通知虚拟列表重新计算高度
+          if (onHeightChange) {
+            onHeightChange();
+          }
+        }}
+      />
     ) : undefined;
 
     // 内容渲染：渐进式加载 vs 普通渲染
