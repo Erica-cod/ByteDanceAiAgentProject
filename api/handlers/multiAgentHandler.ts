@@ -4,13 +4,11 @@
  */
 
 import { MultiAgentOrchestrator, type MultiAgentSession } from '../workflows/multiAgentOrchestrator.js';
-import { MessageService } from '../services/messageService.js';
-import { ConversationService } from '../services/conversationService.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { AgentOutput } from '../agents/baseAgent.js';
 import type { HostDecision } from '../agents/hostAgent.js';
 
-// ✅ Clean Architecture: 使用 Agent Session Use Cases
+// ✅ Clean Architecture
 import { getContainer } from '../_clean/di-container.js';
 
 // =====================================================================
@@ -204,17 +202,30 @@ export async function handleMultiAgentMode(
             try {
               const reporterOutput = session.agents.reporter.last_output;
               if (reporterOutput) {
-                await MessageService.addMessage(
+                // ✅ Clean Architecture
+                const container = getContainer();
+                const createMessageUseCase = container.getCreateMessageUseCase();
+                const updateConversationUseCase = container.getUpdateConversationUseCase();
+                
+                await createMessageUseCase.execute(
                   conversationId,
                   userId,
                   'assistant',
                   reporterOutput.content,
                   clientAssistantMessageId,
-                  undefined,
                   'volcano',
                   undefined
                 );
-                await ConversationService.incrementMessageCount(conversationId, userId);
+                
+                const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+                if (conversation) {
+                  await updateConversationUseCase.execute(
+                    conversationId,
+                    userId,
+                    { messageCount: conversation.messageCount + 1 }
+                  );
+                }
+                
                 console.log('✅ 多Agent最终报告已保存到数据库');
               }
             } catch (dbError) {
