@@ -11,12 +11,8 @@
 // 加载环境变量
 import '../config/env.js';
 import { connectToDatabase } from '../db/connection.js';
-import { ConversationService } from '../services/conversationService.js';
-import { MessageService } from '../services/messageService.js';
-import { UserService } from '../services/userService.js';
 import { errorResponse } from './_utils/response.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';
-// import { ConversationMemoryService } from '../services/conversationMemoryService.js'; // ❌ 已废弃
 import { getContainer } from '../_clean/di-container.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
@@ -27,7 +23,6 @@ import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentH
 import { handleChunkingPlanReview } from '../services/chunkingPlanReviewService.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
-import { UploadService } from '../services/uploadService.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
 
@@ -84,13 +79,16 @@ export async function post({
       isCompressed,
     } = data;
 
-    // ✅ 处理上传会话（压缩或分片上传）
+    // ✅ Clean Architecture: 处理上传会话（压缩或分片上传）
     if (uploadSessionId) {
       console.log(`📦 [Upload] 检测到上传会话: ${uploadSessionId}`);
       
       try {
+        const container = getContainer();
+        
         // 组装分片
-        const assembled = await UploadService.assembleChunks(uploadSessionId);
+        const assembleChunksUseCase = container.getAssembleChunksUseCase();
+        const assembled = await assembleChunksUseCase.execute(uploadSessionId);
         console.log(`📦 [Upload] 组装完成: ${assembled.length} bytes`);
         
         // 如果是压缩的，解压
@@ -104,7 +102,8 @@ export async function post({
         }
         
         // 清理临时文件
-        await UploadService.cleanupSession(uploadSessionId);
+        const cleanupSessionUseCase = container.getCleanupSessionUseCase();
+        await cleanupSessionUseCase.execute(uploadSessionId);
         console.log(`📦 [Upload] 已清理临时文件`);
         
       } catch (error: any) {
@@ -149,32 +148,47 @@ export async function post({
     let handoffToStream = false;
 
     try {
-      // 确保用户存在
-      await UserService.getOrCreateUser(userId);
+      // ✅ Clean Architecture: 确保用户存在
+      const container = getContainer();
+      const getOrCreateUserUseCase = container.getGetOrCreateUserUseCase();
+      await getOrCreateUserUseCase.execute(userId);
 
-      // 如果没有 conversationId，创建新对话
+      // ✅ Clean Architecture: 如果没有 conversationId，创建新对话
       let conversationId = reqConversationId;
       if (!conversationId) {
-        const conversation = await ConversationService.createConversation(
+        const createConversationUseCase = container.getCreateConversationUseCase();
+        const conversationEntity = await createConversationUseCase.execute(
           userId,
           message.slice(0, 50) + (message.length > 50 ? '...' : '')
         );
-        conversationId = conversation.conversationId;
+        conversationId = conversationEntity.conversationId;
         console.log('✅ Created new conversation:', conversationId);
       }
 
-      // 保存用户消息到数据库
+      // ✅ Clean Architecture: 保存用户消息到数据库
       try {
-        await MessageService.addMessage(
+        const createMessageUseCase = container.getCreateMessageUseCase();
+        const updateConversationUseCase = container.getUpdateConversationUseCase();
+        
+        await createMessageUseCase.execute(
           conversationId,
           userId,
           'user',
           message,
           clientUserMessageId,
-          undefined,
-          modelType
+          modelType,
+          undefined
         );
-        await ConversationService.incrementMessageCount(conversationId, userId);
+        
+        const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+        if (conversation) {
+          await updateConversationUseCase.execute(
+            conversationId,
+            userId,
+            { messageCount: conversation.messageCount + 1 }
+          );
+        }
+        
         console.log('✅ User message saved to database');
       } catch (dbError) {
         console.error('❌ Failed to save user message:', dbError);
@@ -265,7 +279,6 @@ export async function post({
       // ==================== 单Agent模式 ====================
       // 🆕 使用新的 Clean Architecture - Memory 模块
       const memoryConfig = getRecommendedConfig(modelType);
-      const container = getContainer();
       const getConversationContextUseCase = container.getGetConversationContextUseCase();
       
       console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);

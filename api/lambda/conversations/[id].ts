@@ -2,7 +2,7 @@
  * Single Conversation API - 符合 Modern.js BFF 规范
  * 路由: /api/conversations/:id
  * 
- * 使用动态路由参数 [id]
+ * ✅ 使用 Clean Architecture
  */
 
 // 加载环境变量
@@ -10,16 +10,11 @@ import '../../config/env.js';
 import type { RequestOption } from '../../types/chat.js';
 import { connectToDatabase } from '../../db/connection.js';
 
-// 旧架构
-import { ConversationService } from '../../services/conversationService.js';
-import { MessageService } from '../../services/messageService.js';
-
-// 新架构（Clean Architecture）
+// Clean Architecture
 import { getContainer } from '../../_clean/di-container.js';
 
 // 工具
 import { successResponse, errorResponse, messageResponse } from '../_utils/response.js';
-import { USE_CLEAN_ARCH } from '../_utils/arch-switch.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -80,20 +75,10 @@ export async function del(
       return errorResponse('Conversation ID is required');
     }
 
-    // 删除对话
-    let deleted;
-    
-    if (USE_CLEAN_ARCH) {
-      // 🆕 使用新架构
-      console.log('🆕 Using Clean Architecture for delete conversation');
-      const container = getContainer();
-      const useCase = container.getDeleteConversationUseCase();
-      deleted = await useCase.execute(id, userId);
-    } else {
-      // ✅ 使用旧架构
-      console.log('✅ Using Legacy Service for delete conversation');
-      deleted = await ConversationService.deleteConversation(userId, id);
-    }
+    // ✅ Clean Architecture: 删除对话
+    const container = getContainer();
+    const useCase = container.getDeleteConversationUseCase();
+    const deleted = await useCase.execute(id, userId);
 
     if (!deleted) {
       return errorResponse('Conversation not found or already deleted');
@@ -137,22 +122,13 @@ export async function put(
       return errorResponse('Title is required');
     }
 
-    // 更新对话标题
-    let conversation;
+    // ✅ Clean Architecture: 更新对话标题
+    const container = getContainer();
+    const useCase = container.getUpdateConversationUseCase();
+    const conversation = await useCase.execute(id, userId, { title });
     
-    if (USE_CLEAN_ARCH) {
-      // 🆕 使用新架构
-      console.log('🆕 Using Clean Architecture for update conversation');
-      const container = getContainer();
-      const useCase = container.getUpdateConversationUseCase();
-      conversation = await useCase.execute(id, userId, { title });
-    } else {
-      // ✅ 使用旧架构
-      console.log('✅ Using Legacy Service for update conversation');
-      const updated = await ConversationService.updateConversationTitle(userId, id, title);
-      if (!updated) {
-        return errorResponse('Conversation not found');
-      }
+    if (!conversation) {
+      return errorResponse('Conversation not found');
     }
 
     return messageResponse('Conversation title updated successfully');
@@ -222,65 +198,32 @@ export async function get(
       return errorResponse('Conversation ID is required');
     }
 
-    // 获取对话详情
-    let conversation;
+    // ✅ Clean Architecture: 获取对话
+    const container = getContainer();
+    const useCase = container.getGetConversationUseCase();
+    const entity = await useCase.execute(id, userId);
     
-    if (USE_CLEAN_ARCH) {
-      // 🆕 使用新架构
-      console.log('🆕 Using Clean Architecture for get conversation');
-      const container = getContainer();
-      const useCase = container.getGetConversationUseCase();
-      const entity = await useCase.execute(id, userId);
-      
-      if (!entity) {
-        console.error('❌ Conversation not found:', { id, userId });
-        return errorResponse('Conversation not found');
-      }
-      
-      conversation = entity.toPersistence();
-      console.log('✅ Found conversation:', conversation.title);
-    } else {
-      // ✅ 使用旧架构
-      console.log('✅ Using Legacy Service for get conversation');
-      conversation = await ConversationService.getConversation(id, userId);
-      
-      if (!conversation) {
-        console.error('❌ Conversation not found:', { id, userId });
-        return errorResponse('Conversation not found');
-      }
-      
-      console.log('✅ Found conversation:', conversation.title);
+    if (!entity) {
+      console.error('❌ Conversation not found:', { id, userId });
+      return errorResponse('Conversation not found');
     }
+    
+    const conversation = entity.toPersistence();
+    console.log('✅ Found conversation:', conversation.title);
 
-    // 获取消息列表
-    let messagesResult;
+    // ✅ Clean Architecture: 获取消息列表
+    const getMessagesUseCase = container.getGetMessagesUseCase();
+    const { messages, total } = await getMessagesUseCase.execute(
+      id,
+      userId,
+      parseInt(limit, 10),
+      parseInt(skip, 10)
+    );
     
-    if (USE_CLEAN_ARCH) {
-      // 🆕 使用新架构
-      console.log('🆕 Using Clean Architecture for get messages');
-      const container = getContainer();
-      const useCase = container.getGetMessagesUseCase();
-      const { messages, total } = await useCase.execute(
-        id,
-        userId,
-        parseInt(limit, 10),
-        parseInt(skip, 10)
-      );
-      
-      messagesResult = {
-        messages: messages.map(m => m.toPersistence()), // 转换为普通对象
-        total
-      };
-    } else {
-      // ✅ 使用旧架构
-      console.log('✅ Using Legacy Service for get messages');
-      messagesResult = await MessageService.getConversationMessages(
-        id,           // conversationId
-        userId,       // userId
-        parseInt(limit, 10),   // limit
-        parseInt(skip, 10)     // skip
-      );
-    }
+    const messagesResult = {
+      messages: messages.map(m => m.toPersistence()), // 转换为普通对象
+      total
+    };
     
     console.log('✅ Found messages:', messagesResult.messages.length);
     console.log('🔗 API 返回前检查 - 有 sources 的消息:', 
