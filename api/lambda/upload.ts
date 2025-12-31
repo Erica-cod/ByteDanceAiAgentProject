@@ -4,9 +4,11 @@
  */
 
 import { UploadService } from '../services/uploadService.js';
+import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
+import { getContainer } from '../_clean/di-container.js';
 
 export async function post({ data }: { data: any }) {
-  const { userId, totalChunks, chunkSize, fileSize } = data;
+  const { userId, totalChunks, chunkSize, fileSize, isCompressed } = data;
   
   if (!userId || !totalChunks || !chunkSize || !fileSize) {
     return {
@@ -16,13 +18,30 @@ export async function post({ data }: { data: any }) {
   }
   
   try {
-    const sessionId = await UploadService.createSession(
-      userId,
-      totalChunks,
-      chunkSize,
-      fileSize,
-      false
-    );
+    let sessionId: string;
+
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for create upload session');
+      const container = getContainer();
+      const createSessionUseCase = container.getCreateSessionUseCase();
+      
+      sessionId = await createSessionUseCase.execute(
+        userId,
+        totalChunks,
+        chunkSize,
+        fileSize,
+        isCompressed || false
+      );
+    } else {
+      console.log('🔧 Using legacy service for create upload session');
+      sessionId = await UploadService.createSession(
+        userId,
+        totalChunks,
+        chunkSize,
+        fileSize,
+        isCompressed || false
+      );
+    }
     
     return {
       status: 200,

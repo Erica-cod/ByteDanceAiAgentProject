@@ -4,6 +4,8 @@
  */
 
 import { UploadService } from '../../services/uploadService.js';
+import { USE_CLEAN_ARCH } from '../_utils/arch-switch.js';
+import { getContainer } from '../../_clean/di-container.js';
 
 export async function post({ data }: { data: any }) {
   try {
@@ -36,34 +38,67 @@ export async function post({ data }: { data: any }) {
       };
     }
     
-    // 保存分片
-    const result = await UploadService.saveChunk(
-      sessionId,
-      chunkIndex,
-      chunkBuffer,
-      hash
-    );
-    
-    if (!result.verified) {
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for save chunk');
+      const container = getContainer();
+      const saveChunkUseCase = container.getSaveChunkUseCase();
+      
+      const result = await saveChunkUseCase.execute(
+        sessionId,
+        chunkIndex,
+        chunkBuffer,
+        hash
+      );
+      
+      if (!result.verified) {
+        return {
+          status: 400,
+          data: { 
+            error: result.error || 'hash校验失败',
+            verified: false,
+          },
+        };
+      }
+      
       return {
-        status: 400,
-        data: { 
-          error: result.error || 'hash校验失败',
-          verified: false,
+        status: 200,
+        data: {
+          success: true,
+          verified: true,
+          uploadedCount: result.uploadedCount,
+        },
+      };
+    } else {
+      console.log('🔧 Using legacy service for save chunk');
+      // 保存分片
+      const result = await UploadService.saveChunk(
+        sessionId,
+        chunkIndex,
+        chunkBuffer,
+        hash
+      );
+      
+      if (!result.verified) {
+        return {
+          status: 400,
+          data: { 
+            error: result.error || 'hash校验失败',
+            verified: false,
+          },
+        };
+      }
+      
+      const uploadedChunks = await UploadService.getUploadedChunks(sessionId);
+      
+      return {
+        status: 200,
+        data: {
+          success: true,
+          verified: true,
+          uploadedCount: uploadedChunks.length,
         },
       };
     }
-    
-    const uploadedChunks = await UploadService.getUploadedChunks(sessionId);
-    
-    return {
-      status: 200,
-      data: {
-        success: true,
-        verified: true,
-        uploadedCount: uploadedChunks.length,
-      },
-    };
     
   } catch (error: any) {
     console.error('上传分片失败:', error);
