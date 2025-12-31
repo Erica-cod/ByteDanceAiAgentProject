@@ -10,6 +10,9 @@ import { IConversationRepository } from './application/interfaces/repositories/c
 import { ConversationRepository } from './infrastructure/repositories/conversation.repository.js';
 import { CreateConversationUseCase } from './application/use-cases/conversation/create-conversation.use-case.js';
 import { GetConversationsUseCase } from './application/use-cases/conversation/get-conversations.use-case.js';
+import { GetConversationUseCase } from './application/use-cases/conversation/get-conversation.use-case.js';
+import { UpdateConversationUseCase } from './application/use-cases/conversation/update-conversation.use-case.js';
+import { DeleteConversationUseCase } from './application/use-cases/conversation/delete-conversation.use-case.js';
 
 /**
  * 简单的 DI 容器
@@ -41,6 +44,30 @@ class SimpleContainer {
   getGetConversationsUseCase(): GetConversationsUseCase {
     const repo = this.getConversationRepository();
     return new GetConversationsUseCase(repo);
+  }
+
+  /**
+   * 创建 GetConversationUseCase（每次新实例）
+   */
+  getGetConversationUseCase(): GetConversationUseCase {
+    const repo = this.getConversationRepository();
+    return new GetConversationUseCase(repo);
+  }
+
+  /**
+   * 创建 UpdateConversationUseCase（每次新实例）
+   */
+  getUpdateConversationUseCase(): UpdateConversationUseCase {
+    const repo = this.getConversationRepository();
+    return new UpdateConversationUseCase(repo);
+  }
+
+  /**
+   * 创建 DeleteConversationUseCase（每次新实例）
+   */
+  getDeleteConversationUseCase(): DeleteConversationUseCase {
+    const repo = this.getConversationRepository();
+    return new DeleteConversationUseCase(repo);
   }
 }
 

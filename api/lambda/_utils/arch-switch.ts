@@ -6,8 +6,9 @@
 /**
  * 是否使用 Clean Architecture
  * 通过环境变量 USE_CLEAN_ARCH 控制
+ * 默认：true（使用新架构）
  */
-export const USE_CLEAN_ARCH = process.env.USE_CLEAN_ARCH === 'true';
+export const USE_CLEAN_ARCH = process.env.USE_CLEAN_ARCH !== 'false';
 
 /**
  * 架构切换包装器
