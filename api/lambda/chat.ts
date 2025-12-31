@@ -324,13 +324,17 @@ export async function post({
         const writer = writable.getWriter();
         const sseWriter = new SSEStreamWriter(writer);
         
+        // ✅ 使用受控 SSE Writer（chunking模式使用远程配置）
+        const { createRemoteControlledWriter } = await import('../_clean/infrastructure/streaming/controlled-sse-writer.js');
+        const controlledWriter = createRemoteControlledWriter(sseWriter);
+        
         handoffToStream = true;
         
         // 异步处理
         (async () => {
           try {
-            // 发送初始化事件
-            await sseWriter.sendEvent({
+            // 发送初始化事件（直接发送）
+            await controlledWriter.sendDirect({
               conversationId,
               type: 'init',
               mode: 'chunking',
@@ -356,7 +360,7 @@ export async function post({
             console.error('❌ [Chunking] 处理失败:', error);
             
             if (!sseWriter.isClosed()) {
-              await sseWriter.sendEvent({ 
+              await controlledWriter.sendDirect({ 
                 error: error.message || '超长文本处理失败' 
               });
             }

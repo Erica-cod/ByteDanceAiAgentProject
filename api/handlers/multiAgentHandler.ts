@@ -11,6 +11,9 @@ import type { HostDecision } from '../agents/hostAgent.js';
 // ✅ Clean Architecture
 import { getContainer } from '../_clean/di-container.js';
 
+// ✅ 流式控制
+import { createRemoteControlledWriter } from '../_clean/infrastructure/streaming/controlled-sse-writer.js';
+
 // =====================================================================
 // 已弃用 Redis 版本（保留用于参考）
 // 原因：MongoDB 更适合多 Agent 状态保存（低频、持久化、查询能力）
@@ -34,12 +37,15 @@ export async function handleMultiAgentMode(
   
   // ✅ 使用 SSEStreamWriter 工具类
   const sseWriter = new SSEStreamWriter(writer);
+  
+  // ✅ 使用受控 SSE Writer（多Agent使用远程配置）
+  const controlledWriter = createRemoteControlledWriter(sseWriter);
 
   // 异步处理多Agent协作
   (async () => {
     try {
-      // 首先发送 conversationId
-      await sseWriter.sendEvent({
+      // 首先发送 conversationId（直接发送）
+      await controlledWriter.sendDirect({
         conversationId: conversationId,
         type: 'init',
         mode: 'multi_agent',
@@ -68,8 +74,8 @@ export async function handleMultiAgentMode(
             actualResumeFromRound = result.data.completedRounds + 1;
             console.log(`🔄 [MultiAgent] 从 MongoDB 恢复状态，将从第 ${actualResumeFromRound} 轮继续`);
             
-            // 通知前端恢复状态
-            await sseWriter.sendEvent({
+            // 通知前端恢复状态（直接发送）
+            await controlledWriter.sendDirect({
               type: 'resume',
               resumedFromRound: result.data.completedRounds,
               continueFromRound: actualResumeFromRound,
@@ -103,7 +109,7 @@ export async function handleMultiAgentMode(
             
             console.log(`🚀 [SSE] Agent开始: ${agentId} (第${round}轮)`);
             
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'agent_start',
               agent: agentId,
               round: round,
@@ -112,10 +118,11 @@ export async function handleMultiAgentMode(
           },
           
           // ✅ 新增：Agent chunk回调（流式内容）
+          // 多Agent模式的chunk已经是流式的，直接发送即可
           onAgentChunk: async (agentId: string, round: number, chunk: string) => {
             if (sseWriter.isClosed()) return;
             
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'agent_chunk',
               agent: agentId,
               round: round,
@@ -130,7 +137,7 @@ export async function handleMultiAgentMode(
             
             console.log(`✅ [SSE] Agent完成: ${output.agent_id}`);
             
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'agent_complete',
               agent: output.agent_id,
               round: output.round,
@@ -146,7 +153,7 @@ export async function handleMultiAgentMode(
             
             console.log(`📤 [SSE] 发送Host决策: ${decision.action}`);
             
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'host_decision',
               action: decision.action,
               reason: decision.reason,
@@ -187,7 +194,7 @@ export async function handleMultiAgentMode(
               return;
             }
             
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'round_complete',
               round,
               timestamp: new Date().toISOString(),
@@ -254,7 +261,7 @@ export async function handleMultiAgentMode(
               return;
             }
 
-            await sseWriter.sendEvent({
+            await controlledWriter.sendDirect({
               type: 'session_complete',
               status: session.status,
               rounds: session.current_round,
@@ -279,7 +286,7 @@ export async function handleMultiAgentMode(
       // 如果连接还在，发送错误信息
       if (!sseWriter.isClosed()) {
         try {
-          await sseWriter.sendEvent({
+          await controlledWriter.sendDirect({
             type: 'error',
             error: error.message,
             timestamp: new Date().toISOString(),

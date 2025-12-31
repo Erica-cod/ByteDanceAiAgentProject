@@ -13,6 +13,11 @@ import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extrac
 import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
 import type { ChatMessage } from '../types/chat.js';
 import { requestCacheService } from '../_clean/infrastructure/cache/request-cache.service.js';
+import { 
+  ControlledSSEWriter,
+  createLocalControlledWriter,
+  createRemoteControlledWriter
+} from '../_clean/infrastructure/streaming/controlled-sse-writer.js';
 
 /**
  * 处理火山引擎流式响应并转换为 SSE 格式
@@ -30,6 +35,11 @@ export async function handleVolcanoStream(
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const sseWriter = new SSEStreamWriter(writer);
+  
+  // ✅ 使用受控 SSE Writer（根据模型类型选择不同的打字机速率）
+  const controlledWriter = modelType === 'local' 
+    ? createLocalControlledWriter(sseWriter)  // 本地模型：快速
+    : createRemoteControlledWriter(sseWriter); // 远程模型：适中
 
   let buffer = '';
   let accumulatedText = '';
@@ -39,8 +49,8 @@ export async function handleVolcanoStream(
   // 异步处理流
   (async () => {
     try {
-      // 发送初始化事件
-      await sseWriter.sendEvent({
+      // 发送初始化事件（直接发送，不需要打字机效果）
+      await controlledWriter.sendDirect({
         conversationId,
         type: 'init'
       });
@@ -77,8 +87,8 @@ export async function handleVolcanoStream(
               accumulatedText += content;
               const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
 
-              await sseWriter.sendEvent({
-                content: mainContent,
+              // ✅ 使用受控发送（带打字机效果和背压检测）
+              await controlledWriter.sendEvent(mainContent, {
                 thinking: thinking || undefined,
               });
             }
@@ -208,6 +218,9 @@ export async function handleLocalStream(
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const sseWriter = new SSEStreamWriter(writer);
+  
+  // ✅ 使用受控 SSE Writer（本地模型使用快速配置）
+  const controlledWriter = createLocalControlledWriter(sseWriter);
 
   let buffer = '';
   let accumulatedText = '';
@@ -218,8 +231,8 @@ export async function handleLocalStream(
   // 异步处理流
   (async () => {
     try {
-      // 发送初始化事件
-      await sseWriter.sendEvent({
+      // 发送初始化事件（直接发送）
+      await controlledWriter.sendDirect({
         conversationId,
         type: 'init'
       });
@@ -257,8 +270,8 @@ export async function handleLocalStream(
                 accumulatedText += jsonData.message.content;
                 const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-                await sseWriter.sendEvent({
-                  content: content,
+                // ✅ 使用受控发送（带打字机效果和背压检测）
+                await controlledWriter.sendEvent(content, {
                   thinking: thinking || undefined,
                 });
               }
@@ -332,8 +345,8 @@ export async function handleLocalStream(
                             accumulatedText += newJsonData.message.content;
                             const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-                            await sseWriter.sendEvent({
-                              content: content,
+                            // ✅ 使用受控发送（带打字机效果和背压检测）
+                            await controlledWriter.sendEvent(content, {
                               thinking: thinking || undefined,
                             });
                           }
