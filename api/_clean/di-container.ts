@@ -20,6 +20,14 @@ import { MessageRepository } from './infrastructure/repositories/message.reposit
 import { CreateMessageUseCase } from './application/use-cases/message/create-message.use-case.js';
 import { GetMessagesUseCase } from './application/use-cases/message/get-messages.use-case.js';
 
+// Import interfaces and implementations - User
+import { IUserRepository } from './application/interfaces/repositories/user.repository.interface.js';
+import { MongoUserRepository } from './infrastructure/repositories/user.repository.js';
+import { GetOrCreateUserUseCase } from './application/use-cases/user/get-or-create-user.use-case.js';
+import { GetUserByIdUseCase } from './application/use-cases/user/get-user-by-id.use-case.js';
+import { UpdateUserUseCase } from './application/use-cases/user/update-user.use-case.js';
+import { getDatabase } from '../db/connection.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -102,6 +110,42 @@ class SimpleContainer {
   getGetMessagesUseCase(): GetMessagesUseCase {
     const repo = this.getMessageRepository();
     return new GetMessagesUseCase(repo);
+  }
+
+  // ==================== User Module ====================
+
+  /**
+   * 获取或创建 User Repository（单例）
+   */
+  getUserRepository(): IUserRepository {
+    if (!this.instances.has('UserRepository')) {
+      this.instances.set('UserRepository', new MongoUserRepository(getDatabase));
+    }
+    return this.instances.get('UserRepository');
+  }
+
+  /**
+   * 创建 GetOrCreateUserUseCase（每次新实例）
+   */
+  getGetOrCreateUserUseCase(): GetOrCreateUserUseCase {
+    const repo = this.getUserRepository();
+    return new GetOrCreateUserUseCase(repo);
+  }
+
+  /**
+   * 创建 GetUserByIdUseCase（每次新实例）
+   */
+  getGetUserByIdUseCase(): GetUserByIdUseCase {
+    const repo = this.getUserRepository();
+    return new GetUserByIdUseCase(repo);
+  }
+
+  /**
+   * 创建 UpdateUserUseCase（每次新实例）
+   */
+  getUpdateUserUseCase(): UpdateUserUseCase {
+    const repo = this.getUserRepository();
+    return new UpdateUserUseCase(repo);
   }
 }
 

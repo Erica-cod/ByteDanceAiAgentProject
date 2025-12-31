@@ -9,6 +9,8 @@ import type { RequestOption } from '../types/chat.js';
 import { connectToDatabase } from '../db/connection.js';
 import { UserService } from '../services/userService.js';
 import { successResponse, errorResponse } from './_utils/response.js';
+import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
+import { getContainer } from '../_clean/di-container.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -43,14 +45,29 @@ export async function post({
       return errorResponse('userId is required');
     }
 
-    // 获取或创建用户
-    const user = await UserService.getOrCreateUser(userId, metadata);
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for get or create user');
+      const container = getContainer();
+      const getOrCreateUserUseCase = container.getGetOrCreateUserUseCase();
+      
+      const userEntity = await getOrCreateUserUseCase.execute(userId, metadata);
+      
+      return successResponse({
+        userId: userEntity.userId,
+        createdAt: userEntity.createdAt,
+        lastActiveAt: userEntity.lastActiveAt
+      });
+    } else {
+      console.log('🔧 Using legacy service for get or create user');
+      // 获取或创建用户
+      const user = await UserService.getOrCreateUser(userId, metadata);
 
-    return successResponse({
-      userId: user.userId,
-      createdAt: user.createdAt,
-      lastActiveAt: user.lastActiveAt
-    });
+      return successResponse({
+        userId: user.userId,
+        createdAt: user.createdAt,
+        lastActiveAt: user.lastActiveAt
+      });
+    }
   } catch (error: any) {
     console.error('❌ User POST API error:', error);
     return errorResponse(error.message || 'Failed to process user request');
@@ -74,19 +91,39 @@ export async function get({
       return errorResponse('userId is required');
     }
 
-    // 查询用户
-    const user = await UserService.getUserById(userId);
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for get user by ID');
+      const container = getContainer();
+      const getUserByIdUseCase = container.getGetUserByIdUseCase();
+      
+      const userEntity = await getUserByIdUseCase.execute(userId);
 
-    if (!user) {
-      return errorResponse('User not found');
+      if (!userEntity) {
+        return errorResponse('User not found');
+      }
+
+      return successResponse({
+        userId: userEntity.userId,
+        username: userEntity.username,
+        createdAt: userEntity.createdAt,
+        lastActiveAt: userEntity.lastActiveAt
+      });
+    } else {
+      console.log('🔧 Using legacy service for get user by ID');
+      // 查询用户
+      const user = await UserService.getUserById(userId);
+
+      if (!user) {
+        return errorResponse('User not found');
+      }
+
+      return successResponse({
+        userId: user.userId,
+        username: user.username,
+        createdAt: user.createdAt,
+        lastActiveAt: user.lastActiveAt
+      });
     }
-
-    return successResponse({
-      userId: user.userId,
-      username: user.username,
-      createdAt: user.createdAt,
-      lastActiveAt: user.lastActiveAt
-    });
   } catch (error: any) {
     console.error('❌ User GET API error:', error);
     return errorResponse(error.message || 'Failed to get user');
