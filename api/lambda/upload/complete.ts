@@ -3,7 +3,7 @@
  * 完成上传
  */
 
-import { UploadService } from '../../services/uploadService.js';
+import { getContainer } from '../../_clean/di-container.js';
 
 export async function post({ data }: { data: any }) {
   const { sessionId } = data;
@@ -16,16 +16,22 @@ export async function post({ data }: { data: any }) {
   }
   
   try {
-    const isComplete = await UploadService.isComplete(sessionId);
+    const container = getContainer();
     
-    if (!isComplete) {
+    // 检查会话状态
+    const getSessionStatusUseCase = container.getGetSessionStatusUseCase();
+    const status = await getSessionStatusUseCase.execute(sessionId);
+    
+    if (!status || !status.isComplete) {
       return {
         status: 400,
         data: { error: '分片不完整，无法完成上传' },
       };
     }
     
-    const assembled = await UploadService.assembleChunks(sessionId);
+    // 组装分片
+    const assembleChunksUseCase = container.getAssembleChunksUseCase();
+    const assembled = await assembleChunksUseCase.execute(sessionId);
     
     return {
       status: 200,

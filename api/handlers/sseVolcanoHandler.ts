@@ -4,9 +4,8 @@
  */
 
 import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
-import { MessageService } from '../services/messageService.js';
-import { ConversationService } from '../services/conversationService.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
+import { getContainer } from '../_clean/di-container.js';
 import { processMultiToolWorkflow } from './workflowProcessor.js';
 import {
   createSafeSSEWriter,
@@ -121,17 +120,30 @@ export async function streamVolcengineToSSEResponse(
                 // 保存 AI 回复到数据库
                 try {
                   console.log('💾 准备保存消息到数据库，searchSources:', searchSources);
-                  await MessageService.addMessage(
+                  const container = getContainer();
+                  const createMessageUseCase = container.getCreateMessageUseCase();
+                  const updateConversationUseCase = container.getUpdateConversationUseCase();
+                  
+                  await createMessageUseCase.execute(
                     conversationId,
                     userId,
                     'assistant',
                     finalContent,
                     clientAssistantMessageId,
-                    finalThinking || undefined,
                     modelType,
+                    finalThinking || undefined,
                     searchSources || undefined
                   );
-                  await ConversationService.incrementMessageCount(conversationId, userId);
+                  
+                  // 增加消息计数
+                  const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+                  if (conversation) {
+                    await updateConversationUseCase.execute(
+                      conversationId,
+                      userId,
+                      { messageCount: conversation.messageCount + 1 }
+                    );
+                  }
                   messageSaved = true; // ✅ 标记已保存
                   console.log(
                     '✅ AI完整回答已保存到数据库 with sources:',
@@ -200,17 +212,30 @@ export async function streamVolcengineToSSEResponse(
           console.log('💾 [Finally] 保存不完整的回答到数据库，长度:', accumulatedText.length);
           const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-          await MessageService.addMessage(
+          const container = getContainer();
+          const createMessageUseCase = container.getCreateMessageUseCase();
+          const updateConversationUseCase = container.getUpdateConversationUseCase();
+          
+          await createMessageUseCase.execute(
             conversationId,
             userId,
             'assistant',
             content || accumulatedText,
             clientAssistantMessageId,
-            thinking || undefined,
             modelType,
+            thinking || undefined,
             searchSources || undefined
           );
-          await ConversationService.incrementMessageCount(conversationId, userId);
+          
+          // 增加消息计数
+          const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
+          if (conversation) {
+            await updateConversationUseCase.execute(
+              conversationId,
+              userId,
+              { messageCount: conversation.messageCount + 1 }
+            );
+          }
           console.log('✅ [Finally] 不完整的回答已保存到数据库');
         } catch (dbError) {
           console.error('❌ [Finally] 保存不完整回答失败:', dbError);

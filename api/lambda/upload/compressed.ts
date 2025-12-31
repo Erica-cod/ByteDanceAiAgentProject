@@ -3,7 +3,7 @@
  * 上传压缩文件（单次请求，不分片）
  */
 
-import { UploadService } from '../../services/uploadService.js';
+import { getContainer } from '../../_clean/di-container.js';
 
 export async function post({ data }: { data: any }) {
   try {
@@ -34,8 +34,11 @@ export async function post({ data }: { data: any }) {
       };
     }
     
+    const container = getContainer();
+    
     // 创建一个单分片会话
-    const sessionId = await UploadService.createSession(
+    const createSessionUseCase = container.getCreateSessionUseCase();
+    const sessionId = await createSessionUseCase.execute(
       userId,
       1,  // 单分片
       buffer.length,
@@ -48,7 +51,13 @@ export async function post({ data }: { data: any }) {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     
     // 保存分片
-    await UploadService.saveChunk(sessionId, 0, buffer, hash);
+    const saveChunkUseCase = container.getSaveChunkUseCase();
+    await saveChunkUseCase.execute(
+      sessionId,
+      0,
+      buffer,
+      hash
+    );
     
     return {
       status: 200,

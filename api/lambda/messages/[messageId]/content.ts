@@ -8,7 +8,7 @@
  * - length: 长度（默认1000）
  */
 
-import { MessageService } from '../../../services/messageService.js';
+import { getContainer } from '../../../_clean/di-container.js';
 
 export async function get({ params, query }: { params: any; query: any }) {
   const { messageId } = params;
@@ -32,12 +32,15 @@ export async function get({ params, query }: { params: any; query: any }) {
       };
     }
     
-    const result = await MessageService.getMessageContentRange(
+    const container = getContainer();
+    const getMessageContentRangeUseCase = container.getGetMessageContentRangeUseCase();
+    
+    const result = await getMessageContentRangeUseCase.execute({
       messageId,
       userId,
-      startNum,
-      lengthNum
-    );
+      start: startNum,
+      length: lengthNum,
+    });
     
     if (!result) {
       return {
