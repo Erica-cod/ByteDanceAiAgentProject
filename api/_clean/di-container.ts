@@ -5,7 +5,7 @@
  * ⚠️ 重要：延迟初始化，避免 Modern.js BFF 扫描问题
  */
 
-// Import interfaces and implementations
+// Import interfaces and implementations - Conversation
 import { IConversationRepository } from './application/interfaces/repositories/conversation.repository.interface.js';
 import { ConversationRepository } from './infrastructure/repositories/conversation.repository.js';
 import { CreateConversationUseCase } from './application/use-cases/conversation/create-conversation.use-case.js';
@@ -13,6 +13,12 @@ import { GetConversationsUseCase } from './application/use-cases/conversation/ge
 import { GetConversationUseCase } from './application/use-cases/conversation/get-conversation.use-case.js';
 import { UpdateConversationUseCase } from './application/use-cases/conversation/update-conversation.use-case.js';
 import { DeleteConversationUseCase } from './application/use-cases/conversation/delete-conversation.use-case.js';
+
+// Import interfaces and implementations - Message
+import { IMessageRepository } from './application/interfaces/repositories/message.repository.interface.js';
+import { MessageRepository } from './infrastructure/repositories/message.repository.js';
+import { CreateMessageUseCase } from './application/use-cases/message/create-message.use-case.js';
+import { GetMessagesUseCase } from './application/use-cases/message/get-messages.use-case.js';
 
 /**
  * 简单的 DI 容器
@@ -68,6 +74,34 @@ class SimpleContainer {
   getDeleteConversationUseCase(): DeleteConversationUseCase {
     const repo = this.getConversationRepository();
     return new DeleteConversationUseCase(repo);
+  }
+
+  // ==================== Message Module ====================
+
+  /**
+   * 获取或创建 Message Repository（单例）
+   */
+  getMessageRepository(): IMessageRepository {
+    if (!this.instances.has('MessageRepository')) {
+      this.instances.set('MessageRepository', new MessageRepository());
+    }
+    return this.instances.get('MessageRepository');
+  }
+
+  /**
+   * 创建 CreateMessageUseCase（每次新实例）
+   */
+  getCreateMessageUseCase(): CreateMessageUseCase {
+    const repo = this.getMessageRepository();
+    return new CreateMessageUseCase(repo);
+  }
+
+  /**
+   * 创建 GetMessagesUseCase（每次新实例）
+   */
+  getGetMessagesUseCase(): GetMessagesUseCase {
+    const repo = this.getMessageRepository();
+    return new GetMessagesUseCase(repo);
   }
 }
 

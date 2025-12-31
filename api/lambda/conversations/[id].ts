@@ -252,17 +252,39 @@ export async function get(
       console.log('✅ Found conversation:', conversation.title);
     }
 
-    // 获取消息列表（注意方法名和参数顺序）
-    const messagesResult = await MessageService.getConversationMessages(
-      id,           // conversationId
-      userId,       // userId
-      parseInt(limit, 10),   // limit
-      parseInt(skip, 10)     // skip
-    );
+    // 获取消息列表
+    let messagesResult;
+    
+    if (USE_CLEAN_ARCH) {
+      // 🆕 使用新架构
+      console.log('🆕 Using Clean Architecture for get messages');
+      const container = getContainer();
+      const useCase = container.getGetMessagesUseCase();
+      const { messages, total } = await useCase.execute(
+        id,
+        userId,
+        parseInt(limit, 10),
+        parseInt(skip, 10)
+      );
+      
+      messagesResult = {
+        messages: messages.map(m => m.toPersistence()), // 转换为普通对象
+        total
+      };
+    } else {
+      // ✅ 使用旧架构
+      console.log('✅ Using Legacy Service for get messages');
+      messagesResult = await MessageService.getConversationMessages(
+        id,           // conversationId
+        userId,       // userId
+        parseInt(limit, 10),   // limit
+        parseInt(skip, 10)     // skip
+      );
+    }
     
     console.log('✅ Found messages:', messagesResult.messages.length);
     console.log('🔗 API 返回前检查 - 有 sources 的消息:', 
-      messagesResult.messages.filter(m => m.sources && m.sources.length > 0).length
+      messagesResult.messages.filter((m: any) => m.sources && m.sources.length > 0).length
     );
 
     return successResponse({
