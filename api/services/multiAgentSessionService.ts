@@ -1,4 +1,22 @@
 /**
+ * ⚠️ DEPRECATED - 已迁移到 Clean Architecture
+ * 
+ * 请使用新的 Use Cases 代替：
+ * - SaveSessionUseCase (api/_clean/application/use-cases/agent-session/save-session.use-case.ts)
+ * - LoadSessionUseCase (api/_clean/application/use-cases/agent-session/load-session.use-case.ts)
+ * - DeleteSessionUseCase (api/_clean/application/use-cases/agent-session/delete-session.use-case.ts)
+ * - CleanExpiredSessionsUseCase (api/_clean/application/use-cases/agent-session/clean-expired-sessions.use-case.ts)
+ * - GetSessionStatsUseCase (api/_clean/application/use-cases/agent-session/get-session-stats.use-case.ts)
+ * 
+ * 获取方式：
+ * ```typescript
+ * import { getContainer } from '../_clean/di-container.js';
+ * const container = getContainer();
+ * const saveSessionUseCase = container.getSaveSessionUseCase();
+ * ```
+ * 
+ * ---
+ * 
  * 多 Agent 会话状态管理服务（MongoDB 实现）
  * 
  * 为什么用 MongoDB 而不是 Redis：
