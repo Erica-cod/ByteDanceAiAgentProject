@@ -5,9 +5,17 @@
  */
 
 import { trackDevice, startDeviceCleanup, getDeviceStats, deleteDevice } from '../services/deviceTracker.js';
+import { USE_CLEAN_ARCH } from './_utils/arch-switch.js';
+import { getContainer } from '../_clean/di-container.js';
 
 // 启动定期清理
-startDeviceCleanup();
+if (USE_CLEAN_ARCH) {
+  const container = getContainer();
+  const cleanupUseCase = container.getCleanupExpiredDevicesUseCase();
+  cleanupUseCase.startPeriodicCleanup();
+} else {
+  startDeviceCleanup();
+}
 
 interface RequestOption<D = any> {
   data?: D;
@@ -47,13 +55,31 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
     });
   }
   
-  // 追踪设备
-  trackDevice(deviceIdHash);
-  
-  return new Response(JSON.stringify({ success: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  try {
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for track device');
+      const container = getContainer();
+      const trackDeviceUseCase = container.getTrackDeviceUseCase();
+      await trackDeviceUseCase.execute(deviceIdHash);
+    } else {
+      console.log('🔧 Using legacy service for track device');
+      trackDevice(deviceIdHash);
+    }
+    
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
+    console.error('❌ Track device API error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'Failed to track device' 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 /**
@@ -61,15 +87,36 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
  * 获取设备统计信息（调试/监控用）
  */
 export async function get(req: RequestOption) {
-  const stats = getDeviceStats();
-  
-  return new Response(JSON.stringify({ 
-    success: true, 
-    data: stats 
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  try {
+    let stats;
+    
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for get device stats');
+      const container = getContainer();
+      const getDeviceStatsUseCase = container.getGetDeviceStatsUseCase();
+      stats = await getDeviceStatsUseCase.execute();
+    } else {
+      console.log('🔧 Using legacy service for get device stats');
+      stats = getDeviceStats();
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      data: stats 
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
+    console.error('❌ Get device stats API error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'Failed to get device stats' 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 /**
@@ -89,14 +136,35 @@ export async function del(req: RequestOption<TrackDeviceRequest>) {
     });
   }
   
-  const deleted = deleteDevice(deviceIdHash);
-  
-  return new Response(JSON.stringify({ 
-    success: true,
-    deleted 
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  try {
+    let deleted;
+    
+    if (USE_CLEAN_ARCH) {
+      console.log('🆕 Using Clean Architecture for delete device');
+      const container = getContainer();
+      const deleteDeviceUseCase = container.getDeleteDeviceUseCase();
+      deleted = await deleteDeviceUseCase.execute(deviceIdHash);
+    } else {
+      console.log('🔧 Using legacy service for delete device');
+      deleted = deleteDevice(deviceIdHash);
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      deleted 
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
+    console.error('❌ Delete device API error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'Failed to delete device' 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
