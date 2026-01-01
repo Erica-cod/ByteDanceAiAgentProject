@@ -7,6 +7,7 @@
  */
 
 import { getContainer } from '../_clean/di-container.js';
+import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
 
 // ✅ Clean Architecture: 启动定期清理
 const container = getContainer();
@@ -16,6 +17,7 @@ cleanupUseCase.startPeriodicCleanup();
 interface RequestOption<D = any> {
   data?: D;
   params?: Record<string, string>;
+  headers?: Record<string, any>;
 }
 
 interface TrackDeviceRequest {
@@ -23,32 +25,37 @@ interface TrackDeviceRequest {
 }
 
 /**
+ * OPTIONS /api/device/track - 处理预检请求
+ */
+export async function options(req: RequestOption) {
+  const origin = req.headers?.origin;
+  return handleOptionsRequest(origin);
+}
+
+/**
  * POST /api/device/track
  * 追踪设备
  */
 export async function post(req: RequestOption<TrackDeviceRequest>) {
+  const requestOrigin = req.headers?.origin;
   const { deviceIdHash } = req.data || {};
   
   // 参数校验
   if (!deviceIdHash || typeof deviceIdHash !== 'string') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Invalid deviceIdHash' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: 'Invalid deviceIdHash' },
+      400,
+      requestOrigin
+    );
   }
   
   // 长度校验（SHA-256 输出应该是 32 或 64 字符）
   if (deviceIdHash.length < 16 || deviceIdHash.length > 64) {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'deviceIdHash length invalid' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: 'deviceIdHash length invalid' },
+      400,
+      requestOrigin
+    );
   }
   
   try {
@@ -57,19 +64,18 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
     const trackDeviceUseCase = container.getTrackDeviceUseCase();
     await trackDeviceUseCase.execute(deviceIdHash);
     
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: true },
+      200,
+      requestOrigin
+    );
   } catch (error: any) {
     console.error('❌ Track device API error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message || 'Failed to track device' 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: error.message || 'Failed to track device' },
+      500,
+      requestOrigin
+    );
   }
 }
 
@@ -78,28 +84,26 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
  * 获取设备统计信息（调试/监控用）
  */
 export async function get(req: RequestOption) {
+  const requestOrigin = req.headers?.origin;
+  
   try {
     // ✅ Clean Architecture
     const container = getContainer();
     const getDeviceStatsUseCase = container.getGetDeviceStatsUseCase();
     const stats = await getDeviceStatsUseCase.execute();
     
-    return new Response(JSON.stringify({ 
-      success: true, 
-      data: stats 
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: true, data: stats },
+      200,
+      requestOrigin
+    );
   } catch (error: any) {
     console.error('❌ Get device stats API error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message || 'Failed to get device stats' 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: error.message || 'Failed to get device stats' },
+      500,
+      requestOrigin
+    );
   }
 }
 
@@ -108,16 +112,15 @@ export async function get(req: RequestOption) {
  * 删除设备（用户请求删除）
  */
 export async function del(req: RequestOption<TrackDeviceRequest>) {
+  const requestOrigin = req.headers?.origin;
   const { deviceIdHash } = req.data || {};
   
   if (!deviceIdHash || typeof deviceIdHash !== 'string') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Invalid deviceIdHash' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: 'Invalid deviceIdHash' },
+      400,
+      requestOrigin
+    );
   }
   
   try {
@@ -126,22 +129,18 @@ export async function del(req: RequestOption<TrackDeviceRequest>) {
     const deleteDeviceUseCase = container.getDeleteDeviceUseCase();
     const deleted = await deleteDeviceUseCase.execute(deviceIdHash);
     
-    return new Response(JSON.stringify({ 
-      success: true,
-      deleted 
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: true, deleted },
+      200,
+      requestOrigin
+    );
   } catch (error: any) {
     console.error('❌ Delete device API error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message || 'Failed to delete device' 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return createJsonResponse(
+      { success: false, error: error.message || 'Failed to delete device' },
+      500,
+      requestOrigin
+    );
   }
 }
 

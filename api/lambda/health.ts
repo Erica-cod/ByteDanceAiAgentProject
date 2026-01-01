@@ -9,8 +9,18 @@
  */
 
 import { getDatabase } from '../db/connection.js';
+import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
 
-export async function get() {
+/**
+ * OPTIONS /api/health - 处理预检请求
+ */
+export async function options({ headers }: any) {
+  const origin = headers?.origin;
+  return handleOptionsRequest(origin);
+}
+
+export async function get({ headers }: any = {}) {
+  const requestOrigin = headers?.origin;
   const startTime = Date.now();
   
   try {
@@ -24,7 +34,7 @@ export async function get() {
     const memUsage = process.memoryUsage();
     const uptime = process.uptime();
     
-    return {
+    return createJsonResponse({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(uptime),
@@ -39,21 +49,15 @@ export async function get() {
           usage: `${((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(1)}%`,
         },
       },
-    };
+    }, 200, requestOrigin);
   } catch (error: any) {
     console.error('❌ 健康检查失败:', error);
     
-    return new Response(
-      JSON.stringify({
-        status: 'unhealthy',
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      }),
-      { 
-        status: 503, 
-        headers: { 'Content-Type': 'application/json' } 
-      }
-    );
+    return createJsonResponse({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    }, 503, requestOrigin);
   }
 }
 

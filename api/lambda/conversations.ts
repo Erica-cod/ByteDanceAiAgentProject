@@ -15,6 +15,7 @@ import { getContainer } from '../_clean/di-container.js';
 
 // 工具
 import { successResponse, errorResponse } from './_utils/response.js';
+import { handleOptionsRequest } from './_utils/cors.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -35,6 +36,14 @@ interface GetConversationsQuery {
 // ============= API 函数 =============
 
 /**
+ * OPTIONS /api/conversations - 处理预检请求
+ */
+export async function options({ headers }: RequestOption<any, any>) {
+  const origin = headers?.origin;
+  return handleOptionsRequest(origin);
+}
+
+/**
  * POST /api/conversations - 创建新对话
  * 
  * @param data - 请求数据 { userId, title? }
@@ -42,18 +51,21 @@ interface GetConversationsQuery {
  */
 export async function post({
   data,
+  headers,
 }: RequestOption<any, CreateConversationData>) {
   try {
+    const requestOrigin = headers?.origin;
+    
     // ✅ 类型检查：确保 data 存在
     if (!data) {
-      return errorResponse('请求数据不能为空');
+      return errorResponse('请求数据不能为空', requestOrigin);
     }
     
     const { userId, title } = data;
 
     // 参数验证
     if (!userId) {
-      return errorResponse('userId is required');
+      return errorResponse('userId is required', requestOrigin);
     }
 
     // ✅ Clean Architecture
@@ -62,10 +74,11 @@ export async function post({
     const entity = await useCase.execute(userId, title);
     const conversation = entity.toPersistence();
 
-    return successResponse({ conversation });
+    return successResponse({ conversation }, undefined, requestOrigin);
   } catch (error: any) {
     console.error('❌ Create conversation error:', error);
-    return errorResponse(error.message || 'Failed to create conversation');
+    const requestOrigin = (error as any).requestOrigin;
+    return errorResponse(error.message || 'Failed to create conversation', requestOrigin);
   }
 }
 
@@ -77,18 +90,21 @@ export async function post({
  */
 export async function get({
   query,
+  headers,
 }: RequestOption<GetConversationsQuery, any>) {
   try {
+    const requestOrigin = headers?.origin;
+    
     // ✅ 类型检查：确保 query 存在
     if (!query) {
-      return errorResponse('查询参数不能为空');
+      return errorResponse('查询参数不能为空', requestOrigin);
     }
     
     const { userId, limit = '20', skip = '0' } = query;
 
     // 参数验证
     if (!userId) {
-      return errorResponse('userId is required');
+      return errorResponse('userId is required', requestOrigin);
     }
 
     // ✅ Clean Architecture
@@ -109,10 +125,11 @@ export async function get({
     return successResponse({
       conversations: result.conversations,
       total: result.total
-    });
+    }, undefined, requestOrigin);
   } catch (error: any) {
     console.error('❌ Get conversations error:', error);
-    return errorResponse(error.message || 'Failed to get conversations');
+    const requestOrigin = (error as any).requestOrigin;
+    return errorResponse(error.message || 'Failed to get conversations', requestOrigin);
   }
 }
 

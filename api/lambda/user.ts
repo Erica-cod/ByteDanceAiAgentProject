@@ -11,6 +11,7 @@ import type { RequestOption } from '../types/chat.js';
 import { connectToDatabase } from '../db/connection.js';
 import { successResponse, errorResponse } from './_utils/response.js';
 import { getContainer } from '../_clean/di-container.js';
+import { handleOptionsRequest } from './_utils/cors.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -29,6 +30,14 @@ interface GetUserQuery {
 // ============= API 函数 =============
 
 /**
+ * OPTIONS /api/user - 处理预检请求
+ */
+export async function options({ headers }: RequestOption<any, any>) {
+  const origin = headers?.origin;
+  return handleOptionsRequest(origin);
+}
+
+/**
  * POST /api/user - 获取或创建用户
  * 
  * @param data - 请求数据 { userId, metadata? }
@@ -36,18 +45,21 @@ interface GetUserQuery {
  */
 export async function post({
   data,
+  headers,
 }: RequestOption<any, CreateUserData>) {
   try {
+    const requestOrigin = headers?.origin;
+    
     // ✅ 类型检查：确保 data 存在
     if (!data) {
-      return errorResponse('请求数据不能为空');
+      return errorResponse('请求数据不能为空', requestOrigin);
     }
     
     const { userId, metadata } = data;
 
     // 参数验证
     if (!userId) {
-      return errorResponse('userId is required');
+      return errorResponse('userId is required', requestOrigin);
     }
 
     // ✅ Clean Architecture
@@ -60,10 +72,11 @@ export async function post({
       userId: userEntity.userId,
       createdAt: userEntity.createdAt,
       lastActiveAt: userEntity.lastActiveAt
-    });
+    }, undefined, requestOrigin);
   } catch (error: any) {
     console.error('❌ User POST API error:', error);
-    return errorResponse(error.message || 'Failed to process user request');
+    const requestOrigin = (error as any).requestOrigin;
+    return errorResponse(error.message || 'Failed to process user request', requestOrigin);
   }
 }
 
@@ -75,18 +88,21 @@ export async function post({
  */
 export async function get({
   query,
+  headers,
 }: RequestOption<GetUserQuery, any>) {
   try {
+    const requestOrigin = headers?.origin;
+    
     // ✅ 类型检查：确保 query 存在
     if (!query) {
-      return errorResponse('查询参数不能为空');
+      return errorResponse('查询参数不能为空', requestOrigin);
     }
     
     const { userId } = query;
 
     // 参数验证
     if (!userId) {
-      return errorResponse('userId is required');
+      return errorResponse('userId is required', requestOrigin);
     }
 
     // ✅ Clean Architecture
@@ -96,7 +112,7 @@ export async function get({
     const userEntity = await getUserByIdUseCase.execute(userId);
 
     if (!userEntity) {
-      return errorResponse('User not found');
+      return errorResponse('User not found', requestOrigin);
     }
 
     return successResponse({
@@ -104,10 +120,11 @@ export async function get({
       username: userEntity.username,
       createdAt: userEntity.createdAt,
       lastActiveAt: userEntity.lastActiveAt
-    });
+    }, undefined, requestOrigin);
   } catch (error: any) {
     console.error('❌ User GET API error:', error);
-    return errorResponse(error.message || 'Failed to get user');
+    const requestOrigin = (error as any).requestOrigin;
+    return errorResponse(error.message || 'Failed to get user', requestOrigin);
   }
 }
 

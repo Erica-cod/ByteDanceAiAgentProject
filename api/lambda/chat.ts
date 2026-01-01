@@ -12,6 +12,7 @@
 import '../config/env.js';
 import { connectToDatabase } from '../db/connection.js';
 import { errorResponse } from './_utils/response.js';
+import { getCorsHeaders, handleOptionsRequest } from './_utils/cors.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';
 import { getContainer } from '../_clean/di-container.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
@@ -38,13 +39,17 @@ connectToDatabase().catch(console.error);
 function tooManyRequests(
   message: string,
   retryAfterSec: number,
+  requestOrigin?: string,
   queueToken?: string,
   queuePosition?: number,
   estimatedWaitSec?: number
 ) {
+  const corsHeaders = getCorsHeaders(requestOrigin);
+  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json; charset=utf-8',
     'Retry-After': String(retryAfterSec),
+    ...corsHeaders,
   };
 
   if (queueToken) headers['X-Queue-Token'] = queueToken;
@@ -58,17 +63,27 @@ function tooManyRequests(
 }
 
 /**
+ * OPTIONS /api/chat - 处理预检请求
+ */
+export async function options({ headers }: RequestOption<any, any>) {
+  const origin = headers?.origin;
+  return handleOptionsRequest(origin);
+}
+
+/**
  * POST /api/chat - 发送聊天消息（流式响应）
  */
 export async function post({
   data,
+  headers,
 }: RequestOption<any, ChatRequestData>) {
   try {
+    const requestOrigin = headers?.origin;
     console.log('=== 收到聊天请求 ===');
     
     // ✅ 类型检查：确保 data 存在
     if (!data) {
-      return errorResponse('请求数据不能为空');
+      return errorResponse('请求数据不能为空', requestOrigin);
     }
     
     let {
@@ -115,7 +130,7 @@ export async function post({
         
       } catch (error: any) {
         console.error(`❌ [Upload] 处理上传会话失败:`, error);
-        return errorResponse(`上传处理失败: ${error.message}`);
+        return errorResponse(`上传处理失败: ${error.message}`, requestOrigin);
       }
     }
 
@@ -129,11 +144,11 @@ export async function post({
     // ==================== 参数验证 ====================
     if (!message || !message.trim()) {
       console.log('消息内容为空');
-      return errorResponse('消息内容不能为空');
+      return errorResponse('消息内容不能为空', requestOrigin);
     }
 
     if (!userId) {
-      return errorResponse('userId is required');
+      return errorResponse('userId is required', requestOrigin);
     }
 
     // ==================== 并发限制（SSE长连接占位）====================
@@ -145,6 +160,7 @@ export async function post({
       return tooManyRequests(
         slot.reason,
         slot.retryAfterSec,
+        requestOrigin,
         slot.queueToken,
         slot.queuePosition,
         slot.estimatedWaitSec
@@ -290,11 +306,13 @@ export async function post({
           }
         })();
         
+        const corsHeaders = getCorsHeaders(requestOrigin);
         return new Response(readable, {
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
+            ...corsHeaders,
           },
         });
       }
@@ -362,7 +380,7 @@ export async function post({
         // 检查配置
         if (!volcengineService.isConfigured()) {
           console.error('❌ 火山引擎 API 未配置！');
-          return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量');
+          return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
         }
 
         const stream = await callVolcengineModel(messages /* , abortController.signal */);
@@ -380,7 +398,7 @@ export async function post({
           message // 传递原始请求文本用于缓存
         );
       } else {
-        return errorResponse('不支持的模型类型');
+        return errorResponse('不支持的模型类型', requestOrigin);
       }
     } finally {
       // ✅ 没有进入流式返回，就在这里释放名额（避免泄漏）
@@ -390,7 +408,9 @@ export async function post({
     }
   } catch (error: any) {
     console.error('处理聊天请求失败:', error);
-    return errorResponse(error.message || '服务器内部错误');
+    // 注意：这里的 requestOrigin 可能未定义（如果异常发生在早期）
+    const origin = (error as any).requestOrigin;
+    return errorResponse(error.message || '服务器内部错误', origin);
   }
 }
 
