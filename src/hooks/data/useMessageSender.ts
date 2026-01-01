@@ -38,7 +38,8 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
         pendingSync: true,
       };
       addMessage(userMessage);
-      saveToCache();
+      // 异步保存到加密缓存（不阻塞）
+      saveToCache().catch(err => console.error('保存缓存失败:', err));
     }
 
     setLoading(true);

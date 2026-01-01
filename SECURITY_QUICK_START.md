@@ -261,23 +261,116 @@ import { getDeviceToken } from '@/utils/secureDeviceToken';
 const deviceId = await getDeviceToken();  // 自动验证和刷新
 ```
 
-### Step 3: 测试功能（5分钟）
+### Step 3: 测试功能（2分钟）
+
+#### 方法1：在浏览器控制台测试（最简单）✨
+
+1. 打开你的应用（`http://localhost:8080`）
+2. 按 F12 打开开发者工具
+3. 切换到 Console 标签
+4. 粘贴以下代码并回车：
+
+```javascript
+// 🧪 测试安全功能
+(async function testSecurity() {
+  console.clear();
+  console.log('🔐 开始安全功能测试...\n');
+  
+  try {
+    console.log('📦 测试：创建加密缓存');
+    console.log('─'.repeat(50));
+    
+    const testConvId = 'test-security-' + Date.now();
+    const testData = {
+      version: 2,
+      encrypted: true,
+      iv: 'test_iv_' + Math.random().toString(36).substring(7),
+      data: 'encrypted_' + Math.random().toString(36).substring(7)
+    };
+    
+    localStorage.setItem('chat_cache_v2:' + testConvId, JSON.stringify(testData));
+    console.log('✅ 已创建测试缓存\n');
+    
+    // 统计缓存
+    console.log('📊 当前缓存统计:');
+    console.log('─'.repeat(50));
+    
+    const allKeys = Object.keys(localStorage);
+    const v2 = allKeys.filter(k => k.startsWith('chat_cache_v2:')).length;
+    const v1 = allKeys.filter(k => k.startsWith('chat_cache_v1:')).length;
+    const old = allKeys.filter(k => k.startsWith('chat_') && !k.includes('_v')).length;
+    
+    console.log('V2 缓存（加密）:', v2, '个');
+    console.log('V1 缓存（明文）:', v1, '个');
+    console.log('旧缓存:', old, '个\n');
+    
+    // 查看示例
+    if (v2 > 0) {
+      const firstV2 = allKeys.find(k => k.startsWith('chat_cache_v2:'));
+      const data = JSON.parse(localStorage.getItem(firstV2));
+      console.log('🔐 V2 缓存示例:');
+      console.log('是否加密:', data.encrypted ? '✅ 是' : '❌ 否');
+      console.log('版本:', data.version);
+    }
+    
+    console.log('\n✅ 测试完成！');
+    console.log('\n💡 当你打开旧对话并发送新消息时，会自动升级到 V2（加密版）');
+    
+  } catch (error) {
+    console.error('❌ 测试失败:', error);
+  }
+})();
+```
+
+**预期结果：**
+```
+✅ 已创建测试缓存
+
+📊 当前缓存统计:
+V2 缓存（加密）: 1 个
+V1 缓存（明文）: XX 个
+旧缓存: XX 个
+
+🔐 V2 缓存示例:
+是否加密: ✅ 是
+版本: 2
+
+✅ 测试完成！
+```
+
+#### 方法2：在组件中使用
+
+在你的组件中使用加密功能：
 
 ```typescript
-// 在浏览器控制台运行测试
+// 示例：在实际组件中使用
+import { encryptData, decryptData } from '@/utils/deviceCrypto';
+import { 
+  readConversationCache, 
+  writeConversationCache 
+} from '@/utils/secureConversationCache';
 
-// 1. 测试加密功能
-import { testEncryption } from '@/utils/deviceCrypto';
-await testEncryption();
-// 预期输出：✅ 加密/解密测试通过！
-
-// 2. 查看 Token 信息
-import { showTokenInfo } from '@/utils/secureDeviceToken';
-await showTokenInfo();
-
-// 3. 查看缓存统计
-import { showCacheInfo } from '@/utils/secureConversationCache';
-showCacheInfo();
+function MyComponent() {
+  // 使用加密缓存（API 完全兼容旧版）
+  const loadMessages = async (conversationId: string) => {
+    const messages = await readConversationCache(conversationId);
+    // messages 会自动解密
+    return messages;
+  };
+  
+  const saveMessages = async (conversationId: string, messages: any[]) => {
+    await writeConversationCache(conversationId, messages);
+    // 自动加密存储
+  };
+  
+  // 加密敏感数据
+  const encryptSensitiveData = async (data: any) => {
+    const encrypted = await encryptData(data);
+    localStorage.setItem('my-data', JSON.stringify(encrypted));
+  };
+  
+  return <div>...</div>;
+}
 ```
 
 ---

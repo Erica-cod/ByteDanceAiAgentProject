@@ -711,7 +711,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       // 标记消息为成功
       markMessageSuccess(userMessageId);
       markMessageSuccess(assistantMessageId);
-      saveToCache();
+      // 异步保存到加密缓存（不阻塞）
+      saveToCache().catch(err => console.error('保存缓存失败:', err));
 
       // 更新对话列表中的消息计数
       if (conversationId && messageCountRefs) {

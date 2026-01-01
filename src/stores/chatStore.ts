@@ -5,7 +5,7 @@ import {
   writeConversationCache,
   mergeServerMessagesWithCache,
   type CachedMessage,
-} from '../utils/conversationCache';
+} from '../utils/secureConversationCache';
 import { getUserId } from '../utils/userManager';
 import { getConversationMessages, type Conversation } from '../utils/conversationAPI';
 import { createEventManager } from '../utils/eventManager';
@@ -63,7 +63,7 @@ interface ChatState {
   // 异步 Actions
   loadConversation: (convId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
-  saveToCache: () => void;
+  saveToCache: () => Promise<void>;
 }
 
 // ⚠️ 内存保护：单个对话最多保留的消息数量
@@ -166,8 +166,8 @@ export const useChatStore = create<ChatState>()(
         console.log('从缓存加载对话:', convId);
         const { userId } = get();
 
-        // 1️⃣ 先读本地缓存（秒开）- 复用现有函数
-        const cached = readConversationCache(convId);
+        // 1️⃣ 先读本地缓存（秒开）- 复用现有函数（加密版）
+        const cached = await readConversationCache(convId);
         if (cached.length > 0) {
           const cachedMessages: Message[] = cached.map((m) => ({
             id: m.id,
@@ -241,8 +241,8 @@ export const useChatStore = create<ChatState>()(
           hasMoreMessages: needLoadMore,
         });
 
-        // 4️⃣ 写回缓存 - 复用现有函数
-        writeConversationCache(convId, merged);
+        // 4️⃣ 写回缓存 - 复用现有函数（加密版）
+        await writeConversationCache(convId, merged);
       } catch (error) {
         console.error('加载对话失败:', error);
         set({
@@ -298,7 +298,7 @@ export const useChatStore = create<ChatState>()(
     },
 
     // 保存到缓存（调用现有工具）
-    saveToCache: () => {
+    saveToCache: async () => {
       const { conversationId, messages } = get();
       if (!conversationId) return;
 
@@ -313,8 +313,8 @@ export const useChatStore = create<ChatState>()(
         pendingSync: m.pendingSync,
       }));
 
-      // ✅ 复用现有函数
-      writeConversationCache(conversationId, cached);
+      // ✅ 复用现有函数（加密版）
+      await writeConversationCache(conversationId, cached);
     },
   }))
 );
