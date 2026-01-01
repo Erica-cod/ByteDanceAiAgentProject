@@ -101,7 +101,29 @@ async function createIndexes() {
       { unique: true, name: 'session_unique_index' }
     );
 
-    console.log('✅ Database indexes created (包括多Agent会话TTL索引)');
+    // ✅ Stream Progress collection indexes (续流功能)
+    // 消息ID索引（唯一）
+    await db.collection('stream_progress').createIndex(
+      { messageId: 1 },
+      { unique: true, name: 'message_id_unique' }
+    );
+    // 用户ID索引
+    await db.collection('stream_progress').createIndex(
+      { userId: 1 },
+      { name: 'user_id_index' }
+    );
+    // 会话ID索引
+    await db.collection('stream_progress').createIndex(
+      { conversationId: 1 },
+      { name: 'conversation_id_index' }
+    );
+    // TTL索引：30分钟后自动清理
+    await db.collection('stream_progress').createIndex(
+      { lastUpdateAt: 1 },
+      { expireAfterSeconds: 1800, name: 'stream_progress_ttl' }
+    );
+
+    console.log('✅ Database indexes created (包括多Agent会话TTL索引 + 续流进度TTL索引)');
   } catch (error) {
     console.error('❌ Failed to create indexes:', error);
   }

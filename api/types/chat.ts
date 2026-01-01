@@ -15,7 +15,11 @@ export interface ChatRequestData {
   clientUserMessageId?: string; // 前端生成的用户消息ID
   clientAssistantMessageId?: string; // 前端生成的 assistant 占位消息ID
   queueToken?: string; // 队列 token
-  resumeFromRound?: number; // 断点续传：从指定轮次恢复
+  resumeFromRound?: number; // 断点续传：从指定轮次恢复（MultiAgent）
+  resumeFrom?: {  // ✅ 新增：续流参数（SingleAgent）
+    messageId: string;  // 要续传的消息ID
+    position: number;   // 前端已接收的字符位置
+  };
   uploadSessionId?: string;  // ✅ 新增：上传会话ID（用于分片/压缩上传）
   isCompressed?: boolean;    // ✅ 新增：是否压缩
   longTextMode?: 'off' | 'plan_review' | 'summarize_only' | 'summarize_then_qa';  // 超长文本处理模式

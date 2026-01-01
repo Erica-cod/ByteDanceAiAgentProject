@@ -18,6 +18,7 @@ import {
   createLocalControlledWriter,
   createRemoteControlledWriter
 } from '../_clean/infrastructure/streaming/controlled-sse-writer.js';
+import { StreamProgressManager } from '../_clean/infrastructure/streaming/stream-progress-manager.js';
 
 /**
  * 处理火山引擎流式响应并转换为 SSE 格式
@@ -46,6 +47,19 @@ export async function handleVolcanoStream(
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
 
+  // ✅ 流式进度管理器（用于续流）
+  const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
+  const container = getContainer();
+  const streamProgressRepo = container.getStreamProgressRepository();
+  const progressManager = new StreamProgressManager(streamProgressRepo, {
+    updateIntervalMs: 1000,  // 每1秒更新一次
+    updateCharThreshold: 100, // 或每100字符更新一次
+  });
+
+  // ⚠️ 内存保护：单个响应最大长度限制（防止内存溢出）
+  const MAX_RESPONSE_LENGTH = 100000; // 100KB，约5万字
+  let isMemoryLimitExceeded = false;
+
   // 异步处理流
   (async () => {
     try {
@@ -59,20 +73,6 @@ export async function handleVolcanoStream(
       sseWriter.startHeartbeat(15000);
 
       for await (const chunk of stream) {
-        // ✅ 关键修复：检测连接断开，立即停止读取
-        if (sseWriter.isClosed()) {
-          console.log('⚠️  [Volcano] 客户端已断开，停止读取模型流');
-          // 主动中断上游流（Web Streams API）
-          try {
-            const readableStream = stream as any;
-            if (readableStream.cancel && typeof readableStream.cancel === 'function') {
-              await readableStream.cancel();
-            }
-          } catch (e) {
-            // 忽略取消错误
-          }
-          return;
-        }
         const chunkStr = chunk.toString();
         buffer += chunkStr;
         
@@ -85,25 +85,64 @@ export async function handleVolcanoStream(
             
             if (content) {
               accumulatedText += content;
+              
+              // 🛡️ 内存保护：检查是否超过限制
+              if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
+                if (!isMemoryLimitExceeded) {
+                  console.warn(`⚠️  [Volcano] 响应长度超过限制 (${MAX_RESPONSE_LENGTH} 字符)，停止累积`);
+                  isMemoryLimitExceeded = true;
+                  
+                  // 提取thinking用于保存
+                  const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
+                  
+                  // 最后一次保存到 MongoDB
+                  await progressManager.updateProgress(
+                    messageId,
+                    accumulatedText + '\n\n[响应过长，已截断]',
+                    {
+                      userId,
+                      conversationId,
+                      modelType,
+                      thinking: thinkingPart,
+                      sources: searchSources,
+                    },
+                    true // 强制更新
+                  );
+                }
+                continue; // 跳过后续内容
+              }
+              
               const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
 
-              // ✅ 使用受控发送（带打字机效果和背压检测）
-              await controlledWriter.sendEvent(mainContent, {
-                thinking: thinking || undefined,
-              });
+              // ✅ 尝试发送给前端（如果连接还在）
+              if (!sseWriter.isClosed()) {
+                await controlledWriter.sendEvent(mainContent, {
+                  thinking: thinking || undefined,
+                });
+              } else {
+                // 🔥 关键：前端断开，但继续累积（不中断模型）
+                console.log('⚠️  [Volcano] 前端断开，继续累积模型输出（续流模式）');
+              }
+
+              // ✅ 批量更新进度到 MongoDB（用于续流）
+              await progressManager.updateProgress(
+                messageId,
+                accumulatedText,
+                {
+                  userId,
+                  conversationId,
+                  modelType,
+                  thinking,
+                  sources: searchSources,
+                }
+              );
             }
 
             // 检查是否完成
             if (line.includes('[DONE]')) {
               console.log('✅ 火山引擎流式响应完成');
               
-              // ✅ 在工具调用前检查连接
-              if (sseWriter.isClosed()) {
-                console.log('⚠️  [Volcano] 完成前客户端已断开，跳过工具调用');
-                return;
-              }
-              
-              // 多工具调用工作流（传递连接检查器）
+              // 🔥 多工具调用工作流（即使前端断开也要执行，因为需要完整内容）
               const workflowResult = await processToolCallWorkflow(
                 accumulatedText,
                 userId,
@@ -120,11 +159,15 @@ export async function handleVolcanoStream(
               // 最终处理和保存
               if (accumulatedText) {
                 const { thinking, content } = extractThinkingAndContent(accumulatedText);
-                await sseWriter.sendEvent({
-                  content: content || accumulatedText,
-                  thinking: thinking || undefined,
-                  sources: searchSources || undefined,
-                });
+                
+                // 尝试发送最终结果（如果前端还连接着）
+                if (!sseWriter.isClosed()) {
+                  await sseWriter.sendEvent({
+                    content: content || accumulatedText,
+                    thinking: thinking || undefined,
+                    sources: searchSources || undefined,
+                  });
+                }
                 
                 // 保存到数据库和缓存
                 await saveMessage(
@@ -138,6 +181,15 @@ export async function handleVolcanoStream(
                   requestText // 传递请求文本用于缓存
                 );
                 messageSaved = true;
+
+                // ✅ 标记流式进度为完成
+                await progressManager.markCompleted(
+                  messageId,
+                  content || accumulatedText,
+                  thinking,
+                  searchSources
+                );
+                console.log('✅ [StreamProgress] 标记为完成');
               }
               
               await sseWriter.close();
@@ -228,6 +280,19 @@ export async function handleLocalStream(
   let messageSaved = false;
   const originalRequestText = requestText; // 保存原始请求文本
 
+  // ✅ 流式进度管理器（用于续流）
+  const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
+  const container = getContainer();
+  const streamProgressRepo = container.getStreamProgressRepository();
+  const progressManager = new StreamProgressManager(streamProgressRepo, {
+    updateIntervalMs: 1000,
+    updateCharThreshold: 100,
+  });
+
+  // ⚠️ 内存保护：单个响应最大长度限制
+  const MAX_RESPONSE_LENGTH = 100000; // 100KB，约5万字
+  let isMemoryLimitExceeded = false;
+
   // 异步处理流
   (async () => {
     try {
@@ -241,20 +306,6 @@ export async function handleLocalStream(
       sseWriter.startHeartbeat(15000);
       
       for await (const chunk of stream) {
-        // ✅ 关键修复：检测连接断开，立即停止读取
-        if (sseWriter.isClosed()) {
-          console.log('⚠️  [Local] 客户端已断开，停止读取模型流');
-          // 主动中断上游流
-          try {
-            const readableStream = stream as any;
-            if (readableStream.cancel && typeof readableStream.cancel === 'function') {
-              await readableStream.cancel();
-            }
-          } catch (e) {
-            // 忽略取消错误
-          }
-          return;
-        }
         const chunkStr = chunk.toString();
         buffer += chunkStr;
         
@@ -268,12 +319,55 @@ export async function handleLocalStream(
 
               if (jsonData.message && jsonData.message.content !== undefined) {
                 accumulatedText += jsonData.message.content;
+                
+                // 🛡️ 内存保护：检查是否超过限制
+                if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
+                  if (!isMemoryLimitExceeded) {
+                    console.warn(`⚠️  [Local] 响应长度超过限制 (${MAX_RESPONSE_LENGTH} 字符)，停止累积`);
+                    isMemoryLimitExceeded = true;
+                    
+                    const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
+                    
+                    await progressManager.updateProgress(
+                      messageId,
+                      accumulatedText + '\n\n[响应过长，已截断]',
+                      {
+                        userId,
+                        conversationId,
+                        modelType,
+                        thinking: thinkingPart,
+                        sources: searchSources,
+                      },
+                      true
+                    );
+                  }
+                  continue;
+                }
+                
                 const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-                // ✅ 使用受控发送（带打字机效果和背压检测）
-                await controlledWriter.sendEvent(content, {
-                  thinking: thinking || undefined,
-                });
+                // ✅ 尝试发送给前端（如果连接还在）
+                if (!sseWriter.isClosed()) {
+                  await controlledWriter.sendEvent(content, {
+                    thinking: thinking || undefined,
+                  });
+                } else {
+                  // 🔥 关键：前端断开，但继续累积（不中断模型）
+                  console.log('⚠️  [Local] 前端断开，继续累积模型输出（续流模式）');
+                }
+
+                // ✅ 批量更新进度到 MongoDB
+                await progressManager.updateProgress(
+                  messageId,
+                  accumulatedText,
+                  {
+                    userId,
+                    conversationId,
+                    modelType,
+                    thinking,
+                    sources: searchSources,
+                  }
+                );
               }
 
               if (jsonData.done) {
@@ -316,20 +410,6 @@ export async function handleLocalStream(
                   
                   // 继续处理新的流
                   for await (const newChunk of newStream) {
-                    // ✅ 二次调用中也要检查连接
-                    if (sseWriter.isClosed()) {
-                      console.log('⚠️  [Local] 二次调用期间客户端已断开');
-                      try {
-                        const readableStream = newStream as any;
-                        if (readableStream.cancel && typeof readableStream.cancel === 'function') {
-                          await readableStream.cancel();
-                        }
-                      } catch (e) {
-                        // 忽略取消错误
-                      }
-                      return;
-                    }
-                    
                     const newChunkStr = newChunk.toString();
                     buffer += newChunkStr;
                     
@@ -343,12 +423,54 @@ export async function handleLocalStream(
 
                           if (newJsonData.message && newJsonData.message.content !== undefined) {
                             accumulatedText += newJsonData.message.content;
+                            
+                            // 🛡️ 内存保护
+                            if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
+                              if (!isMemoryLimitExceeded) {
+                                console.warn(`⚠️  [Local] 二次调用响应长度超过限制，停止累积`);
+                                isMemoryLimitExceeded = true;
+                                
+                                const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
+                                
+                                await progressManager.updateProgress(
+                                  messageId,
+                                  accumulatedText + '\n\n[响应过长，已截断]',
+                                  {
+                                    userId,
+                                    conversationId,
+                                    modelType,
+                                    thinking: thinkingPart,
+                                    sources: searchSources,
+                                  },
+                                  true
+                                );
+                              }
+                              continue;
+                            }
+                            
                             const { thinking, content } = extractThinkingAndContent(accumulatedText);
 
-                            // ✅ 使用受控发送（带打字机效果和背压检测）
-                            await controlledWriter.sendEvent(content, {
-                              thinking: thinking || undefined,
-                            });
+                            // ✅ 尝试发送（如果连接还在）
+                            if (!sseWriter.isClosed()) {
+                              await controlledWriter.sendEvent(content, {
+                                thinking: thinking || undefined,
+                              });
+                            } else {
+                              console.log('⚠️  [Local] 二次调用期间前端断开，继续累积（续流模式）');
+                            }
+
+                            // ✅ 更新进度
+                            await progressManager.updateProgress(
+                              messageId,
+                              accumulatedText,
+                              {
+                                userId,
+                                conversationId,
+                                modelType,
+                                thinking,
+                                sources: searchSources,
+                              }
+                            );
                           }
 
                           if (newJsonData.done) {
@@ -365,11 +487,15 @@ export async function handleLocalStream(
                 // 最终处理和保存
                 if (accumulatedText) {
                   const { thinking, content } = extractThinkingAndContent(accumulatedText);
-                  await sseWriter.sendEvent({
-                    content: content || accumulatedText,
-                    thinking: thinking || undefined,
-                    sources: searchSources || undefined,
-                  });
+                  
+                  // 尝试发送最终结果（如果前端还连接着）
+                  if (!sseWriter.isClosed()) {
+                    await sseWriter.sendEvent({
+                      content: content || accumulatedText,
+                      thinking: thinking || undefined,
+                      sources: searchSources || undefined,
+                    });
+                  }
                   
                   // 保存到数据库和缓存
                   await saveMessage(
@@ -383,6 +509,15 @@ export async function handleLocalStream(
                     originalRequestText // 传递请求文本用于缓存
                   );
                   messageSaved = true;
+
+                  // ✅ 标记流式进度为完成
+                  await progressManager.markCompleted(
+                    messageId,
+                    content || accumulatedText,
+                    thinking,
+                    searchSources
+                  );
+                  console.log('✅ [StreamProgress] 标记为完成');
                 }
                 
                 await sseWriter.close();

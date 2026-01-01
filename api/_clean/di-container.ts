@@ -89,6 +89,10 @@ import { GetCachedResponseUseCase } from './application/use-cases/request-cache/
 import { CleanupExpiredCachesUseCase } from './application/use-cases/request-cache/cleanup-expired-caches.use-case.js';
 import { GetCacheStatsUseCase } from './application/use-cases/request-cache/get-cache-stats.use-case.js';
 
+// Import interfaces and implementations - Stream Progress
+import type { IStreamProgressRepository } from './application/interfaces/repositories/stream-progress.repository.interface.js';
+import { StreamProgressRepository } from './infrastructure/repositories/stream-progress.repository.js';
+
 /**
  * 简单的 DI 容器
  */
@@ -555,6 +559,26 @@ class SimpleContainer {
    */
   async ensureRequestCacheIndexes(): Promise<void> {
     const repo = this.getRequestCacheRepository();
+    await repo.ensureIndexes();
+  }
+
+  // ====================== Stream Progress Module ======================
+
+  /**
+   * 获取或创建 Stream Progress Repository（单例）
+   */
+  getStreamProgressRepository(): IStreamProgressRepository {
+    if (!this.instances.has('StreamProgressRepository')) {
+      this.instances.set('StreamProgressRepository', new StreamProgressRepository());
+    }
+    return this.instances.get('StreamProgressRepository');
+  }
+
+  /**
+   * 确保 Stream Progress 索引存在（初始化时调用）
+   */
+  async ensureStreamProgressIndexes(): Promise<void> {
+    const repo = this.getStreamProgressRepository();
     await repo.ensureIndexes();
   }
 }

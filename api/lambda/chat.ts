@@ -20,11 +20,12 @@ import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/ll
 import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { handleMultiAgentMode } from '../handlers/multiAgentHandler.js';
 import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentHandler.js';
+import { handleResumeRequest } from '../handlers/resumeHandler.js';
+import { handleCacheRequest } from '../handlers/cacheHandler.js';
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
-import { requestCacheService } from '../_clean/infrastructure/cache/request-cache.service.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -82,6 +83,7 @@ export async function post({
       queueToken,
       uploadSessionId,
       isCompressed,
+      resumeFrom, // 续流参数：{ messageId, position }
     } = data;
 
     // ✅ Clean Architecture: 处理上传会话（压缩或分片上传）
@@ -149,6 +151,9 @@ export async function post({
       );
     }
 
+    // 获取 release 函数
+    const release = slot.release;
+
     // 是否已把 release"交接"给流式处理
     let handoffToStream = false;
 
@@ -168,6 +173,13 @@ export async function post({
         );
         conversationId = conversationEntity.conversationId;
         console.log('✅ Created new conversation:', conversationId);
+      }
+
+      // ==================== 续流请求处理 ====================
+      const resumeResponse = await handleResumeRequest(resumeFrom, release);
+      if (resumeResponse) {
+        handoffToStream = true;
+        return resumeResponse;
       }
 
       // ✅ Clean Architecture: 保存用户消息到数据库
@@ -201,140 +213,18 @@ export async function post({
       }
 
       // ==================== 缓存检查 ====================
-      // 在处理请求前，先检查是否有缓存的响应（仅对单Agent模式）
-      if (mode !== 'multi_agent' && requestCacheService.isAvailable()) {
-        console.log('🔍 [Cache] 检查缓存...');
-        
-        try {
-          const cachedResponse = await requestCacheService.findCachedResponse(
-            message,
-            userId,
-            {
-              modelType,
-              mode: mode || 'single',
-              similarityThreshold: 0.95, // 95% 相似度阈值
-            }
-          );
-
-          if (cachedResponse) {
-            console.log('🎯 [Cache] 缓存命中！使用打字机效果返回缓存的响应');
-            
-            // 创建 SSE 流返回缓存内容
-            const { readable, writable } = new TransformStream();
-            const writer = writable.getWriter();
-            const sseWriter = new SSEStreamWriter(writer);
-            
-            // ✅ 使用受控 SSE Writer（根据模型类型选择配置）
-            const { 
-              createLocalControlledWriter, 
-              createRemoteControlledWriter 
-            } = await import('../_clean/infrastructure/streaming/controlled-sse-writer.js');
-            
-            const controlledWriter = modelType === 'local'
-              ? createLocalControlledWriter(sseWriter)  // 本地：20ms/字符
-              : createRemoteControlledWriter(sseWriter); // 远程：40ms/字符
-            
-            handoffToStream = true;
-            
-            // 异步发送缓存内容
-            (async () => {
-              try {
-                // 发送初始化事件（直接发送）
-                await controlledWriter.sendDirect({
-                  conversationId,
-                  type: 'init',
-                  mode: 'cached',
-                  cached: true,
-                  cacheHitCount: cachedResponse.hitCount,
-                });
-                
-                // 启动心跳
-                sseWriter.startHeartbeat(15000);
-                
-                // ✅ 使用打字机效果逐步推送缓存内容
-                const content = cachedResponse.content;
-                const chunkSize = 10; // 每次增加10个字符
-                
-                for (let i = chunkSize; i <= content.length; i += chunkSize) {
-                  // 检查连接是否关闭
-                  if (controlledWriter.isClosed()) {
-                    console.warn('⚠️  [Cache] 客户端已断开');
-                    break;
-                  }
-                  
-                  // 使用 sendEvent 发送内容（带打字机效果和背压检测）
-                  await controlledWriter.sendEvent(
-                    content.slice(0, i),
-                    {
-                      thinking: cachedResponse.thinking,
-                    }
-                  );
-                }
-                
-                // 发送最后的完整内容（确保没有遗漏）
-                if (!controlledWriter.isClosed()) {
-                  await controlledWriter.sendEvent(content, {
-                    thinking: cachedResponse.thinking,
-                  });
-                }
-                
-                // 输出统计信息
-                controlledWriter.logStats();
-                
-                // 保存助手消息到数据库
-                try {
-                  const createMessageUseCase = container.getCreateMessageUseCase();
-                  const updateConversationUseCase = container.getUpdateConversationUseCase();
-                  
-                  await createMessageUseCase.execute(
-                    conversationId,
-                    userId,
-                    'assistant',
-                    cachedResponse.content,
-                    clientAssistantMessageId,
-                    modelType,
-                    cachedResponse.thinking
-                  );
-                  
-                  const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
-                  if (conversation) {
-                    await updateConversationUseCase.execute(
-                      conversationId,
-                      userId,
-                      { messageCount: conversation.messageCount + 1 }
-                    );
-                  }
-                  
-                  console.log('✅ [Cache] 缓存的消息已保存到数据库');
-                } catch (dbError) {
-                  console.error('❌ [Cache] 保存缓存消息失败:', dbError);
-                }
-                
-                await sseWriter.close();
-              } catch (error: any) {
-                console.error('❌ [Cache] 发送缓存内容失败:', error);
-                await sseWriter.close();
-              } finally {
-                slot.release();
-              }
-            })();
-            
-            return new Response(readable, {
-              headers: {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                'X-Cache-Hit': 'true',
-                'X-Cache-Hit-Count': String(cachedResponse.hitCount),
-              },
-            });
-          } else {
-            console.log('📭 [Cache] 没有找到缓存，继续正常处理');
-          }
-        } catch (error: any) {
-          console.error('⚠️  [Cache] 缓存查找失败，继续正常处理:', error);
-          // 缓存失败不影响主流程
-        }
+      const cacheResponse = await handleCacheRequest(
+        message,
+        userId,
+        conversationId,
+        modelType,
+        mode,
+        clientAssistantMessageId,
+        release
+      );
+      if (cacheResponse) {
+        handoffToStream = true;
+        return cacheResponse;
       }
 
       // ==================== 超长文本 Chunking 模式 ====================
