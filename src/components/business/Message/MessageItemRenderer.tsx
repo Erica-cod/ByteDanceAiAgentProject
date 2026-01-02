@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
-import StreamingMarkdown from '../../old-structure/StreamingMarkdown';
+import StreamingMarkdown from './StreamingMarkdown';
 import MultiAgentDisplay from '../../old-structure/MultiAgentDisplay';
 import { ProgressiveMessageRefactored } from './ProgressiveMessageRefactored';
 import type { Message } from '../../../stores/chatStore';

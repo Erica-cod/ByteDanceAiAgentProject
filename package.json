@@ -35,6 +35,7 @@
     "test:redis:optimization": "node test/test-redis-optimization.js",
     "test:refactored": "node test/test-refactored-code.js",
     "test:refactored:files": "node test/test-refactored-files.js",
+    "test:markdown": "tsx src/utils/__tests__/markdownFixer.test.ts",
     "test:all": "node test-volcengine.js && node test-planning-tools.js"
   },
   "dependencies": {

@@ -1,0 +1,311 @@
+/* StreamingMarkdown 组件样式 */
+
+.streaming-markdown {
+  width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Markdown 内容样式优化 */
+.streaming-markdown,
+.fallback-markdown {
+  line-height: 1.6;
+  color: #333;
+}
+
+.streaming-markdown h1,
+.fallback-markdown h1 {
+  font-size: 1.8em;
+  font-weight: bold;
+  margin: 0.67em 0;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eaecef;
+}
+
+.streaming-markdown h2,
+.fallback-markdown h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.75em 0;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eaecef;
+}
+
+.streaming-markdown h3,
+.fallback-markdown h3 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+
+.streaming-markdown h4,
+.fallback-markdown h4 {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  color: #555;
+}
+
+.streaming-markdown p,
+.fallback-markdown p {
+  margin: 0.8em 0;
+  line-height: 1.7;
+}
+
+.streaming-markdown ul,
+.streaming-markdown ol,
+.fallback-markdown ul,
+.fallback-markdown ol {
+  margin: 0.8em 0;
+  padding-left: 2em;
+}
+
+.streaming-markdown li,
+.fallback-markdown li {
+  margin: 0.3em 0;
+  line-height: 1.6;
+}
+
+/* 代码块样式 */
+.streaming-markdown pre,
+.fallback-markdown pre {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  margin: 1em 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  line-height: 1.45;
+}
+
+.streaming-markdown code,
+.fallback-markdown code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+/* 行内代码样式 */
+.streaming-markdown p code,
+.streaming-markdown li code,
+.streaming-markdown .inline-code,
+.fallback-markdown .inline-code {
+  background-color: rgba(175, 184, 193, 0.2);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: #e01e5a;
+}
+
+/* 表格样式 */
+.streaming-markdown table,
+.fallback-markdown table,
+.table-wrapper table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  overflow: auto;
+}
+
+.streaming-markdown th,
+.streaming-markdown td,
+.fallback-markdown th,
+.fallback-markdown td,
+.table-wrapper th,
+.table-wrapper td {
+  border: 1px solid #dfe2e5;
+  padding: 6px 13px;
+  text-align: left;
+}
+
+.streaming-markdown th,
+.fallback-markdown th,
+.table-wrapper th {
+  font-weight: bold;
+  background-color: #f6f8fa;
+}
+
+/* 引用样式 */
+.streaming-markdown blockquote,
+.fallback-markdown blockquote {
+  border-left: 4px solid #dfe2e5;
+  padding: 0 1em;
+  margin: 1em 0;
+  color: #6a737d;
+  background-color: #f6f8fa;
+}
+
+/* 水平线 */
+.streaming-markdown hr,
+.fallback-markdown hr {
+  border: none;
+  border-top: 2px solid #e1e4e8;
+  margin: 1.5em 0;
+}
+
+/* 图片样式 */
+.streaming-markdown img,
+.fallback-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+
+/* 链接样式 */
+.streaming-markdown a,
+.fallback-markdown a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.streaming-markdown a:hover,
+.fallback-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* 粗体 */
+.streaming-markdown strong,
+.fallback-markdown strong {
+  font-weight: 600;
+}
+
+/* 斜体 */
+.streaming-markdown em,
+.fallback-markdown em {
+  font-style: italic;
+}
+
+/* 删除线 */
+.streaming-markdown del,
+.fallback-markdown del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* 任务列表 */
+.streaming-markdown input[type="checkbox"],
+.fallback-markdown input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+/* 通用优化：防止内容溢出 */
+.streaming-markdown *,
+.fallback-markdown * {
+  max-width: 100%;
+}
+
+/* 列表项中的段落（避免换行） */
+.list-item-text {
+  display: inline;
+}
+
+/* 表格容器（支持横向滚动） */
+.table-wrapper {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+/* 备用渲染器样式（与 react-markdown 保持一致） */
+.fallback-markdown.fallback-mode {
+  /* 与正常模式保持一致的样式 */
+}
+
+/* 错误降级提示 */
+.markdown-error-notice {
+  font-size: 0.85em;
+  color: #856404;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-top: 8px;
+}
+
+.markdown-error-notice.severe-error {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+/* 纯文本降级输出 */
+.markdown-plain-text-fallback {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: #212529;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* 代码块语言标签样式 */
+.streaming-markdown pre code[class*="language-"],
+.fallback-markdown pre code[class*="language-"] {
+  display: block;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .streaming-markdown,
+  .fallback-markdown {
+    font-size: 0.95em;
+  }
+  
+  .streaming-markdown h1,
+  .fallback-markdown h1 {
+    font-size: 1.5em;
+  }
+  
+  .streaming-markdown h2,
+  .fallback-markdown h2 {
+    font-size: 1.3em;
+  }
+  
+  .streaming-markdown pre,
+  .fallback-markdown pre {
+    padding: 12px;
+    font-size: 0.85em;
+  }
+}
+
+/* 暗色模式支持（可选） */
+@media (prefers-color-scheme: dark) {
+  .streaming-markdown,
+  .fallback-markdown {
+    color: #e4e4e4;
+  }
+  
+  .streaming-markdown pre,
+  .fallback-markdown pre,
+  .streaming-markdown th,
+  .fallback-markdown th {
+    background-color: #2d2d2d;
+  }
+  
+  .streaming-markdown code,
+  .fallback-markdown code {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .streaming-markdown blockquote,
+  .fallback-markdown blockquote {
+    background-color: #2d2d2d;
+    border-left-color: #4d4d4d;
+    color: #b4b4b4;
+  }
+  
+  .streaming-markdown table th,
+  .streaming-markdown table td,
+  .fallback-markdown table th,
+  .fallback-markdown table td {
+    border-color: #4d4d4d;
+  }
+}
+
