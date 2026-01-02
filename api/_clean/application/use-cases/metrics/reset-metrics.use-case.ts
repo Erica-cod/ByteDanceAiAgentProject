@@ -4,12 +4,19 @@
  * 职责：
  * - 协调重置性能指标的业务流程
  * - 清空所有指标数据
+ * 
+ * 使用 @Service 和 @Inject 装饰器实现依赖注入
  */
 
+import { Service, Inject } from '../../../shared/decorators/index.js';
 import { IMetricsRepository } from '../../interfaces/repositories/metrics.repository.interface.js';
 
+@Service() // 使用装饰器标记为可注入的服务
+@Inject(['IMetricsRepository']) // 声明依赖的 token 数组
 export class ResetMetricsUseCase {
-  constructor(private metricsRepository: IMetricsRepository) {}
+  constructor(
+    private metricsRepository: IMetricsRepository
+  ) {}
 
   /**
    * 执行重置指标

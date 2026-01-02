@@ -310,11 +310,15 @@ class SimpleContainer {
   }
 
   /**
-   * 创建 CleanupExpiredDevicesUseCase（每次新实例）
+   * 获取或创建 CleanupExpiredDevicesUseCase（单例）
+   * 🔒 单例模式：防止创建多个定期清理任务
    */
   getCleanupExpiredDevicesUseCase(): CleanupExpiredDevicesUseCase {
-    const repo = this.getDeviceRepository();
-    return new CleanupExpiredDevicesUseCase(repo);
+    if (!this.instances.has('CleanupExpiredDevicesUseCase')) {
+      const repo = this.getDeviceRepository();
+      this.instances.set('CleanupExpiredDevicesUseCase', new CleanupExpiredDevicesUseCase(repo));
+    }
+    return this.instances.get('CleanupExpiredDevicesUseCase');
   }
 
   // ==================== Metrics Module ====================

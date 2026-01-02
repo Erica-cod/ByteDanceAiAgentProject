@@ -5,8 +5,11 @@
  * - 协调记录各类性能指标的业务流程
  * - 调用仓储层获取指标实例
  * - 执行指标记录操作
+ * 
+ * 使用 @Service 和 @Inject 装饰器实现依赖注入
  */
 
+import { Service, Inject } from '../../../shared/decorators/index.js';
 import { IMetricsRepository } from '../../interfaces/repositories/metrics.repository.interface.js';
 
 export type MetricType = 
@@ -26,8 +29,12 @@ export interface RecordMetricParams {
   tokensUsed?: number;
 }
 
+@Service() // 使用装饰器标记为可注入的服务
+@Inject(['IMetricsRepository']) // 声明依赖的 token 数组
 export class RecordMetricUseCase {
-  constructor(private metricsRepository: IMetricsRepository) {}
+  constructor(
+    private metricsRepository: IMetricsRepository
+  ) {}
 
   /**
    * 执行记录指标

@@ -4,11 +4,15 @@
  * 职责：
  * - 使用内存存储性能指标数据（单例模式）
  * - 管理指标实体的生命周期
+ * 
+ * 使用 @Repository 装饰器标记为可注入的仓储类
  */
 
+import { Repository } from '../../shared/decorators/index.js';
 import { IMetricsRepository } from '../../application/interfaces/repositories/metrics.repository.interface.js';
 import { MetricsEntity } from '../../domain/entities/metrics.entity.js';
 
+@Repository() // 使用装饰器标记为可注入的仓储
 export class InMemoryMetricsRepository implements IMetricsRepository {
   private metricsInstance: MetricsEntity | null = null;
 
