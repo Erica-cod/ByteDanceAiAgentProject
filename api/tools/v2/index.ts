@@ -19,6 +19,12 @@ export {
   getPlanPlugin,
   listPlansPlugin,
 } from './plugins/plan-tools.plugin.js';
+export {
+  getCurrentTimePlugin,
+  calculateDatePlugin,
+  parseNaturalDatePlugin,
+  compareDatesPlugin,
+} from './plugins/time-tools.plugin.js';
 
 // ============ 快速初始化 ============
 import { toolRegistry } from './core/tool-registry.js';
@@ -32,6 +38,12 @@ import {
   getPlanPlugin,
   listPlansPlugin,
 } from './plugins/plan-tools.plugin.js';
+import {
+  getCurrentTimePlugin,
+  calculateDatePlugin,
+  parseNaturalDatePlugin,
+  compareDatesPlugin,
+} from './plugins/time-tools.plugin.js';
 
 /**
  * 初始化工具系统
@@ -48,6 +60,10 @@ export function initializeToolSystem(): void {
     updatePlanPlugin,
     getPlanPlugin,
     listPlansPlugin,
+    getCurrentTimePlugin,
+    calculateDatePlugin,
+    parseNaturalDatePlugin,
+    compareDatesPlugin,
   ];
 
   plugins.forEach(plugin => {
