@@ -7,13 +7,35 @@
  * npx tsx test/test-tool-fallback-redis.js
  */
 
-// 加载环境变量
+// ⚠️ 必须先加载环境变量再导入模块！
 import dotenv from 'dotenv';
-dotenv.config();
+import { existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-import { toolRegistry, toolExecutor, cacheManager } from '../api/tools/v2/index.js';
-import { searchWebPlugin } from '../api/tools/v2/plugins/search-web.plugin.js';
-import { getRedisClient, isRedisAvailable } from '../api/_clean/infrastructure/cache/redis-client.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, '..');
+
+// 优先加载 .env.local
+if (existsSync(join(rootDir, '.env.local'))) {
+  dotenv.config({ path: join(rootDir, '.env.local') });
+  console.log('📄 加载环境变量: .env.local');
+} else {
+  dotenv.config();
+  console.log('📄 加载环境变量: .env');
+}
+
+// 验证环境变量
+console.log('🔍 Redis 配置检查:');
+console.log(`   REDIS_HOST: ${process.env.REDIS_HOST || '未设置'}`);
+console.log(`   REDIS_PORT: ${process.env.REDIS_PORT || '未设置'}`);
+console.log(`   REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? '已设置 (***' + process.env.REDIS_PASSWORD.slice(-4) + ')' : '未设置'}`);
+
+// 动态导入（确保在环境变量加载后）
+const { toolRegistry, toolExecutor, cacheManager } = await import('../api/tools/v2/index.js');
+const { searchWebPlugin } = await import('../api/tools/v2/plugins/search-web.plugin.js');
+const { getRedisClient, isRedisAvailable } = await import('../api/_clean/infrastructure/cache/redis-client.js');
 
 async function testFallbackAndRedisCache() {
   console.log('\n🧪 ===== 测试工具降级机制和 Redis 缓存 =====\n');
