@@ -25,6 +25,7 @@ console.log(`🔧 Ollama Model: ${process.env.OLLAMA_MODEL}`);
 console.log(`🔧 MongoDB URI: ${process.env.MONGODB_URI}`);
 console.log(`🔧 火山引擎 API Key: ${process.env.ARK_API_KEY ? '已配置 (' + process.env.ARK_API_KEY.substring(0, 10) + '...)' : '❌ 未配置'}`);
 console.log(`🔧 火山引擎 Model: ${process.env.ARK_MODEL || '使用默认值'}`);
+console.log(`🔧 Tavily API Key: ${process.env.TAVILY_API_KEY ? '已配置 (' + process.env.TAVILY_API_KEY.substring(0, 10) + '...)' : '❌ 未配置'}`);
 
 export {};
 

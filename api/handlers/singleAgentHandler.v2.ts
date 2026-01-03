@@ -74,6 +74,9 @@ export async function handleVolcanoStreamV2(
   let accumulatedText = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
+  
+  // ✅ V2: 累积 tool_calls（流式模式下分批返回）
+  let accumulatedToolCalls: Map<number, { name?: string; arguments: string }> = new Map();
 
   // ✅ 流式进度管理器
   const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
@@ -86,13 +89,11 @@ export async function handleVolcanoStreamV2(
 
 
   // 处理流的辅助函数（支持递归调用）
-  async function processStream(currentStream: any): Promise<void> {
-    console.log('🔍 [V2] 开始处理流...');
+  async function processStream(currentStream: any, depth: number = 0): Promise<void> {
     let chunkCount = 0;
     
     for await (const chunk of currentStream) {
       chunkCount++;
-      console.log(`🔍 [V2] 收到第 ${chunkCount} 个 chunk, 大小:`, chunk.length);
       
       if (sseWriter.isClosed()) {
         console.log('⚠️  客户端已断开连接，停止处理流');
@@ -100,7 +101,6 @@ export async function handleVolcanoStreamV2(
       }
 
       const text = chunk.toString();
-      console.log('🔍 [V2] chunk 文本:', text.substring(0, 100));
       buffer += text;
 
       const lines = buffer.split('\n');
@@ -118,48 +118,71 @@ export async function handleVolcanoStreamV2(
 
         try {
           const jsonData = JSON.parse(data);
-          console.log('🔍 [V2 Debug] 收到响应:', JSON.stringify(jsonData).substring(0, 200));
           
           // 火山引擎格式: choices[0].delta
           const choice = jsonData.choices?.[0];
           if (!choice) {
-            console.log('⚠️  [V2 Debug] 没有 choice');
             continue;
           }
           
           const delta = choice.delta;
           if (!delta) {
-            console.log('⚠️  [V2 Debug] 没有 delta');
             continue;
           }
           
-          console.log('✅ [V2 Debug] delta:', JSON.stringify(delta).substring(0, 200));
-          
-          // ✅ V2: 检查是否有 tool_calls（Function Calling）
+          // ✅ V2: 累积 tool_calls（流式模式）
           if (delta.tool_calls && delta.tool_calls.length > 0) {
-            console.log('🔧 [V2] 检测到 Function Calling:', delta.tool_calls);
+            for (const toolCall of delta.tool_calls) {
+              const index = toolCall.index || 0;
+              const func = toolCall.function;
+              
+              if (!accumulatedToolCalls.has(index)) {
+                accumulatedToolCalls.set(index, { arguments: '' });
+              }
+              
+              const accumulated = accumulatedToolCalls.get(index)!;
+              
+              // 累积函数名
+              if (func?.name) {
+                accumulated.name = func.name;
+              }
+              
+              // 累积参数
+              if (func?.arguments) {
+                accumulated.arguments += func.arguments;
+              }
+            }
             
-            const toolCalls = delta.tool_calls;
+            continue; // 继续累积，不要立即执行
+          }
+
+          // ✅ V2: 检查是否完成并执行工具
+          if (choice.finish_reason === 'tool_calls') {
+            console.log('🔧 工具调用完成，开始执行...');
             
-            // 执行所有工具调用
-            for (const toolCall of toolCalls) {
+            // 执行所有累积的工具调用
+            for (const [index, accumulated] of accumulatedToolCalls.entries()) {
               if (sseWriter.isClosed()) {
                 console.log('⚠️  客户端已断开，跳过工具调用');
                 return;
               }
 
-              const func = toolCall.function;
-              const toolName = func.name;
+              const toolName = accumulated.name;
+              if (!toolName) {
+                console.error('❌ 工具名缺失');
+                continue;
+              }
+              
               let params: any;
               
               try {
-                params = JSON.parse(func.arguments);
+                params = JSON.parse(accumulated.arguments);
               } catch (e) {
                 console.error('❌ 解析工具参数失败:', e);
                 params = {};
               }
 
-              console.log(`🔧 [V2] 执行工具: ${toolName}`, params);
+              console.log(`🔧 执行工具: ${toolName}`, params);
 
               // 发送工具调用通知
               await controlledWriter.sendEvent('正在执行工具...', {
@@ -187,9 +210,10 @@ export async function handleVolcanoStreamV2(
               } else {
                 console.log(`✅ 工具执行成功 (${result.duration}ms, 缓存: ${result.fromCache})`);
                 
-                // 保存搜索来源（如果有）
-                if (result.data?.sources) {
-                  searchSources = result.data.sources;
+                // 保存搜索来源（如果有）- sources 在 result 顶层，不在 data 里
+                if (result.sources && Array.isArray(result.sources)) {
+                  searchSources = result.sources;
+                  console.log(`📎 已保存 ${result.sources.length} 个搜索来源`);
                 }
 
                 // 将工具结果返回给模型
@@ -203,16 +227,18 @@ export async function handleVolcanoStreamV2(
                 );
               }
             }
-
-            // 重新调用模型（基于工具结果）
+            
+            // 所有工具执行完成，重新调用模型
             if (sseWriter.isClosed()) {
               console.log('⚠️  客户端已断开，停止后续调用');
               return;
             }
 
             console.log('🔄 基于工具结果继续生成...');
+            
             accumulatedText = '';
             buffer = '';
+            accumulatedToolCalls.clear(); // 清空累积的工具调用
             
             const newStream = modelType === 'local'
               ? await callLocalModelV2(messages, { 
@@ -223,7 +249,7 @@ export async function handleVolcanoStreamV2(
                 });
 
             // 递归处理新的流
-            await processStream(newStream);
+            await processStream(newStream, (depth || 0) + 1);
             return; // 新流处理完成后退出当前流
           }
 
@@ -242,9 +268,9 @@ export async function handleVolcanoStreamV2(
             }
           }
 
-          // 处理完成
-          if (choice.finish_reason === 'stop' || choice.finish_reason === 'tool_calls') {
-            console.log('✅ 模型响应完成 (finish_reason:', choice.finish_reason, ')');
+          // 处理完成（只处理 stop，tool_calls 已在上面处理）
+          if (choice.finish_reason === 'stop') {
+            console.log('✅ 模型响应完成');
             
             // 保存消息到数据库
             if (!messageSaved && accumulatedText) {
@@ -259,7 +285,7 @@ export async function handleVolcanoStreamV2(
                   thinking,
                   searchSources
                 );
-                console.log(`💾 助手消息已保存: ${clientAssistantMessageId}`);
+                console.log(`💾 助手消息已保存${searchSources ? ` (含 ${searchSources.length} 个来源)` : ''}`);
               } catch (error) {
                 console.error('❌ 保存助手消息失败:', error);
               }
@@ -276,7 +302,7 @@ export async function handleVolcanoStreamV2(
           }
 
         } catch (e) {
-          console.error('解析 JSON 失败:', e);
+          console.error('❌ 解析 JSON 失败:', e);
         }
       }
     }
@@ -298,9 +324,7 @@ export async function handleVolcanoStreamV2(
       sseWriter.startHeartbeat(15000);
 
       // 开始处理流
-      console.log('🔍 [V2] 准备调用 processStream...');
       await processStream(stream);
-      console.log('🔍 [V2] processStream 执行完成');
 
     } catch (error: any) {
       console.error('❌ 流处理错误:', error);
