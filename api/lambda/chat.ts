@@ -11,6 +11,16 @@
 // 加载环境变量
 import '../config/env.js';
 import { connectToDatabase } from '../db/connection.js';
+
+// ✅ V2: 初始化工具系统
+import { initializeToolSystem } from '../tools/v2/index.js';
+
+// 初始化标志（确保只初始化一次）
+let toolSystemInitialized = false;
+if (!toolSystemInitialized) {
+  initializeToolSystem();
+  toolSystemInitialized = true;
+}
 import { errorResponse } from './_utils/response.js';
 import { getCorsHeaders, handleOptionsRequest } from './_utils/cors.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';

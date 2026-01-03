@@ -6,7 +6,7 @@
 import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import { getContainer } from '../_clean/di-container.js';
-import { executeToolCall } from '../_clean/infrastructure/tools/tool-executor.js';
+import { executeToolCall } from '../tools/v2/adapters/legacy-adapter.js'; // ✅ V2: 使用新工具系统（兼容适配器）
 import { callLocalModel } from '../_clean/infrastructure/llm/llm-caller.js';
 import {
   createSafeSSEWriter,

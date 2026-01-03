@@ -8,7 +8,7 @@ import { volcengineService } from '../_clean/infrastructure/llm/volcengine-servi
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import { getContainer } from '../_clean/di-container.js';
 import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
-import { executeToolCall } from '../tools/toolExecutor.js';
+import { executeToolCall } from '../tools/v2/adapters/legacy-adapter.js'; // ✅ V2: 使用新工具系统（兼容适配器）
 import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
 import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
 import type { ChatMessage } from '../types/chat.js';

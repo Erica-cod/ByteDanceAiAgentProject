@@ -60,7 +60,7 @@ export async function get({ headers }: any = {}) {
 /**
  * 获取指定工具的详细指标（内部使用）
  */
-export function getToolMetrics(toolName: string) {
+function getToolMetrics(toolName: string) {
   try {
     const metrics = toolExecutor.getMetrics(toolName);
 
