@@ -107,12 +107,28 @@ export async function handleVolcanoStreamV2(
 
         try {
           const jsonData = JSON.parse(data);
+          console.log('🔍 [V2 Debug] 收到响应:', JSON.stringify(jsonData).substring(0, 200));
+          
+          // 火山引擎格式: choices[0].delta
+          const choice = jsonData.choices?.[0];
+          if (!choice) {
+            console.log('⚠️  [V2 Debug] 没有 choice');
+            continue;
+          }
+          
+          const delta = choice.delta;
+          if (!delta) {
+            console.log('⚠️  [V2 Debug] 没有 delta');
+            continue;
+          }
+          
+          console.log('✅ [V2 Debug] delta:', JSON.stringify(delta).substring(0, 200));
           
           // ✅ V2: 检查是否有 tool_calls（Function Calling）
-          if (jsonData.message?.tool_calls && jsonData.message.tool_calls.length > 0) {
-            console.log('🔧 [V2] 检测到 Function Calling:', jsonData.message.tool_calls);
+          if (delta.tool_calls && delta.tool_calls.length > 0) {
+            console.log('🔧 [V2] 检测到 Function Calling:', delta.tool_calls);
             
-            const toolCalls = jsonData.message.tool_calls;
+            const toolCalls = delta.tool_calls;
             
             // 执行所有工具调用
             for (const toolCall of toolCalls) {
@@ -201,7 +217,7 @@ export async function handleVolcanoStreamV2(
           }
 
           // 处理普通文本流
-          const content = jsonData.message?.content || jsonData.content || '';
+          const content = delta.content || '';
           if (content) {
             accumulatedText += content;
 
@@ -216,8 +232,8 @@ export async function handleVolcanoStreamV2(
           }
 
           // 处理完成
-          if (jsonData.done) {
-            console.log('✅ 模型响应完成');
+          if (choice.finish_reason === 'stop' || choice.finish_reason === 'tool_calls') {
+            console.log('✅ 模型响应完成 (finish_reason:', choice.finish_reason, ')');
             
             // 保存消息到数据库
             if (!messageSaved && accumulatedText) {

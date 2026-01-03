@@ -76,13 +76,15 @@ export class VolcengineService {
       maxTokens?: number;
       topP?: number;
       signal?: AbortSignal; // ✅ 新增：支持中断信号
+      tools?: any[]; // ✅ V2: 支持工具定义
+      tool_choice?: string; // ✅ V2: 工具选择策略
     }
   ): Promise<NodeJS.ReadableStream> {
     if (!this.apiKey) {
       throw new Error('ARK_API_KEY 未配置，请设置环境变量');
     }
 
-    const requestBody: VolcengineRequest = {
+    const requestBody: any = {
       model: this.model,
       messages: messages,
       stream: true,
@@ -90,6 +92,12 @@ export class VolcengineService {
       max_tokens: options?.maxTokens ?? 2000,
       top_p: options?.topP ?? 0.95,
     };
+
+    // ✅ V2: 如果提供了工具定义，添加到请求体
+    if (options?.tools && options.tools.length > 0) {
+      requestBody.tools = options.tools;
+      requestBody.tool_choice = options.tool_choice || 'auto';
+    }
 
     console.log('🔥 调用火山引擎大模型:', {
       url: this.apiUrl,
