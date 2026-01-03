@@ -381,9 +381,12 @@ export async function post({
       // 调用模型
       if (useV2) {
         // ==================== V2: Function Calling 模式 ====================
+        console.log('🔍 [V2] 开始动态导入 V2 模块...');
         const { callLocalModelV2, callVolcengineModelV2 } = await import('../_clean/infrastructure/llm/model-service.v2.js');
         const { handleLocalStreamV2, handleVolcanoStreamV2 } = await import('../handlers/singleAgentHandler.v2.js');
         const { toolRegistry } = await import('../tools/v2/index.js');
+        console.log('✅ [V2] 动态导入成功');
+        console.log('✅ [V2] handleVolcanoStreamV2 类型:', typeof handleVolcanoStreamV2);
 
         // 获取工具定义
         const tools = toolRegistry.getAllSchemas();
@@ -418,9 +421,10 @@ export async function post({
 
           const stream = await callVolcengineModelV2(messages, { tools });
           console.log('✅ 已收到火山引擎的流式响应');
+          console.log('🔍 [V2] 准备调用 handleVolcanoStreamV2...');
           
           handoffToStream = true;
-          return handleVolcanoStreamV2(
+          const result = handleVolcanoStreamV2(
             stream,
             conversationId,
             userId,
@@ -430,6 +434,8 @@ export async function post({
             slot.release,
             message
           );
+          console.log('🔍 [V2] handleVolcanoStreamV2 已返回，result 类型:', typeof result, result?.constructor?.name);
+          return result;
         } else {
           return errorResponse('不支持的模型类型', requestOrigin);
         }

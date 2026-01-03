@@ -57,6 +57,10 @@ export async function handleVolcanoStreamV2(
   onFinally?: () => void,
   requestText?: string
 ): Promise<Response> {
+  console.log('🚀 [V2] handleVolcanoStreamV2 被调用！');
+  console.log('🚀 [V2] stream 类型:', typeof stream, stream?.constructor?.name);
+  console.log('🚀 [V2] conversationId:', conversationId);
+  
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const sseWriter = new SSEStreamWriter(writer);
@@ -83,13 +87,20 @@ export async function handleVolcanoStreamV2(
 
   // 处理流的辅助函数（支持递归调用）
   async function processStream(currentStream: any): Promise<void> {
+    console.log('🔍 [V2] 开始处理流...');
+    let chunkCount = 0;
+    
     for await (const chunk of currentStream) {
+      chunkCount++;
+      console.log(`🔍 [V2] 收到第 ${chunkCount} 个 chunk, 大小:`, chunk.length);
+      
       if (sseWriter.isClosed()) {
         console.log('⚠️  客户端已断开连接，停止处理流');
         return;
       }
 
       const text = chunk.toString();
+      console.log('🔍 [V2] chunk 文本:', text.substring(0, 100));
       buffer += text;
 
       const lines = buffer.split('\n');
@@ -287,7 +298,9 @@ export async function handleVolcanoStreamV2(
       sseWriter.startHeartbeat(15000);
 
       // 开始处理流
+      console.log('🔍 [V2] 准备调用 processStream...');
       await processStream(stream);
+      console.log('🔍 [V2] processStream 执行完成');
 
     } catch (error: any) {
       console.error('❌ 流处理错误:', error);
