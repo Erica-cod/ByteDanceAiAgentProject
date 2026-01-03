@@ -63,6 +63,9 @@ async function createIndexes() {
     await db.collection('conversations').createIndex({ conversationId: 1 }, { unique: true });
     await db.collection('conversations').createIndex({ userId: 1, updatedAt: -1 });
     await db.collection('conversations').createIndex({ userId: 1, isActive: 1 });
+    // ✅ LRU 索引
+    await db.collection('conversations').createIndex({ userId: 1, isArchived: 1 });
+    await db.collection('conversations').createIndex({ userId: 1, lastAccessedAt: -1 });
 
     // Messages collection indexes
     await db.collection('messages').createIndex({ messageId: 1 }, { unique: true });

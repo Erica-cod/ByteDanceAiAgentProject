@@ -9,6 +9,7 @@ import {
 import { getUserId } from '../utils/userManager';
 import { getConversationMessages, type Conversation } from '../utils/conversationAPI';
 import { createEventManager } from '../utils/eventManager';
+import { touchConversationCache, smartCleanupConversationCache } from '../utils/localStorageLRU';
 
 export interface Message {
   id: string;
@@ -166,6 +167,9 @@ export const useChatStore = create<ChatState>()(
         console.log('从缓存加载对话:', convId);
         const { userId } = get();
 
+        // ✅ LRU: 记录对话访问
+        touchConversationCache(convId, 0);
+
         // 1️⃣ 先读本地缓存（秒开）- 复用现有函数（加密版）
         const cached = await readConversationCache(convId);
         if (cached.length > 0) {
@@ -243,6 +247,12 @@ export const useChatStore = create<ChatState>()(
 
         // 4️⃣ 写回缓存 - 复用现有函数（加密版）
         await writeConversationCache(convId, merged);
+
+        // ✅ LRU: 更新访问记录（包含消息数）
+        touchConversationCache(convId, merged.length);
+
+        // ✅ LRU: 智能清理（在后台执行，不阻塞主流程）
+        setTimeout(() => smartCleanupConversationCache(userId), 0);
       } catch (error) {
         console.error('加载对话失败:', error);
         set({

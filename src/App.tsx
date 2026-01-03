@@ -1,5 +1,6 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { useThemeStore } from './stores/themeStore';
+import { initLocalStorageLRU } from './utils/localStorageLRU';
 
 // ✅ 懒加载 ChatInterface（代码分割）- 使用重构版
 const ChatInterface = lazy(() => import('./components/business/Chat/ChatInterfaceRefactored'));
@@ -24,6 +25,16 @@ const App: React.FC = () => {
   // 初始化主题
   useEffect(() => {
     updateEffectiveTheme();
+  }, []);
+
+  // ✅ 初始化 LocalStorage LRU 管理
+  useEffect(() => {
+    console.log('🚀 初始化 LocalStorage LRU 管理...');
+    // 获取用户 ID 并初始化 LRU
+    import('./utils/userManager').then(({ getUserId }) => {
+      const userId = getUserId();
+      initLocalStorageLRU(userId);
+    });
   }, []);
   
   return (

@@ -19,8 +19,11 @@ export interface Conversation {
   title: string;            // Conversation title
   createdAt: Date;
   updatedAt: Date;
+  lastAccessedAt?: Date;    // ✅ LRU: 最后访问时间
   messageCount: number;
   isActive: boolean;
+  isArchived?: boolean;     // ✅ LRU: 是否已归档
+  archivedAt?: Date;        // ✅ LRU: 归档时间
 }
 
 export interface Message {
