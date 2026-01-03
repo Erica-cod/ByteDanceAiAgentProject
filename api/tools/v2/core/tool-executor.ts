@@ -5,13 +5,14 @@
  * - 整合限流、缓存、熔断等保护机制
  * - 执行工具调用
  * - 记录指标和日志
+ * - 实现降级链（参考 Netflix Hystrix）
  */
 
 import { toolRegistry } from './tool-registry.js';
 import { rateLimiter } from './rate-limiter.js';
 import { cacheManager } from './cache-manager.js';
 import { circuitBreaker } from './circuit-breaker.js';
-import type { ToolContext, ToolResult, ExecuteOptions, ToolMetrics, ToolStatus } from './types.js';
+import type { ToolContext, ToolResult, ExecuteOptions, ToolMetrics, ToolStatus, ToolPlugin, FallbackStrategy } from './types.js';
 
 export class ToolExecutor {
   private metrics: Map<string, {
@@ -58,7 +59,7 @@ export class ToolExecutor {
     try {
       // 3. 检查缓存
       if (!options.skipCache) {
-        const cached = cacheManager.get(toolName, params, context);
+        const cached = await cacheManager.get(toolName, params, context);
         if (cached) {
           metrics.successCalls++;
           metrics.cacheHits++;
@@ -78,6 +79,13 @@ export class ToolExecutor {
       const cbCheck = circuitBreaker.canExecute(toolName);
       if (!cbCheck.allowed) {
         metrics.failedCalls++;
+        
+        // 🆕 熔断时触发降级
+        if (plugin.fallback?.enabled) {
+          console.warn(`⚠️  工具 "${toolName}" 已熔断，尝试降级...`);
+          return await this.executeFallbackChain(toolName, params, context, plugin, new Error(cbCheck.reason || '工具已熔断'));
+        }
+        
         return {
           success: false,
           error: cbCheck.reason || '工具不可用',
@@ -123,7 +131,7 @@ export class ToolExecutor {
 
           // 9. 缓存结果（如果成功）
           if (result.success && !options.skipCache) {
-            cacheManager.set(toolName, params, context, result);
+            await cacheManager.set(toolName, params, context, result);
           }
 
           // 10. 记录耗时
@@ -290,6 +298,147 @@ export class ToolExecutor {
   resetAllMetrics(): void {
     this.metrics.clear();
     console.log('🔄 所有工具指标已重置');
+  }
+
+  /**
+   * 执行降级链（参考 Netflix Hystrix Fallback Chain）
+   */
+  private async executeFallbackChain(
+    toolName: string,
+    params: any,
+    context: ToolContext,
+    plugin: ToolPlugin,
+    originalError: Error
+  ): Promise<ToolResult> {
+    const fallbackConfig = plugin.fallback;
+    
+    if (!fallbackConfig?.enabled || !fallbackConfig.fallbackChain.length) {
+      return {
+        success: false,
+        error: originalError.message,
+      };
+    }
+
+    console.log(`🔄 [Fallback Chain] 开始降级，共 ${fallbackConfig.fallbackChain.length} 个策略`);
+
+    // 按降级链顺序尝试
+    for (let i = 0; i < fallbackConfig.fallbackChain.length; i++) {
+      const strategy = fallbackConfig.fallbackChain[i];
+      console.log(`   ${i + 1}/${fallbackConfig.fallbackChain.length} 尝试降级策略: ${strategy.type}`);
+
+      try {
+        const result = await this.executeFallbackStrategy(
+          strategy,
+          toolName,
+          params,
+          context,
+          plugin,
+          fallbackConfig
+        );
+
+        if (result) {
+          console.log(`   ✅ 降级策略 "${strategy.type}" 成功`);
+          return {
+            ...result,
+            degraded: true,
+            degradedBy: strategy.type,
+          };
+        }
+      } catch (error: any) {
+        console.warn(`   ❌ 降级策略 "${strategy.type}" 失败: ${error.message}`);
+        continue;
+      }
+    }
+
+    // 所有降级策略都失败
+    console.error(`🚫 [Fallback Chain] 所有降级策略都失败`);
+    return {
+      success: false,
+      error: `服务不可用，所有降级方案均失败。原始错误: ${originalError.message}`,
+      degraded: true,
+    };
+  }
+
+  /**
+   * 执行单个降级策略
+   */
+  private async executeFallbackStrategy(
+    strategy: FallbackStrategy,
+    toolName: string,
+    params: any,
+    context: ToolContext,
+    plugin: ToolPlugin,
+    fallbackConfig: any
+  ): Promise<ToolResult | null> {
+    const timeout = fallbackConfig.fallbackTimeout || 5000;
+
+    switch (strategy.type) {
+      case 'cache':
+        // 策略 1: 返回正常缓存
+        return await cacheManager.get(toolName, params, context);
+
+      case 'stale-cache':
+        // 策略 2: 返回过期缓存
+        if (fallbackConfig.allowStaleCache !== false) {
+          return await cacheManager.getStale(toolName, params, context);
+        }
+        return null;
+
+      case 'fallback-tool':
+        // 策略 3: 切换到备用工具
+        if (fallbackConfig.fallbackTool) {
+          console.log(`   ↪️  切换到备用工具: ${fallbackConfig.fallbackTool}`);
+          return await Promise.race([
+            this.execute(fallbackConfig.fallbackTool, params, context, { timeout }),
+            new Promise<ToolResult>((_, reject) =>
+              setTimeout(() => reject(new Error('备用工具超时')), timeout)
+            ),
+          ]);
+        }
+        return null;
+
+      case 'simplified':
+        // 策略 4: 简化调用（用更少的参数重试主服务）
+        if (fallbackConfig.simplifiedParams) {
+          console.log(`   ⚡ 尝试简化调用`);
+          const simplifiedParams = {
+            ...params,
+            ...fallbackConfig.simplifiedParams,
+          };
+          
+          // 跳过熔断检查，直接执行
+          try {
+            const result = await Promise.race([
+              plugin.execute(simplifiedParams, context),
+              new Promise<ToolResult>((_, reject) =>
+                setTimeout(() => reject(new Error('简化调用超时')), timeout)
+              ),
+            ]);
+            
+            if (result.success) {
+              return result;
+            }
+          } catch (error) {
+            // 简化调用失败，继续下一个策略
+          }
+        }
+        return null;
+
+      case 'default':
+        // 策略 5: 返回默认响应（兜底）
+        if (fallbackConfig.defaultResponse) {
+          console.log(`   📦 返回默认响应`);
+          return {
+            ...fallbackConfig.defaultResponse,
+            message: fallbackConfig.defaultResponse.message || '服务降级，返回默认数据',
+          };
+        }
+        return null;
+
+      default:
+        console.warn(`   ⚠️  未知的降级策略类型: ${strategy.type}`);
+        return null;
+    }
   }
 }
 
