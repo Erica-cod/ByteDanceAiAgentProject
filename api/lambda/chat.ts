@@ -342,18 +342,31 @@ export async function post({
       }
 
       // ==================== 单Agent模式 ====================
+      // ✅ V2: 检查是否启用 Function Calling
+      const useV2 = process.env.TOOL_SYSTEM_V2 === 'true';
+      console.log(`🔧 工具系统版本: ${useV2 ? 'V2 (Function Calling)' : 'V1 (Prompt-based)'}`);
+
       // 🆕 使用新的 Clean Architecture - Memory 模块
       const memoryConfig = getRecommendedConfig(modelType);
       const getConversationContextUseCase = container.getGetConversationContextUseCase();
       
       console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
 
+      // ✅ V2: 根据版本选择 System Prompt
+      let systemPrompt: string;
+      if (useV2) {
+        const { SYSTEM_PROMPT_V2 } = await import('../config/systemPrompt.v2.js');
+        systemPrompt = SYSTEM_PROMPT_V2;
+      } else {
+        systemPrompt = SYSTEM_PROMPT;
+      }
+
       // 构建消息历史（带上下文记忆）
       const contextResult = await getConversationContextUseCase.execute({
         conversationId,
         userId,
         currentMessage: message,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: systemPrompt,
         config: memoryConfig,
       });
       
@@ -366,49 +379,106 @@ export async function post({
       // const abortController = new AbortController();
       
       // 调用模型
-      if (modelType === 'local') {
-        console.log('开始调用本地模型...');
-        const stream = await callLocalModel(messages /* , abortController.signal */);
-        handoffToStream = true;
-        return handleLocalStream(
-          stream,
-          conversationId,
-          userId,
-          modelType,
-          messages,
-          clientAssistantMessageId,
-          slot.release,
-          message // 传递原始请求文本用于缓存
-        );
-      } else if (modelType === 'volcano') {
-        console.log('==========================================');
-        console.log('🌋 开始调用火山引擎豆包模型...');
-        console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
-        console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
-        console.log('==========================================');
-        
-        // 检查配置
-        if (!volcengineService.isConfigured()) {
-          console.error('❌ 火山引擎 API 未配置！');
-          return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
-        }
+      if (useV2) {
+        // ==================== V2: Function Calling 模式 ====================
+        const { callLocalModelV2, callVolcengineModelV2 } = await import('../_clean/infrastructure/llm/model-service.v2.js');
+        const { handleLocalStreamV2, handleVolcanoStreamV2 } = await import('../handlers/singleAgentHandler.v2.js');
+        const { toolRegistry } = await import('../tools/v2/index.js');
 
-        const stream = await callVolcengineModel(messages /* , abortController.signal */);
-        console.log('✅ 已收到火山引擎的流式响应');
-        
-        handoffToStream = true;
-        return handleVolcanoStream(
-          stream,
-          conversationId,
-          userId,
-          modelType,
-          messages,
-          clientAssistantMessageId,
-          slot.release,
-          message // 传递原始请求文本用于缓存
-        );
+        // 获取工具定义
+        const tools = toolRegistry.getAllSchemas();
+        console.log(`🔧 传递 ${tools.length} 个工具定义给模型`);
+
+        if (modelType === 'local') {
+          console.log('开始调用本地模型（V2 - Function Calling）...');
+          const stream = await callLocalModelV2(messages, { tools });
+          handoffToStream = true;
+          return handleLocalStreamV2(
+            stream,
+            conversationId,
+            userId,
+            modelType,
+            messages,
+            clientAssistantMessageId,
+            slot.release,
+            message
+          );
+        } else if (modelType === 'volcano') {
+          console.log('==========================================');
+          console.log('🌋 开始调用火山引擎豆包模型（V2 - Function Calling）...');
+          console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
+          console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
+          console.log('==========================================');
+          
+          // 检查配置
+          if (!volcengineService.isConfigured()) {
+            console.error('❌ 火山引擎 API 未配置！');
+            return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
+          }
+
+          const stream = await callVolcengineModelV2(messages, { tools });
+          console.log('✅ 已收到火山引擎的流式响应');
+          
+          handoffToStream = true;
+          return handleVolcanoStreamV2(
+            stream,
+            conversationId,
+            userId,
+            modelType,
+            messages,
+            clientAssistantMessageId,
+            slot.release,
+            message
+          );
+        } else {
+          return errorResponse('不支持的模型类型', requestOrigin);
+        }
       } else {
-        return errorResponse('不支持的模型类型', requestOrigin);
+        // ==================== V1: Prompt-based 模式 ====================
+        if (modelType === 'local') {
+          console.log('开始调用本地模型...');
+          const stream = await callLocalModel(messages /* , abortController.signal */);
+          handoffToStream = true;
+          return handleLocalStream(
+            stream,
+            conversationId,
+            userId,
+            modelType,
+            messages,
+            clientAssistantMessageId,
+            slot.release,
+            message // 传递原始请求文本用于缓存
+          );
+        } else if (modelType === 'volcano') {
+          console.log('==========================================');
+          console.log('🌋 开始调用火山引擎豆包模型...');
+          console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
+          console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
+          console.log('==========================================');
+          
+          // 检查配置
+          if (!volcengineService.isConfigured()) {
+            console.error('❌ 火山引擎 API 未配置！');
+            return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
+          }
+
+          const stream = await callVolcengineModel(messages /* , abortController.signal */);
+          console.log('✅ 已收到火山引擎的流式响应');
+          
+          handoffToStream = true;
+          return handleVolcanoStream(
+            stream,
+            conversationId,
+            userId,
+            modelType,
+            messages,
+            clientAssistantMessageId,
+            slot.release,
+            message // 传递原始请求文本用于缓存
+          );
+        } else {
+          return errorResponse('不支持的模型类型', requestOrigin);
+        }
       }
     } finally {
       // ✅ 没有进入流式返回，就在这里释放名额（避免泄漏）
