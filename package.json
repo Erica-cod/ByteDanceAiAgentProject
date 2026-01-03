@@ -36,6 +36,7 @@
     "test:refactored": "node test/test-refactored-code.js",
     "test:refactored:files": "node test/test-refactored-files.js",
     "test:markdown": "tsx src/utils/__tests__/markdownFixer.test.ts",
+    "test:fallback": "tsx test/test-tool-fallback-redis.js",
     "test:all": "node test-volcengine.js && node test-planning-tools.js"
   },
   "dependencies": {

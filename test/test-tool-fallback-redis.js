@@ -1,6 +1,15 @@
 /**
  * 测试工具降级机制和 Redis 缓存
+ * 
+ * 运行方式：
+ * npm run test:fallback
+ * 或
+ * npx tsx test/test-tool-fallback-redis.js
  */
+
+// 加载环境变量
+import dotenv from 'dotenv';
+dotenv.config();
 
 import { toolRegistry, toolExecutor, cacheManager } from '../api/tools/v2/index.js';
 import { searchWebPlugin } from '../api/tools/v2/plugins/search-web.plugin.js';
