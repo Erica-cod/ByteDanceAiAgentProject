@@ -10,16 +10,21 @@
 import type { RequestOption } from '../../types/chat.js';
 import { handleOptionsRequest } from '../_utils/cors.js';
 import { createLoginState, saveLoginState, buildAuthorizationUrl } from '../_utils/bffOidcAuth.js';
+import { issueCsrfToken } from '../_utils/csrf.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
   return handleOptionsRequest(origin);
 }
 
-export async function get({ query }: RequestOption<{ returnTo?: string; deviceIdHash?: string }, any>) {
+export async function get({ query, headers }: RequestOption<{ returnTo?: string; deviceIdHash?: string }, any>) {
+  // ✅ 绑定浏览器：确保存在 HttpOnly csrfSid cookie（没有就发一个）
+  const issued = await issueCsrfToken(headers);
+
   const { record, code_challenge } = createLoginState({
     returnTo: query?.returnTo,
     deviceIdHash: query?.deviceIdHash,
+    csrfSid: issued.csrfSid,
   });
 
   await saveLoginState(record);
@@ -31,10 +36,15 @@ export async function get({ query }: RequestOption<{ returnTo?: string; deviceId
     deviceIdHash: record.deviceIdHash,
   });
 
+  const outHeaders: Record<string, string> = {
+    Location: location,
+  };
+  if (issued.setCookie) outHeaders['Set-Cookie'] = issued.setCookie;
+
   return new Response(null, {
     status: 302,
     headers: {
-      Location: location,
+      ...outHeaders,
     },
   });
 }

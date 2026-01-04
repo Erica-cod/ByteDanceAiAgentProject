@@ -17,6 +17,7 @@ import {
   createBffSession,
   buildSetBffSessionCookie,
   sanitizeReturnTo,
+  readCsrfSidFromHeaders,
 } from '../_utils/bffOidcAuth.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
@@ -38,6 +39,15 @@ export async function get({
   const record = await loadLoginState(state);
   if (!record) {
     return new Response('登录 state 无效或已过期', { status: 400 });
+  }
+
+  // ✅ 防 URL 泄露“抢登”：要求 callback 请求必须来自同一浏览器（带同一个 HttpOnly csrfSid）
+  if (record.csrfSid) {
+    const currentCsrfSid = readCsrfSidFromHeaders(headers);
+    if (!currentCsrfSid || currentCsrfSid !== record.csrfSid) {
+      // 这里用 403 更贴近“拒绝”，避免泄露细节
+      return new Response('登录上下文不匹配（可能是回调链接被复用/泄露）', { status: 403 });
+    }
   }
 
   // 单次使用，先删掉（避免重放）

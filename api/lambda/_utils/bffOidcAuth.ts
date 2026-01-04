@@ -35,6 +35,9 @@ type LoginStateRecord = {
   state: string;
   nonce: string;
   code_verifier: string;
+  // 绑定发起登录的浏览器：要求 callback 必须带同一个 HttpOnly csrfSid
+  // 这样就算 code/state URL 泄露，外部请求也抢不到登录态（因为拿不到 cookie）
+  csrfSid?: string;
   returnTo: string;
   deviceIdHash?: string;
   createdAt: number;
@@ -143,7 +146,7 @@ export async function getJwks() {
   return jwksCache;
 }
 
-export function createLoginState(input: { returnTo?: string; deviceIdHash?: string }) {
+export function createLoginState(input: { returnTo?: string; deviceIdHash?: string; csrfSid?: string }) {
   const state = base64url(randomBytes(24));
   const nonce = base64url(randomBytes(24));
   const code_verifier = base64url(randomBytes(32));
@@ -151,6 +154,7 @@ export function createLoginState(input: { returnTo?: string; deviceIdHash?: stri
 
   const returnTo = sanitizeReturnTo(input.returnTo);
   const deviceIdHash = input.deviceIdHash?.slice(0, 128) || undefined;
+  const csrfSid = input.csrfSid?.slice(0, 256) || undefined;
 
   const record: LoginStateRecord = {
     state,
@@ -158,10 +162,22 @@ export function createLoginState(input: { returnTo?: string; deviceIdHash?: stri
     code_verifier,
     returnTo,
     deviceIdHash,
+    csrfSid,
     createdAt: Date.now(),
   };
 
   return { record, code_challenge };
+}
+
+export function readCsrfSidFromHeaders(headers?: Record<string, any>) {
+  // 兼容 http/dev 与 https/prod 的 cookie 名
+  const cookieHeader = headers?.cookie || headers?.Cookie;
+  const cookies = parseCookies(cookieHeader);
+  return (
+    cookies['__Host-bff_csrf_sid']
+    || cookies['bff_csrf_sid']
+    || ''
+  );
 }
 
 export async function saveLoginState(record: LoginStateRecord) {
