@@ -30,6 +30,13 @@ pipeline {
                 sh 'npm ci'
             }
         }
+
+        stage('Run Integration Tests') {
+            steps {
+                echo 'Running integration tests (must be green to continue)...'
+                sh 'npm run test:integration'
+            }
+        }// Only run integration tests if they are green
         
         stage('Build Application') {
             steps {

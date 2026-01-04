@@ -16,7 +16,7 @@ export interface Message {
   clientMessageId?: string;
   role: 'user' | 'assistant';
   content: string;
-  contentLength?: number;  // ✅ 新增：完整内容长度
+  contentLength?: number;  //  新增：完整内容长度
   thinking?: string;
   sources?: Array<{ title: string; url: string }>;
   timestamp: number;
@@ -28,7 +28,7 @@ export interface Message {
     status: 'in_progress' | 'converged' | 'terminated';
     consensusTrend: number[];
   };
-  streamingAgentContent?: Record<string, string>; // ✅ 新增：流式内容（"agentId:round" -> 累积内容）
+  streamingAgentContent?: Record<string, string>; //  新增：流式内容（"agentId:round" -> 累积内容）
 }
 
 interface ChatState {
@@ -37,7 +37,7 @@ interface ChatState {
   conversations: Conversation[];
   conversationId: string | null;
   userId: string;
-  deviceId: string; // ✅ 新增：设备指纹 ID（用于并发控制）
+  deviceId: string; //  新增：设备指纹 ID（用于并发控制）
   firstItemIndex: number; // Virtuoso 分页索引
   hasMoreMessages: boolean;
   totalMessages: number;
@@ -49,7 +49,7 @@ interface ChatState {
   updateMessage: (id: string, updates: Partial<Message>) => void;
   removeMessage: (id: string) => void;
   setConversationId: (id: string | null) => void;
-  setDeviceId: (deviceId: string) => void; // ✅ 新增
+  setDeviceId: (deviceId: string) => void; //  新增
   setConversations: (conversations: Conversation[]) => void;
   setFirstItemIndex: (index: number) => void;
   setHasMoreMessages: (has: boolean) => void;
@@ -67,8 +67,8 @@ interface ChatState {
   saveToCache: () => Promise<void>;
 }
 
-// ⚠️ 内存保护：单个对话最多保留的消息数量
-const MAX_MESSAGES_IN_MEMORY = 200; // 约200条消息，防止内存溢出
+//  内存保护：单个对话最多保留的消息数量
+const MAX_MESSAGES_IN_MEMORY = 30; // 约30条消息，防止内存溢出
 
 export const useChatStore = create<ChatState>()(
   immer((set, get) => ({
@@ -77,7 +77,7 @@ export const useChatStore = create<ChatState>()(
     conversations: [],
     conversationId: null,
     userId: getUserId(),
-    deviceId: '', // ✅ 初始为空，ChatInterface 异步加载后设置
+    deviceId: '', //  初始为空，ChatInterface 异步加载后设置
     firstItemIndex: 0,
     hasMoreMessages: false,
     totalMessages: 0,
@@ -85,9 +85,9 @@ export const useChatStore = create<ChatState>()(
 
     // 同步 Actions
     setMessages: (messages) => {
-      // ✅ 内存保护：限制消息数量
+      //  内存保护：限制消息数量
       if (messages.length > MAX_MESSAGES_IN_MEMORY) {
-        console.warn(`⚠️ 消息数量超过限制 (${messages.length} > ${MAX_MESSAGES_IN_MEMORY})，保留最新的消息`);
+        console.warn(`消息数量超过限制 (${messages.length} > ${MAX_MESSAGES_IN_MEMORY})，保留最新的消息`);
         const recentMessages = messages.slice(-MAX_MESSAGES_IN_MEMORY);
         set({ messages: recentMessages });
       } else {
@@ -99,10 +99,10 @@ export const useChatStore = create<ChatState>()(
       set((state) => {
         state.messages.push(message);
         
-        // ✅ 内存保护：如果消息过多，移除最早的消息
+        //  内存保护：如果消息过多，移除最早的消息
         if (state.messages.length > MAX_MESSAGES_IN_MEMORY) {
           const removed = state.messages.shift();
-          console.warn(`⚠️ 内存保护：移除最早的消息 (ID: ${removed?.id})`);
+          console.warn(`内存保护：移除最早的消息 (ID: ${removed?.id})`);
         }
       }),
 
@@ -118,7 +118,7 @@ export const useChatStore = create<ChatState>()(
       }),
 
     setConversationId: (id) => set({ conversationId: id }),
-    setDeviceId: (deviceId) => set({ deviceId }), // ✅ 新增
+    setDeviceId: (deviceId) => set({ deviceId }), //  新增
     setConversations: (conversations) => set({ conversations }),
     setFirstItemIndex: (index) => set({ firstItemIndex: index }),
     setHasMoreMessages: (has) => set({ hasMoreMessages: has }),
@@ -167,10 +167,10 @@ export const useChatStore = create<ChatState>()(
         console.log('从缓存加载对话:', convId);
         const { userId } = get();
 
-        // ✅ LRU: 记录对话访问
+        //  LRU: 记录对话访问
         touchConversationCache(convId, 0);
 
-        // 1️⃣ 先读本地缓存（秒开）- 复用现有函数（加密版）
+        //  先读本地缓存（秒开）- 复用现有函数（加密版）
         const cached = await readConversationCache(convId);
         if (cached.length > 0) {
           const cachedMessages: Message[] = cached.map((m) => ({
@@ -190,7 +190,7 @@ export const useChatStore = create<ChatState>()(
           });
         }
 
-        // 2️⃣ 拉服务端数据
+        //  拉服务端数据
         const PAGE_SIZE = 30;
         const result = await getConversationMessages(userId, convId, PAGE_SIZE, 0);
         console.log('首屏消息数据:', result);
@@ -224,7 +224,7 @@ export const useChatStore = create<ChatState>()(
           timestamp: new Date(msg.timestamp).getTime(),
         }));
 
-        // 3️⃣ 合并服务端 + 本地待同步消息 - 复用现有函数
+        //  合并服务端 + 本地待同步消息 - 复用现有函数
         const merged = mergeServerMessagesWithCache(serverForCache, cached);
 
         const mergedForUI: Message[] = merged.map((m) => ({
@@ -245,13 +245,13 @@ export const useChatStore = create<ChatState>()(
           hasMoreMessages: needLoadMore,
         });
 
-        // 4️⃣ 写回缓存 - 复用现有函数（加密版）
+        //  写回缓存 - 复用现有函数（加密版）
         await writeConversationCache(convId, merged);
 
-        // ✅ LRU: 更新访问记录（包含消息数）
+        //  LRU: 更新访问记录（包含消息数）
         touchConversationCache(convId, merged.length);
 
-        // ✅ LRU: 智能清理（在后台执行，不阻塞主流程）
+        //  LRU: 智能清理（在后台执行，不阻塞主流程）
         setTimeout(() => smartCleanupConversationCache(userId), 0);
       } catch (error) {
         console.error('加载对话失败:', error);
@@ -323,13 +323,13 @@ export const useChatStore = create<ChatState>()(
         pendingSync: m.pendingSync,
       }));
 
-      // ✅ 复用现有函数（加密版）
+      //  复用现有函数（加密版）
       await writeConversationCache(conversationId, cached);
     },
   }))
 );
 
-// ✅ 使用事件管理器处理多窗口同步
+//  使用事件管理器处理多窗口同步
 const chatEventManager = createEventManager();
 
 if (typeof window !== 'undefined') {
@@ -353,9 +353,9 @@ if (typeof window !== 'undefined') {
             pendingSync: m.pendingSync,
           }));
           useChatStore.getState().setMessages(messagesForUI);
-          console.log('✅ 检测到其他标签页更新，已同步消息');
+          console.log('检测到其他标签页更新，已同步消息');
         } catch (err) {
-          console.error('❌ 同步消息失败:', err);
+          console.error('同步消息失败:', err);
         }
       }
     }
