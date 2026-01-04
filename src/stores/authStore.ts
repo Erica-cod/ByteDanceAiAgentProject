@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { fetchWithCsrf } from '../utils/fetchWithCsrf';
 
 export type AuthUser = {
   userId: string;
@@ -59,7 +60,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetchWithCsrf('/api/auth/logout', { method: 'POST' });
     } finally {
       // 不论后端是否成功，都在前端清空状态（避免“假登录”）
       set({ loggedIn: false, user: null, canUseMultiAgent: false, isLoading: false });

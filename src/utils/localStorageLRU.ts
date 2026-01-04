@@ -8,6 +8,8 @@
  * 4. 优雅降级（存储满时的处理）
  */
 
+import { fetchWithCsrf } from './fetchWithCsrf';
+
 interface ConversationAccessRecord {
   conversationId: string;
   lastAccessedAt: number; // 时间戳
@@ -224,7 +226,7 @@ async function notifyServerToArchive(conversationIds: string[], userId: string):
   try {
     // 批量归档请求
     const promises = conversationIds.map((conversationId) =>
-      fetch('/api/conversations/archive', {
+      fetchWithCsrf('/api/conversations/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId, userId }),

@@ -1,4 +1,5 @@
 // 对话管理 API 工具函数
+import { fetchWithCsrf } from './fetchWithCsrf';
 
 export interface Conversation {
   _id?: string;
@@ -47,7 +48,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
  */
 export async function createConversation(userId: string, title?: string): Promise<Conversation | null> {
   try {
-    const response = await fetch('/api/conversations', {
+    const response = await fetchWithCsrf('/api/conversations', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export async function deleteConversation(
   conversationId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}?userId=${userId}`, {
+    const response = await fetchWithCsrf(`/api/conversations/${conversationId}?userId=${userId}`, {
       method: 'DELETE',
     });
     
@@ -162,7 +163,7 @@ export async function updateConversationTitle(
   newTitle: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
+    const response = await fetchWithCsrf(`/api/conversations/${conversationId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

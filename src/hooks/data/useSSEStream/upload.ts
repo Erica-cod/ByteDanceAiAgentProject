@@ -6,6 +6,7 @@
 import { selectUploadStrategy } from '../../../utils/uploadStrategy';
 import { compressText } from '../../../utils/compression';
 import { ChunkUploader } from '../../../utils/chunkUploader';
+import { fetchWithCsrf } from '../../../utils/fetchWithCsrf';
 import type { UploadPayload } from './types';
 
 /**
@@ -17,7 +18,7 @@ export async function uploadCompressedBlob(blob: Blob, userId: string): Promise<
   formData.append('data', blob);
   formData.append('isCompressed', 'true');
 
-  const response = await fetch('/api/upload/compressed', {
+  const response = await fetchWithCsrf('/api/upload/compressed', {
     method: 'POST',
     body: formData,
   });

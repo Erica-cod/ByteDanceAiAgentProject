@@ -4,8 +4,18 @@
  */
 
 import { getContainer } from '../../_clean/di-container.js';
+import type { RequestOption } from '../../types/chat.js';
+import { requireCsrf } from '../_utils/csrf.js';
 
-export async function post({ data }: { data: any }) {
+export async function post({ data, headers }: RequestOption<any, any>) {
+  const csrf = await requireCsrf(headers);
+  if (csrf.ok === false) {
+    return {
+      status: csrf.status,
+      data: { error: csrf.message },
+    };
+  }
+
   const { sessionId } = data;
   
   if (!sessionId) {

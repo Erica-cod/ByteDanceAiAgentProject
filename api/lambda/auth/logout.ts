@@ -6,6 +6,8 @@
 import type { RequestOption } from '../../types/chat.js';
 import { getCorsHeaders, handleOptionsRequest } from '../_utils/cors.js';
 import { buildClearBffSessionCookie, deleteBffSessionFromHeaders } from '../_utils/bffOidcAuth.js';
+import { requireCsrf } from '../_utils/csrf.js';
+import { errorResponseWithStatus } from '../_utils/response.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
@@ -15,6 +17,11 @@ export async function options({ headers }: RequestOption<any, any>) {
 export async function post({ headers }: RequestOption<any, any>) {
   const requestOrigin = headers?.origin;
   const corsHeaders = getCorsHeaders(requestOrigin);
+
+  const csrf = await requireCsrf(headers);
+  if (csrf.ok === false) {
+    return errorResponseWithStatus(csrf.message, csrf.status, requestOrigin);
+  }
 
   await deleteBffSessionFromHeaders(headers);
 

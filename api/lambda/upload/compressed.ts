@@ -4,9 +4,19 @@
  */
 
 import { getContainer } from '../../_clean/di-container.js';
+import type { RequestOption } from '../../types/chat.js';
+import { requireCsrf } from '../_utils/csrf.js';
 
-export async function post({ data }: { data: any }) {
+export async function post({ data, headers }: RequestOption<any, any>) {
   try {
+    const csrf = await requireCsrf(headers);
+    if (csrf.ok === false) {
+      return {
+        status: csrf.status,
+        data: { error: csrf.message },
+      };
+    }
+
     const formData = data instanceof FormData ? data : data;
     
     const userId = formData.get ? formData.get('userId') : data.userId;

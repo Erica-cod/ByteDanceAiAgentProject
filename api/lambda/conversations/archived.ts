@@ -9,6 +9,7 @@ import type { RequestOption } from '../../types/chat.js';
 import { getDatabase } from '../../db/connection.js';
 import type { Conversation } from '../../db/models.js';
 import { getConversationLRUService } from '../../services/conversationLRUService.js';
+import { requireCsrf } from '../_utils/csrf.js';
 
 // ==================== 响应工具函数 ====================
 
@@ -111,6 +112,19 @@ export async function post({
 }: RequestOption<any, RestoreArchivedData>) {
   try {
     const requestOrigin = headers?.origin;
+
+    const csrf = await requireCsrf(headers);
+    if (csrf.ok === false) {
+      return {
+        statusCode: csrf.status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': requestOrigin || '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+        body: JSON.stringify({ success: false, error: csrf.message }),
+      };
+    }
 
     if (!data) {
       return errorResponse('请求数据不能为空', requestOrigin);

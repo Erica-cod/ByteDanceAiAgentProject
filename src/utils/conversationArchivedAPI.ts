@@ -2,6 +2,8 @@
  * 归档对话 API 调用函数
  */
 
+import { fetchWithCsrf } from './fetchWithCsrf';
+
 export interface ArchivedConversation {
   _id?: string;
   conversationId: string;
@@ -56,7 +58,7 @@ export async function restoreArchivedConversation(
   userId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch('/api/conversations/archived/restore', {
+    const response = await fetchWithCsrf('/api/conversations/archived/restore', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

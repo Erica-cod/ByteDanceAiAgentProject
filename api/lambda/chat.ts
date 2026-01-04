@@ -38,6 +38,7 @@ import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
 import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
+import { requireCsrf } from './_utils/csrf.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -95,6 +96,12 @@ export async function post({
     // ✅ 类型检查：确保 data 存在
     if (!data) {
       return errorResponse('请求数据不能为空', requestOrigin);
+    }
+
+    // ✅ CSRF + Origin/Referer 校验（保护所有写请求）
+    const csrf = await requireCsrf(headers);
+    if (csrf.ok === false) {
+      return errorResponseWithStatus(csrf.message, csrf.status, requestOrigin);
     }
     
     let {

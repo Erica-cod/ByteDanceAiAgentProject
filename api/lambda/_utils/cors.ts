@@ -40,7 +40,8 @@ export function getCorsHeaders(requestOrigin?: string): Record<string, string> {
   // 设置其他 CORS 头
   if (headers['Access-Control-Allow-Origin']) {
     headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Queue-Token, X-Queue-Position, X-Queue-Estimated-Wait';
+    // 允许 CSRF Header（前端写请求会带 X-CSRF-Token）
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRF-Token, X-Queue-Token, X-Queue-Position, X-Queue-Estimated-Wait';
     headers['Access-Control-Allow-Credentials'] = 'true';
     headers['Access-Control-Max-Age'] = '86400'; // 24小时
     

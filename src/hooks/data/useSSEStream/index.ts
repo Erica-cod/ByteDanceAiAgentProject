@@ -121,6 +121,7 @@ import {
   handleChunkingChunk,
 } from './chunking-handlers';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
+import { fetchWithCsrf } from '../../../utils/fetchWithCsrf';
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -218,7 +219,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         };
 
         const signal = abortControllerRef.current?.signal;
-        const response = await fetch('/api/chat', {
+        const response = await fetchWithCsrf('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
