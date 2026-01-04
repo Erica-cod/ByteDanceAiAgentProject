@@ -295,10 +295,10 @@ try {
 
 ## 测试
 
-运行测试脚本：
+运行 Jest 集成测试（可选）：
 
 ```bash
-node test/test-request-cache.js
+npm run test:request-cache
 ```
 
 测试内容：

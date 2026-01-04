@@ -157,10 +157,14 @@ console.log('归档对话:', data);
 
 ### 完整测试脚本
 
-已创建 `test/test-lru.js`，运行：
+已迁移为 Jest 集成测试，运行：
 
 ```bash
-node test/test-lru.js
+# 需要服务端运行（以及 MongoDB 可用）
+npm run dev
+
+# 另一个终端运行（脚本会自动打开 RUN_LRU_TEST=1）
+npm run test:lru
 ```
 
 ---

@@ -228,8 +228,8 @@ content (流式输出最终报告)
 # 启动开发服务器
 npm run dev
 
-# 运行测试脚本（另一个终端）
-node test/test-chunking.js
+# 运行 Jest 集成测试（另一个终端，会自动打开 RUN_CHUNKING_TEST=1）
+npm run test:chunking
 ```
 
 预期输出：

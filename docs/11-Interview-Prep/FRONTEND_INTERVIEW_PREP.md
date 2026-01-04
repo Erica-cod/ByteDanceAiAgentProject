@@ -1007,8 +1007,10 @@ for (const [userId, record] of invalidTokenAttempts.entries()) {
 
 #### **测试验证**
 ```bash
-# 位置：test/test-queue-invalid-final.js
-node test/test-queue-invalid-final.js
+# 无效 token 惩罚机制：已迁移为单元测试
+npm run test:unit
+# 或仅跑该文件：
+# node --experimental-vm-modules ./node_modules/jest/bin/jest.js api/_clean/infrastructure/queue/__tests__/queue-manager.test.ts
 
 # 预期结果：
 # 1. 全局队列触发 ✅
@@ -1035,14 +1037,13 @@ node test/test-queue-invalid-final.js
 
 ### **✅ 7. 测试文件说明**
 
-所有队列化相关测试位于 `test/` 目录：
+队列化相关测试（已迁移到 Jest / k6）：
 
 | 文件 | 用途 | 运行命令 |
 |------|------|----------|
-| `test-queue.js` | 基础队列功能测试（单用户并发限制） | `node test/test-queue.js` |
-| `test-queue-global.js` | 多用户全局队列测试 | `node test/test-queue-global.js` |
-| `test-queue-stress.js` | 压力测试（10 并发触发全局队列） | `node test/test-queue-stress.js` |
-| `test-queue-invalid-final.js` | 无效 token 惩罚机制测试 | `node test/test-queue-invalid-final.js` |
+| `test/jest/queueing.int.test.ts` | 429/Retry-After/队列 Token（需要服务端运行） | `npm run test:queue` |
+| `api/_clean/infrastructure/queue/__tests__/queue-manager.test.ts` | 无效 token 惩罚（纯单元） | `npm run test:unit` |
+| `test/k6/chat_sse_queue_429.js` | 压测：队列与 429 行为 | `npm run load:k6:chat:queue` |
 
 **运行前提**：
 - 服务已启动：`npm run dev`
