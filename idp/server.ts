@@ -52,6 +52,51 @@ async function recordLoginEvent(evt: Record<string, any>) {
   }
 }
 
+function generateOtp() {
+  // 演示：6 位数字验证码
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function mfaKey(uid: string) {
+  return `idp:mfa:${uid}`;
+}
+
+function pendingLoginKey(uid: string) {
+  return `idp:pending_login:${uid}`;
+}
+
+async function savePendingLogin(uid: string, data: { accountId: string; username: string; deviceIdHash?: string }) {
+  await redis.set(pendingLoginKey(uid), JSON.stringify({ ...data, createdAt: Date.now() }), 'EX', 10 * 60);
+}
+
+async function loadPendingLogin(uid: string): Promise<{ accountId: string; username: string; deviceIdHash?: string } | null> {
+  const raw = await redis.get(pendingLoginKey(uid));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as any;
+    return {
+      accountId: String(parsed.accountId || ''),
+      username: String(parsed.username || ''),
+      deviceIdHash: parsed.deviceIdHash ? String(parsed.deviceIdHash) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function clearPendingLogin(uid: string) {
+  await redis.del(pendingLoginKey(uid));
+  await redis.del(mfaKey(uid));
+}
+
+async function saveOtp(uid: string, otp: string) {
+  await redis.set(mfaKey(uid), otp, 'EX', 5 * 60); // 5 分钟
+}
+
+async function loadOtp(uid: string) {
+  return await redis.get(mfaKey(uid));
+}
+
 async function bindDevice(accountId: string, deviceIdHash: string) {
   const key = `idp:account_device:${accountId}:${deviceIdHash}`;
   await redis.set(key, String(Date.now()), 'EX', 30 * 24 * 3600); // 30 天
@@ -208,6 +253,46 @@ provider.use(async (ctx, next) => {
     if (deviceIdHash) {
       const seen = await hasSeenDevice(accountId, deviceIdHash);
       if (!seen) risk = 'medium';
+    }
+
+    // ✅ 新设备：强制二次确认（演示）
+    if (risk === 'medium') {
+      const otp = generateOtp();
+      await saveOtp(uid, otp);
+      await savePendingLogin(uid, { accountId, username, deviceIdHash: deviceIdHash || undefined });
+      await recordLoginEvent({
+        type: 'login_step_up_required',
+        accountId,
+        username,
+        deviceIdHash: deviceIdHash || undefined,
+        risk,
+      });
+
+      const body = `
+        <h2>二次确认（新设备）</h2>
+        <div class="muted">
+          检测到这是该账号的<strong>新设备</strong>登录（risk=medium）。为演示账号保护流程，需要输入一次性验证码才能继续。
+        </div>
+        <div class="kv">
+          <div>账号</div><div><code>${escapeHtml(username)}</code></div>
+          <div>deviceIdHash</div><div><code>${escapeHtml(deviceIdHash || '（未提供）')}</code></div>
+          <div>演示验证码</div><div><code>${escapeHtml(otp)}</code> <span class="muted">（生产环境应通过短信/邮箱/验证码服务下发）</span></div>
+        </div>
+        <form method="post" action="/interaction/${escapeHtml(uid)}/mfa" style="margin-top:16px" class="row">
+          <input name="otp" placeholder="输入 6 位验证码" />
+          <button type="submit">验证并继续</button>
+        </form>
+        <form method="get" action="/interaction/${escapeHtml(uid)}" style="margin-top:12px">
+          <button type="submit" class="secondary">返回</button>
+        </form>
+      `;
+      ctx.type = 'html';
+      ctx.body = page('二次确认', body);
+      return;
+    }
+
+    // 低风险：直接登录成功，绑定设备
+    if (deviceIdHash) {
       await bindDevice(accountId, deviceIdHash);
     }
 
@@ -221,6 +306,69 @@ provider.use(async (ctx, next) => {
 
     const result = {
       login: { accountId },
+    };
+
+    await provider.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
+    return;
+  }
+
+  if (ctx.method === 'POST' && rest === '/mfa') {
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      ctx.req.on('data', (c) => chunks.push(Buffer.from(c)));
+      ctx.req.on('end', () => resolve());
+      ctx.req.on('error', reject);
+    });
+    const raw = Buffer.concat(chunks).toString('utf-8');
+    const form = new URLSearchParams(raw);
+    const otp = (form.get('otp') || '').trim();
+
+    const expected = await loadOtp(uid);
+    const pending = await loadPendingLogin(uid);
+
+    if (!expected || !pending?.accountId) {
+      ctx.type = 'html';
+      ctx.body = page('二次确认失败', `<h2>二次确认失败</h2><div class="muted">验证码已过期或上下文丢失，请返回重新登录。</div>`);
+      return;
+    }
+
+    if (otp !== expected) {
+      await recordLoginEvent({
+        type: 'login_step_up_failed',
+        accountId: pending.accountId,
+        username: pending.username,
+        deviceIdHash: pending.deviceIdHash,
+        risk: 'medium',
+      });
+      const body = `
+        <h2>二次确认失败</h2>
+        <div class="muted">验证码不正确，请重试（演示）。</div>
+        <form method="post" action="/interaction/${escapeHtml(uid)}/mfa" style="margin-top:16px" class="row">
+          <input name="otp" placeholder="输入 6 位验证码" />
+          <button type="submit">重新验证</button>
+        </form>
+      `;
+      ctx.type = 'html';
+      ctx.body = page('二次确认失败', body);
+      return;
+    }
+
+    // 验证成功：绑定设备 + 完成登录
+    if (pending.deviceIdHash) {
+      await bindDevice(pending.accountId, pending.deviceIdHash);
+    }
+    await recordLoginEvent({
+      type: 'login_step_up_ok',
+      accountId: pending.accountId,
+      username: pending.username,
+      deviceIdHash: pending.deviceIdHash,
+      risk: 'medium',
+    });
+
+    await clearPendingLogin(uid);
+
+    const result = {
+      login: { accountId: pending.accountId },
     };
 
     await provider.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
