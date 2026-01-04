@@ -7,6 +7,9 @@
   overflow: hidden;
   position: relative;
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* 关键：保证虚拟列表在 flex 容器中能正确计算高度 */
 }
 
 .message-list-refactored__mask {
@@ -35,6 +38,18 @@
 .message-list-refactored__list {
   padding: 16px;
   outline: none;
+}
+
+/* Virtuoso 的滚动容器（负责 padding） */
+.message-list-refactored__scroller {
+  padding: 16px;
+  outline: none;
+}
+
+.message-list-refactored__virtuoso {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .message-list-refactored__empty {

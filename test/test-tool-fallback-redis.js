@@ -7,7 +7,7 @@
  * npx tsx test/test-tool-fallback-redis.js
  */
 
-// ⚠️ 必须先加载环境变量再导入模块！
+//  必须先加载环境变量再导入模块！
 import dotenv from 'dotenv';
 import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';

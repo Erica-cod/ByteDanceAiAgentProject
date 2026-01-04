@@ -5,28 +5,33 @@
   position: relative;
 }
 
-/* 覆盖 react-virtualized 默认样式 */
-.virtual-list-container .ReactVirtualized__List {
+/* Virtuoso 的滚动容器 */
+.virtual-list-scroller {
   outline: none;
 }
 
 /* 自定义滚动条样式 */
-.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar {
+.virtual-list-scroller::-webkit-scrollbar {
   width: 6px;
 }
 
-.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-track {
+.virtual-list-scroller::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-thumb {
+.virtual-list-scroller::-webkit-scrollbar-thumb {
   background: rgba(204, 204, 204, 0.6);
   border-radius: 3px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 
-.virtual-list-container .ReactVirtualized__List::-webkit-scrollbar-thumb:hover {
+.virtual-list-scroller::-webkit-scrollbar-thumb:hover {
   background: rgba(153, 153, 153, 0.8);
+}
+
+.virtual-list-empty {
+  height: 100%;
+  width: 100%;
 }
 

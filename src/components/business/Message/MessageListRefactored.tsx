@@ -8,14 +8,12 @@
  * - 代码更简洁，职责更清晰
  */
 
-import React, { useRef, useImperativeHandle, useCallback, forwardRef } from 'react';
-import { List, CellMeasurer, CellMeasurerCache, AutoSizer } from 'react-virtualized';
-import type { ListRowProps } from 'react-virtualized';
+import React, { useRef, useImperativeHandle, useCallback, forwardRef, memo, useMemo } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MessageItemRenderer } from './MessageItemRenderer';
 import type { Message } from '../../../stores/chatStore';
 import type { QueueItem } from '../../../stores/queueStore';
 import { useChatStore } from '../../../stores';
-import 'react-virtualized/styles.css';
 import './MessageListRefactored.css';
 
 interface MessageListRefactoredProps {
@@ -36,7 +34,7 @@ export interface MessageListRefactoredHandle {
   recomputeRowHeights: (index?: number) => void;
 }
 
-const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageListRefactoredProps>((props, ref) => {
+const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, MessageListRefactoredProps>((props, ref) => {
   const {
     messages,
     queue,
@@ -49,18 +47,27 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
     onRetry,
   } = props;
 
-  const listRef = useRef<List>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const userId = useChatStore((s) => s.userId);
-  
-  // 缓存每行高度
-  const cacheRef = useRef(
-    new CellMeasurerCache({
-      defaultHeight: 200,
-      fixedWidth: true,
-      minHeight: 120,
-    })
-  );
+  const isAtBottomRef = useRef(true);
+
+  // 关键：不要把 atBottom 放进 React state（会导致布局变化/输入变化触发频繁 setState → 列表闪烁）
+  // 用 ref 记录即可，并提供一个稳定的 followOutput 回调。
+  const followOutput = useCallback(() => (isAtBottomRef.current ? 'auto' : false), []);
+
+  const VirtuosoScroller = useMemo(() => {
+    return React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function Scroller(props, scrollerRef) {
+      const { className, ...rest } = props;
+      return (
+        <div
+          {...rest}
+          ref={scrollerRef}
+          className={['message-list-refactored__scroller', className].filter(Boolean).join(' ')}
+        />
+      );
+    });
+  }, []);
 
   // 遮罩状态
   const [isTransitioning, setIsTransitioning] = React.useState(true);
@@ -93,89 +100,51 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
     }
   }, [messages.length]);
 
+  // 注意：不要在流式输出的每个 chunk 里主动 scrollToIndex。
+  // 这会导致 Virtuoso 频繁布局 + 滚动联动，产生“闪烁/抖动”。
+  // 我们只用 Virtuoso 自带 followOutput 来跟随底部，并用 atBottomStateChange 控制是否跟随。
+
   // 暴露方法
   useImperativeHandle(ref, () => ({
     scrollToRow: (index: number) => {
-      listRef.current?.scrollToRow(index);
+      virtuosoRef.current?.scrollToIndex({ index, align: 'end', behavior: 'auto' });
     },
     scrollToBottom: () => {
       if (messages.length > 0) {
-        listRef.current?.scrollToRow(messages.length - 1);
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'auto' });
       }
     },
     recomputeRowHeights: (index?: number) => {
-      if (index !== undefined) {
-        cacheRef.current.clear(index, 0);
-        listRef.current?.recomputeRowHeights(index);
-      } else {
-        cacheRef.current.clearAll();
-        listRef.current?.recomputeRowHeights();
-      }
+      // Virtuoso 会自动测量并处理动态高度，这里保留接口用于兼容调用方
+      // 如果后续需要强制刷新，可通过 key 或 data 触发 Virtuoso 内部重算
+      void index;
     },
   }));
 
-  // 滚动到底部
-  React.useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        listRef.current?.scrollToRow(messages.length - 1);
-      }, 100);
-    }
-  }, [messages.length]);
-
-  // 滚动处理
-  const handleScroll = useCallback(
-    ({ scrollTop }: { scrollTop: number }) => {
-      if (scrollTop < 100 && hasMoreMessages && !isLoadingMore) {
-        onLoadOlder();
-      }
-    },
-    [hasMoreMessages, isLoadingMore, onLoadOlder]
-  );
-
-  // 渲染单行
-  const rowRenderer = useCallback(
-    ({ index, key, parent, style }: ListRowProps) => {
+  // Virtuoso item renderer
+  const itemContent = useCallback(
+    (index: number) => {
       const message = messages[index];
-      const queueItem = queue.find(q => q.userMessageId === message.id);
+      const queueItem = queue.find((q) => q.userMessageId === message.id);
 
       return (
-        <CellMeasurer
-          key={key}
-          cache={cacheRef.current}
-          parent={parent}
-          columnIndex={0}
-          rowIndex={index}
-        >
-          {({ registerChild, measure }) => (
-            <div
-              ref={registerChild as any}
-              style={style}
-              onLoad={measure}
-            >
-              <MessageItemRenderer
-                message={message}
-                userId={userId}
-                queuePosition={queueItem ? queue.indexOf(queueItem) + 1 : undefined}
-                onRetry={(id) => {
-                  const msgIndex = messages.findIndex((m) => m.id === id);
-                  const prevUserMsg = messages[msgIndex - 1];
-                  if (prevUserMsg?.role === 'user') {
-                    onRetry(prevUserMsg.id);
-                  }
-                }}
-                onHeightChange={() => {
-                  // ⚡ 性能优化：使用 RAF 批量处理布局更新
-                  requestAnimationFrame(() => {
-                    cacheRef.current.clear(index, 0);
-                    measure();
-                    listRef.current?.recomputeRowHeights(index);
-                  });
-                }}
-              />
-            </div>
-          )}
-        </CellMeasurer>
+        <MessageItemRenderer
+          message={message}
+          userId={userId}
+          queuePosition={queueItem ? queue.indexOf(queueItem) + 1 : undefined}
+          onRetry={(id) => {
+            const msgIndex = messages.findIndex((m) => m.id === id);
+            const prevUserMsg = messages[msgIndex - 1];
+            if (prevUserMsg?.role === 'user') {
+              onRetry(prevUserMsg.id);
+            }
+          }}
+          onHeightChange={() => {
+            // 流式输出会频繁触发高度变化；这里不主动滚动，交给 followOutput 处理。
+            // 只有“用户在底部”时，Virtuoso 才会自动跟随到底部。
+            void index;
+          }}
+        />
       );
     },
     [messages, queue, userId, onRetry]
@@ -206,28 +175,39 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
       )}
 
       {/* 虚拟列表 */}
-      <AutoSizer>
-        {({ height, width }) => {
-          const loadMoreHeight = (isLoadingMore || hasMoreMessages) && messages.length > 0 ? 40 : 0;
-          const listHeight = height - loadMoreHeight;
-          return (
-            <List
-              ref={listRef}
-              height={listHeight}
-              width={width}
-              rowCount={messages.length}
-              rowHeight={cacheRef.current.rowHeight}
-              rowRenderer={rowRenderer}
-              overscanRowCount={10}
-              noRowsRenderer={noRowsRenderer}
-              onScroll={handleScroll}
-              scrollToAlignment="end"
-              className="message-list-refactored__list"
-              estimatedRowSize={800}
-            />
-          );
-        }}
-      </AutoSizer>
+      {messages.length === 0 ? (
+        noRowsRenderer()
+      ) : (
+        <Virtuoso
+          ref={virtuosoRef}
+          className="message-list-refactored__virtuoso"
+          data={messages}
+          itemContent={(index) => itemContent(index)}
+          computeItemKey={(_, item) => item.id}
+          // 关键：初始渲染从底部开始（聊天默认展示最新消息）
+          initialTopMostItemIndex={messages.length - 1}
+          // 关键：避免“流式输出想到底部却卡顶部”
+          // - 只有在用户接近底部时才自动跟随
+          followOutput={followOutput}
+          atBottomStateChange={(isAtBottom) => {
+            // atBottom = true 表示用户在底部；否则用户在看历史，不要抢滚动
+            isAtBottomRef.current = isAtBottom;
+          }}
+          // 上拉加载历史：滚动到顶部触发
+          startReached={() => {
+            if (hasMoreMessages && !isLoadingMore) {
+              onLoadOlder();
+            }
+          }}
+          // 如果你们有“firstItemIndex”用于分页锚定，这里预留入口（当前实现先不强依赖它）
+          // initialTopMostItemIndex={Math.max(0, firstItemIndex)}
+          overscan={600}
+          components={{
+            Scroller: VirtuosoScroller,
+            Footer: () => <div ref={thinkingEndRef} />,
+          }}
+        />
+      )}
 
       {/* 正在生成提示 */}
       {isLoading && (
@@ -243,7 +223,7 @@ const MessageListRefactored = forwardRef<MessageListRefactoredHandle, MessageLis
   );
 });
 
-MessageListRefactored.displayName = 'MessageListRefactored';
+MessageListRefactoredInner.displayName = 'MessageListRefactored';
 
-export default MessageListRefactored;
+export default memo(MessageListRefactoredInner);
 

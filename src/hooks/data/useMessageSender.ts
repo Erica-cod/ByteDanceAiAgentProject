@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useChatStore, useUIStore } from '../../stores';
 import { useSSEStream } from './useSSEStream';
 import type { MessageListRefactoredHandle as MessageListHandle } from '../../components/business/Message/MessageListRefactored';
@@ -20,7 +21,7 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
   });
 
   // 核心发送逻辑
-  const sendMessageInternal = async (messageText: string, existingUserMessageId?: string) => {
+  const sendMessageInternal = useCallback(async (messageText: string, existingUserMessageId?: string) => {
     let userMessage;
 
     if (existingUserMessageId) {
@@ -60,7 +61,7 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
 
     addMessage(assistantMessage);
 
-    // ✅ react-virtualized 会在 MessageList 内部处理首次滚动
+    //  虚拟列表会在 MessageList 内部处理首次滚动（当前实现基于 react-virtuoso）
     // 不需要在这里手动滚动
 
     try {
@@ -73,15 +74,23 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    addMessage,
+    createAbortController,
+    options.messageCountRefs,
+    removeMessage,
+    saveToCache,
+    sendSSEMessage,
+    setLoading,
+  ]);
 
   // 重发失败的消息
-  const retryMessage = async (userMessageId: string) => {
+  const retryMessage = useCallback(async (userMessageId: string) => {
     const messages = useChatStore.getState().messages;
     const userMsg = messages.find((m) => m.id === userMessageId);
     if (!userMsg || userMsg.role !== 'user') return;
 
-    console.log('🔄 重发消息:', userMsg.content);
+    console.log('重发消息:', userMsg.content);
 
     // 移除失败的 assistant 消息（如果有）
     const userMsgIndex = messages.findIndex((m) => m.id === userMessageId);
@@ -94,12 +103,12 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
 
     // 重新发送
     await sendMessageInternal(userMsg.content, userMsg.id);
-  };
+  }, [removeMessage, sendMessageInternal]);
 
   return {
     sendMessageInternal,
     retryMessage,
-    abort,
+    abort: useCallback(() => abort(), [abort]),
   };
 }
 
