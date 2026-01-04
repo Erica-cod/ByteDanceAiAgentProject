@@ -1,6 +1,6 @@
 /**
  * 工具缓存管理器
- * 
+ *
  * 功能：
  * - 基于参数的智能缓存
  * - 支持 TTL 过期
@@ -9,8 +9,8 @@
  */
 
 import crypto from 'crypto';
-import type { CacheConfig, ToolContext } from './types.js';
-import { getRedisClient, isRedisAvailable } from '../../../_clean/infrastructure/cache/redis-client.js';
+import type { CacheConfig, ToolContext } from '../types.js';
+import { getRedisClient, isRedisAvailable } from '../../../../_clean/infrastructure/cache/redis-client.js';
 import {
   getToolCache,
   getStaleToolCache,
@@ -54,7 +54,7 @@ export class CacheManager {
       this.useRedis = false;
     }
   }
-  
+
   /**
    * 检查 Redis 是否可用
    */
@@ -77,12 +77,7 @@ export class CacheManager {
   /**
    * 生成缓存键
    */
-  private generateKey(
-    toolName: string,
-    params: any,
-    context: ToolContext,
-    config: CacheConfig
-  ): string {
+  private generateKey(toolName: string, params: any, context: ToolContext, config: CacheConfig): string {
     let keyData: any;
 
     switch (config.keyStrategy) {
@@ -90,7 +85,7 @@ export class CacheManager {
         // 按用户缓存（同一用户同样的参数返回缓存）
         keyData = { userId: context.userId, params };
         break;
-      
+
       case 'custom':
         // 自定义策略
         if (config.keyGenerator) {
@@ -99,7 +94,7 @@ export class CacheManager {
         // 降级到默认策略
         keyData = params;
         break;
-      
+
       case 'params':
       default:
         // 只按参数缓存（不区分用户）
@@ -117,7 +112,7 @@ export class CacheManager {
    */
   async get(toolName: string, params: any, context: ToolContext): Promise<any | null> {
     const config = this.configs.get(toolName);
-    
+
     // 缓存未启用
     if (!config || !config.enabled) {
       return null;
@@ -140,36 +135,36 @@ export class CacheManager {
     // 降级到内存缓存
     const key = this.generateKey(toolName, params, context, config);
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       return null;
     }
-    
+
     // 检查是否过期
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
       this.stats.misses++;
       return null;
     }
-    
+
     // 命中
     entry.hits++;
     this.stats.hits++;
     console.log(`✅ 缓存命中: ${toolName} (已使用 ${entry.hits} 次)`);
-    
+
     return {
       ...entry.result,
       fromCache: true,
     };
   }
-  
+
   /**
    * 获取过期缓存（用于降级）
    */
   async getStale(toolName: string, params: any, context: ToolContext): Promise<any | null> {
     const config = this.configs.get(toolName);
-    
+
     if (!config || !config.enabled) {
       return null;
     }
@@ -190,7 +185,7 @@ export class CacheManager {
     // 内存缓存：即使过期也返回
     const key = this.generateKey(toolName, params, context, config);
     const entry = this.cache.get(key);
-    
+
     if (entry) {
       console.log(`⚠️  返回过期缓存: ${toolName}`);
       return {
@@ -200,7 +195,7 @@ export class CacheManager {
         message: (entry.result.message || '') + ' (数据可能已过期)',
       };
     }
-    
+
     return null;
   }
 
@@ -209,7 +204,7 @@ export class CacheManager {
    */
   async set(toolName: string, params: any, context: ToolContext, result: any): Promise<void> {
     const config = this.configs.get(toolName);
-    
+
     // 缓存未启用
     if (!config || !config.enabled) {
       return;
@@ -230,14 +225,14 @@ export class CacheManager {
     // 降级到内存缓存
     const key = this.generateKey(toolName, params, context, config);
     const now = Date.now();
-    
+
     this.cache.set(key, {
       result,
       timestamp: now,
       expiresAt: now + config.ttl * 1000,
       hits: 0,
     });
-    
+
     this.stats.sets++;
     console.log(`💾 缓存已设置: ${toolName}，有效期 ${config.ttl}秒`);
   }
@@ -247,7 +242,7 @@ export class CacheManager {
    */
   async clear(toolName: string): Promise<number> {
     let cleared = 0;
-    
+
     // 清除 Redis 缓存
     if (this.useRedis) {
       try {
@@ -257,19 +252,19 @@ export class CacheManager {
         console.warn('⚠️  Redis 缓存清除失败');
       }
     }
-    
+
     // 清除内存缓存
-    for (const [key, _] of this.cache.entries()) {
+    for (const [key] of this.cache.entries()) {
       if (key.startsWith(`${toolName}:`)) {
         this.cache.delete(key);
         cleared++;
       }
     }
-    
+
     if (cleared > 0) {
       console.log(`🧹 清除了 ${cleared} 个 "${toolName}" 的缓存`);
     }
-    
+
     return cleared;
   }
 
@@ -278,7 +273,7 @@ export class CacheManager {
    */
   async clearAll(): Promise<void> {
     let total = 0;
-    
+
     // 清除 Redis 缓存
     if (this.useRedis) {
       try {
@@ -288,12 +283,12 @@ export class CacheManager {
         console.warn('⚠️  Redis 缓存清除失败');
       }
     }
-    
+
     // 清除内存缓存
     const size = this.cache.size;
     this.cache.clear();
     total += size;
-    
+
     console.log(`🧹 清除了所有缓存，共 ${total} 个`);
   }
 
@@ -303,14 +298,14 @@ export class CacheManager {
   cleanup(): void {
     const now = Date.now();
     let cleaned = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (now > entry.expiresAt) {
         this.cache.delete(key);
         cleaned++;
       }
     }
-    
+
     if (cleaned > 0) {
       console.log(`🧹 清理了 ${cleaned} 个过期缓存`);
     }
@@ -321,8 +316,8 @@ export class CacheManager {
    */
   getStats() {
     const total = this.stats.hits + this.stats.misses;
-    const hitRate = total > 0 ? (this.stats.hits / total * 100).toFixed(1) : '0.0';
-    
+    const hitRate = total > 0 ? ((this.stats.hits / total) * 100).toFixed(1) : '0.0';
+
     return {
       size: this.cache.size,
       hits: this.stats.hits,
@@ -338,14 +333,14 @@ export class CacheManager {
   getToolStats(toolName: string) {
     let count = 0;
     let totalHits = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (key.startsWith(`${toolName}:`)) {
         count++;
         totalHits += entry.hits;
       }
     }
-    
+
     return {
       count,
       totalHits,
@@ -356,4 +351,5 @@ export class CacheManager {
 
 // 单例实例
 export const cacheManager = new CacheManager();
+
 

@@ -83,6 +83,38 @@ export interface CircuitBreakerConfig {
   resetTimeout: number;
   /** 半开状态下的测试请求数 */
   halfOpenRequests?: number;
+  /**
+   * 额外策略配置（用于扩展：如按 HTTP 状态码熔断、慢调用熔断、错误率熔断等）
+   *
+   * 约定：key 为策略名，value 为该策略的自定义配置。
+   * 例如：
+   * strategies: {
+   *   httpStatus: { enabled: true, statusCodes: [429, 500], failureThreshold: 3 }
+   * }
+   */
+  strategies?: Record<string, any>;
+}
+
+/**
+ * 熔断器状态
+ */
+export type CircuitState = 'closed' | 'open' | 'half-open';
+
+/**
+ * 熔断器可插拔接口
+ * 
+ * 说明：ToolExecutor 只依赖这个接口，从而允许后续替换不同熔断实现
+ * （例如基于滑动窗口的错误率熔断、Resilience4j 风格、分布式熔断等）。
+ */
+export interface CircuitBreakerProvider {
+  setConfig(toolName: string, config: CircuitBreakerConfig): void;
+  canExecute(toolName: string): { allowed: boolean; reason?: string };
+  recordSuccess(toolName: string, info?: { result?: ToolResult }): void;
+  recordFailure(toolName: string, info?: { error?: any; result?: ToolResult }): void;
+  reset(toolName: string): void;
+  getState(toolName: string): CircuitState;
+  getStats(toolName: string): any;
+  destroy?(): void;
 }
 
 /**

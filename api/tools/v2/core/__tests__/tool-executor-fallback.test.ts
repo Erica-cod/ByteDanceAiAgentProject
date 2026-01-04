@@ -14,8 +14,8 @@ import type { ToolPlugin } from '../types.js';
 describe('ToolExecutor fallback chain', () => {
   test('主工具失败：应触发 default 降级', async () => {
     // 只导入 core 单例，避免引入 search-web 等插件带来外部依赖告警
-    const { toolRegistry } = await import('../tool-registry.js');
-    const { toolExecutor } = await import('../tool-executor.js');
+    const { toolRegistry } = await import('../registry/tool-registry.js');
+    const { toolExecutor } = await import('../execution/tool-executor.js');
 
     const toolName = `test_dummy_fail_${Date.now()}`;
 

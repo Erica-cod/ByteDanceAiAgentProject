@@ -5,9 +5,11 @@
  * 保证现有代码无需修改即可使用新的限流、缓存、熔断等功能
  */
 
-import { toolExecutor } from '../core/tool-executor.js';
+import { toolExecutor } from '../core/execution/tool-executor.js';
 import type { ToolExecutionResult } from '../../toolExecutor.js';
 import type { ToolContext } from '../core/types.js';
+import '../protocols/builtins.js';
+import { toolCallProtocolRegistry } from '../protocols/protocol-registry.js';
 
 /**
  * 兼容旧的 executeToolCall 接口
@@ -27,8 +29,13 @@ export async function executeToolCall(
 ): Promise<ToolExecutionResult> {
   console.log('🔄 [LegacyAdapter] 使用新工具系统处理旧格式的工具调用');
 
-  // 1. 解析工具调用（兼容旧格式）
-  const { tool, query, params, options } = normalizeToolCall(toolCall);
+  // 1. 解析工具调用（通过可插拔协议）
+  const protocol = toolCallProtocolRegistry.detect(toolCall);
+  if (!protocol) {
+    console.warn('⚠️  [LegacyAdapter] 未匹配到协议，使用兜底解析');
+  }
+
+  const normalized = protocol?.parse(toolCall) ?? fallbackParse(toolCall);
 
   // 2. 构建新的执行上下文
   const context: ToolContext = {
@@ -37,36 +44,32 @@ export async function executeToolCall(
     timestamp: Date.now(),
   };
 
-  // 3. 合并参数
-  const mergedParams = {
-    ...params,
-    ...(query ? { query } : {}),
-    ...(options || {}),
-  };
+  // 3. 参数（协议已标准化）
+  const params = normalized.params ?? {};
 
   // 4. 执行工具
-  const result = await toolExecutor.execute(tool, mergedParams, context);
+  const result = await toolExecutor.execute(normalized.toolName, params, context);
 
   // 5. 转换为旧格式的返回值
+  if (protocol?.formatToTextResult) {
+    return protocol.formatToTextResult(result, context);
+  }
+
   return convertToLegacyFormat(result);
 }
 
 /**
- * 标准化工具调用（支持多种旧格式）
+ * 兜底解析（尽量向后兼容）
  */
-function normalizeToolCall(toolCall: any): {
-  tool: string;
-  query?: string;
-  params: any;
-  options?: any;
-} {
+function fallbackParse(toolCall: any): { toolName: string; params: any } {
   // 格式 1：{ tool, query, options }
   if (toolCall.tool && typeof toolCall.tool === 'string') {
     return {
-      tool: toolCall.tool,
-      query: toolCall.query,
-      params: {},
-      options: toolCall.options,
+      toolName: toolCall.tool,
+      params: {
+        ...(toolCall.query ? { query: toolCall.query } : {}),
+        ...(toolCall.options || {}),
+      },
     };
   }
 
@@ -77,22 +80,30 @@ function normalizeToolCall(toolCall: any): {
       : toolCall.function.arguments;
 
     return {
-      tool: toolCall.function.name,
+      toolName: toolCall.function.name,
       params: args,
+    };
+  }
+
+  // 格式 2.1：{ name, args }（常见于 <tool_call> JSON）
+  if (toolCall.name && toolCall.args) {
+    return {
+      toolName: String(toolCall.name),
+      params: toolCall.args || {},
     };
   }
 
   // 格式 3：直接就是工具名
   if (typeof toolCall === 'string') {
     return {
-      tool: toolCall,
+      toolName: toolCall,
       params: {},
     };
   }
 
   // 默认格式
   return {
-    tool: toolCall.tool || 'unknown',
+    toolName: toolCall.tool || 'unknown',
     params: toolCall,
   };
 }

@@ -4,7 +4,7 @@
  * 展示如何在实际场景中使用时间工具插件
  */
 
-import { toolExecutor } from '../core/tool-executor.js';
+import { toolExecutor } from '../core/execution/tool-executor.js';
 import { initializeToolSystem } from '../index.js';
 
 // 初始化工具系统

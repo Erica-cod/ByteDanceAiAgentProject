@@ -1,13 +1,13 @@
 /**
  * 熔断器
- * 
+ *
  * 功能：
  * - 当工具连续失败达到阈值时，熔断（拒绝请求）
  * - 半开状态：定时尝试恢复
  * - 自动关闭：成功后恢复正常
  */
 
-import type { CircuitBreakerConfig } from './types.js';
+import type { CircuitBreakerConfig } from '../types.js';
 
 type CircuitState = 'closed' | 'open' | 'half-open';
 
@@ -43,7 +43,7 @@ export class CircuitBreaker {
    */
   canExecute(toolName: string): { allowed: boolean; reason?: string } {
     const config = this.configs.get(toolName);
-    
+
     // 未启用熔断器
     if (!config || !config.enabled) {
       return { allowed: true };
@@ -55,19 +55,19 @@ export class CircuitBreaker {
       case 'closed':
         // 正常状态，允许执行
         return { allowed: true };
-      
+
       case 'open':
         // 熔断状态，拒绝执行
         return {
           allowed: false,
           reason: `工具 "${toolName}" 已熔断（连续失败过多），请稍后重试`,
         };
-      
-      case 'half-open':
+
+      case 'half-open': {
         // 半开状态，允许少量请求测试
         const halfOpenRequests = config.halfOpenRequests || 1;
         const stats = this.stats.get(toolName)!;
-        
+
         if (stats.successes < halfOpenRequests) {
           return { allowed: true };
         } else {
@@ -77,19 +77,20 @@ export class CircuitBreaker {
             reason: `工具 "${toolName}" 正在恢复中，请稍后重试`,
           };
         }
+      }
     }
   }
 
   /**
    * 记录成功
    */
-  recordSuccess(toolName: string): void {
+  recordSuccess(toolName: string, _info?: { result?: any }): void {
     const config = this.configs.get(toolName);
     if (!config || !config.enabled) return;
 
     const state = this.states.get(toolName)!;
     const stats = this.stats.get(toolName)!;
-    
+
     stats.successes++;
     stats.lastSuccessTime = Date.now();
 
@@ -105,13 +106,13 @@ export class CircuitBreaker {
   /**
    * 记录失败
    */
-  recordFailure(toolName: string): void {
+  recordFailure(toolName: string, _info?: { error?: any; result?: any }): void {
     const config = this.configs.get(toolName);
     if (!config || !config.enabled) return;
 
     const state = this.states.get(toolName)!;
     const stats = this.stats.get(toolName)!;
-    
+
     stats.failures++;
     stats.lastFailureTime = Date.now();
 
@@ -133,7 +134,7 @@ export class CircuitBreaker {
    */
   private open(toolName: string): void {
     const config = this.configs.get(toolName)!;
-    
+
     this.states.set(toolName, 'open');
     console.error(`🚨 工具 "${toolName}" 已熔断，将在 ${config.resetTimeout}ms 后尝试恢复`);
 
@@ -145,7 +146,7 @@ export class CircuitBreaker {
     const timer = setTimeout(() => {
       this.halfOpen(toolName);
     }, config.resetTimeout);
-    
+
     this.resetTimers.set(toolName, timer);
   }
 
@@ -154,10 +155,10 @@ export class CircuitBreaker {
    */
   private halfOpen(toolName: string): void {
     this.states.set(toolName, 'half-open');
-    
+
     const stats = this.stats.get(toolName)!;
     stats.successes = 0; // 重置成功计数，用于测试
-    
+
     console.log(`🔄 工具 "${toolName}" 进入半开状态，开始测试恢复`);
   }
 
@@ -166,18 +167,18 @@ export class CircuitBreaker {
    */
   private close(toolName: string): void {
     this.states.set(toolName, 'closed');
-    
+
     const stats = this.stats.get(toolName)!;
     stats.failures = 0;
     stats.successes = 0;
-    
+
     // 清除定时器
     const timer = this.resetTimers.get(toolName);
     if (timer) {
       clearTimeout(timer);
       this.resetTimers.delete(toolName);
     }
-    
+
     console.log(`✅ 工具 "${toolName}" 熔断器已关闭，恢复正常`);
   }
 
@@ -205,7 +206,7 @@ export class CircuitBreaker {
 
     const state = this.getState(toolName);
     const total = stats.failures + stats.successes;
-    const failureRate = total > 0 ? (stats.failures / total * 100).toFixed(1) : '0.0';
+    const failureRate = total > 0 ? ((stats.failures / total) * 100).toFixed(1) : '0.0';
 
     return {
       state,
@@ -231,4 +232,5 @@ export class CircuitBreaker {
 
 // 单例实例
 export const circuitBreaker = new CircuitBreaker();
+
 

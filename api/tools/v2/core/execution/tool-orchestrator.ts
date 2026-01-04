@@ -1,8 +1,8 @@
 /**
  * 工具编排器
- * 
+ *
  * 解决问题：用户要求"列计划→查方案→更新计划"，模型只做第一步
- * 
+ *
  * 功能：
  * - 解析多步执行计划
  * - 管理工具依赖关系
@@ -11,22 +11,13 @@
  */
 
 import { toolExecutor } from './tool-executor.js';
-import type {
-  ToolContext,
-  ToolOrchestrationPlan,
-  ToolStep,
-  OrchestrationResult,
-  ToolResult,
-} from './types.js';
+import type { ToolContext, ToolOrchestrationPlan, ToolStep, OrchestrationResult, ToolResult } from '../types.js';
 
 export class ToolOrchestrator {
   /**
    * 执行编排计划
    */
-  async executePlan(
-    plan: ToolOrchestrationPlan,
-    context: ToolContext
-  ): Promise<OrchestrationResult> {
+  async executePlan(plan: ToolOrchestrationPlan, context: ToolContext): Promise<OrchestrationResult> {
     const startTime = Date.now();
     const stepResults: Record<string, ToolResult> = {};
     const { steps, planId } = plan;
@@ -125,11 +116,7 @@ export class ToolOrchestrator {
   /**
    * 执行单个步骤
    */
-  private async executeStep(
-    step: ToolStep,
-    previousResults: Record<string, ToolResult>,
-    context: ToolContext
-  ): Promise<ToolResult> {
+  private async executeStep(step: ToolStep, previousResults: Record<string, ToolResult>, context: ToolContext): Promise<ToolResult> {
     // 解析参数中的变量引用（如 ${step1.data.planId}）
     const resolvedParams = this.resolveParams(step.params, previousResults);
 
@@ -139,15 +126,12 @@ export class ToolOrchestrator {
 
   /**
    * 解析参数中的变量引用
-   * 
+   *
    * 例如：
    * params: { plan_id: "${step1.data.planId}" }
    * 解析为: { plan_id: "actual-plan-id-value" }
    */
-  private resolveParams(
-    params: any,
-    previousResults: Record<string, ToolResult>
-  ): any {
+  private resolveParams(params: any, previousResults: Record<string, ToolResult>): any {
     if (typeof params === 'string') {
       // 匹配 ${stepId.path} 格式
       return params.replace(/\$\{([^}]+)\}/g, (match, path) => {
@@ -218,7 +202,7 @@ export class ToolOrchestrator {
 
   /**
    * 从 LLM 的多步计划中构建编排计划
-   * 
+   *
    * 例如：
    * "1. 列出所有计划 (list_plans)
    *  2. 查看第一个计划的详情 (get_plan)
@@ -230,13 +214,13 @@ export class ToolOrchestrator {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       // 匹配格式：1. 描述 (tool_name)
       const match = line.match(/^\d+\.\s*(.+?)\s*\(([^)]+)\)/);
-      
+
       if (match) {
-        const [_, description, toolName] = match;
-        
+        const [, description, toolName] = match;
+
         steps.push({
           stepId: `step${i + 1}`,
           toolName: toolName.trim(),
@@ -257,13 +241,10 @@ export class ToolOrchestrator {
   /**
    * 从结构化的 Function Calling 数组构建编排计划
    */
-  static fromToolCalls(
-    toolCalls: Array<{ function: { name: string; arguments: string } }>,
-    userId: string
-  ): ToolOrchestrationPlan {
+  static fromToolCalls(toolCalls: Array<{ function: { name: string; arguments: string } }>, userId: string): ToolOrchestrationPlan {
     const steps: ToolStep[] = toolCalls.map((call, index) => {
       const args = JSON.parse(call.function.arguments);
-      
+
       return {
         stepId: `step${index + 1}`,
         toolName: call.function.name,
@@ -282,4 +263,5 @@ export class ToolOrchestrator {
 
 // 单例实例
 export const toolOrchestrator = new ToolOrchestrator();
+
 

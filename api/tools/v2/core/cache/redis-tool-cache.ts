@@ -1,6 +1,6 @@
 /**
  * Redis 工具缓存管理器
- * 
+ *
  * 功能：
  * - 基于 Redis 的工具结果缓存
  * - 支持 TTL 过期
@@ -10,7 +10,7 @@
 
 import type Redis from 'ioredis';
 import crypto from 'crypto';
-import type { ToolContext, ToolResult, CacheConfig } from './types.js';
+import type { ToolContext, ToolResult, CacheConfig } from '../types.js';
 
 /**
  * 生成缓存键
@@ -28,7 +28,7 @@ function generateCacheKey(
       // 按用户缓存（同一用户同样的参数返回缓存）
       keyData = { userId: context.userId, params };
       break;
-    
+
     case 'custom':
       // 自定义策略
       if (config.keyGenerator) {
@@ -37,7 +37,7 @@ function generateCacheKey(
       // 降级到默认策略
       keyData = params;
       break;
-    
+
     case 'params':
     default:
       // 只按参数缓存（不区分用户）
@@ -67,14 +67,14 @@ export async function getToolCache(
   try {
     const key = generateCacheKey(toolName, params, context, config);
     const cached = await redis.get(key);
-    
+
     if (!cached) {
       return null;
     }
 
     const result: ToolResult = JSON.parse(cached);
     console.log(`✅ [Redis Cache] 缓存命中: ${toolName}`);
-    
+
     return {
       ...result,
       fromCache: true,
@@ -99,7 +99,7 @@ export async function getStaleToolCache(
   try {
     const key = generateCacheKey(toolName, params, context, config);
     const staleKey = `${key}:stale`;
-    
+
     // 先尝试正常缓存
     const cached = await redis.get(key);
     if (cached) {
@@ -111,7 +111,7 @@ export async function getStaleToolCache(
         degraded: true,
       };
     }
-    
+
     // 尝试过期缓存
     const staleCached = await redis.get(staleKey);
     if (staleCached) {
@@ -124,7 +124,7 @@ export async function getStaleToolCache(
         message: (result.message || '') + ' (数据可能已过期)',
       };
     }
-    
+
     return null;
   } catch (error: any) {
     console.error(`❌ [Redis Cache] 获取过期缓存失败:`, error);
@@ -151,13 +151,13 @@ export async function setToolCache(
     const key = generateCacheKey(toolName, params, context, config);
     const staleKey = `${key}:stale`;
     const value = JSON.stringify(result);
-    
+
     // 设置主缓存（带 TTL）
     await redis.setex(key, config.ttl, value);
-    
+
     // 设置过期缓存（TTL 的 2 倍，用于降级）
     await redis.setex(staleKey, config.ttl * 2, value);
-    
+
     console.log(`💾 [Redis Cache] 缓存已设置: ${toolName}，TTL ${config.ttl}秒`);
     return true;
   } catch (error: any) {
@@ -169,18 +169,15 @@ export async function setToolCache(
 /**
  * 清除指定工具的所有缓存
  */
-export async function clearToolCache(
-  redis: Redis,
-  toolName: string
-): Promise<number> {
+export async function clearToolCache(redis: Redis, toolName: string): Promise<number> {
   try {
     const pattern = `tool:cache:${toolName}:*`;
     const keys = await redis.keys(pattern);
-    
+
     if (keys.length === 0) {
       return 0;
     }
-    
+
     await redis.del(...keys);
     console.log(`🧹 [Redis Cache] 清除了 ${keys.length} 个 "${toolName}" 的缓存`);
     return keys.length;
@@ -197,11 +194,11 @@ export async function clearAllToolCache(redis: Redis): Promise<number> {
   try {
     const pattern = 'tool:cache:*';
     const keys = await redis.keys(pattern);
-    
+
     if (keys.length === 0) {
       return 0;
     }
-    
+
     await redis.del(...keys);
     console.log(`🧹 [Redis Cache] 清除了所有工具缓存，共 ${keys.length} 个`);
     return keys.length;
@@ -224,18 +221,19 @@ export async function getToolCacheStats(
   try {
     const pattern = toolName ? `tool:cache:${toolName}:*` : 'tool:cache:*';
     const keys = await redis.keys(pattern);
-    
+
     let estimatedSize = 0;
-    for (const key of keys.slice(0, 100)) { // 只采样前 100 个
+    for (const key of keys.slice(0, 100)) {
+      // 只采样前 100 个
       const size = await redis.strlen(key);
       estimatedSize += size;
     }
-    
+
     // 估算总大小
     if (keys.length > 100) {
       estimatedSize = Math.round((estimatedSize / 100) * keys.length);
     }
-    
+
     return {
       totalKeys: keys.length,
       estimatedSize,
@@ -248,4 +246,5 @@ export async function getToolCacheStats(
     };
   }
 }
+
 

@@ -1,13 +1,13 @@
 /**
  * 工具限流器
- * 
+ *
  * 功能：
  * - 并发限制
  * - 频率限制（滑动窗口）
  * - 超时控制
  */
 
-import type { RateLimitConfig } from './types.js';
+import type { RateLimitConfig } from '../types.js';
 
 interface AcquireResult {
   ok: boolean;
@@ -33,7 +33,7 @@ export class RateLimiter {
    */
   async acquire(toolName: string): Promise<AcquireResult> {
     const config = this.configs.get(toolName);
-    
+
     // 没有配置则不限流
     if (!config) {
       return { ok: true, release: () => {} };
@@ -54,17 +54,17 @@ export class RateLimiter {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     const history = this.callHistory.get(toolName) || [];
-    
+
     // 清理过期记录
     const recentCalls = history.filter(timestamp => timestamp > oneMinuteAgo);
-    
+
     if (recentCalls.length >= config.maxPerMinute) {
       console.warn(`⚠️  工具 "${toolName}" 达到频率上限: ${recentCalls.length}/${config.maxPerMinute} 次/分钟`);
-      
+
       // 计算需要等待多少秒
       const oldestCall = recentCalls[0];
       const waitTime = Math.ceil((oldestCall + 60000 - now) / 1000);
-      
+
       return {
         ok: false,
         reason: `工具调用过于频繁: ${recentCalls.length}/${config.maxPerMinute} 次/分钟`,
@@ -84,11 +84,11 @@ export class RateLimiter {
     const release = () => {
       if (released) return;
       released = true;
-      
+
       const prev = this.concurrentCounts.get(toolName) || 0;
       const next = Math.max(0, prev - 1);
       this.concurrentCounts.set(toolName, next);
-      
+
       console.log(`✅ 工具 "${toolName}" 释放资源，当前并发: ${next}/${config.maxConcurrent}`);
     };
 
@@ -149,4 +149,5 @@ export class RateLimiter {
 
 // 单例实例
 export const rateLimiter = new RateLimiter();
+
 

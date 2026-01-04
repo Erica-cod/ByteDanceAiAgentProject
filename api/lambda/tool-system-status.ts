@@ -6,11 +6,11 @@
  * POST - 重置指标（管理员）
  */
 
-import { toolExecutor } from '../tools/v2/core/tool-executor.js';
-import { toolRegistry } from '../tools/v2/core/tool-registry.js';
-import { cacheManager } from '../tools/v2/core/cache-manager.js';
-import { rateLimiter } from '../tools/v2/core/rate-limiter.js';
-import { circuitBreaker } from '../tools/v2/core/circuit-breaker.js';
+import { toolExecutor } from '../tools/v2/core/execution/tool-executor.js';
+import { toolRegistry } from '../tools/v2/core/registry/tool-registry.js';
+import { cacheManager } from '../tools/v2/core/cache/cache-manager.js';
+import { rateLimiter } from '../tools/v2/core/limits/rate-limiter.js';
+import { circuitBreaker } from '../tools/v2/core/resilience/circuit-breaker.js';
 import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
 
 /**

@@ -27,10 +27,10 @@ describe('tool fallback chain + redis cache (optional)', () => {
     process.env.ALLOW_REDIS_IN_TEST = 'true';
 
     // 动态导入：确保读取到最新 env
-    const { toolRegistry } = await import('../../api/tools/v2/core/tool-registry.js');
-    const { toolExecutor } = await import('../../api/tools/v2/core/tool-executor.js');
-    const { cacheManager } = await import('../../api/tools/v2/core/cache-manager.js');
-    const { circuitBreaker } = await import('../../api/tools/v2/core/circuit-breaker.js');
+    const { toolRegistry } = await import('../../api/tools/v2/core/registry/tool-registry.js');
+    const { toolExecutor } = await import('../../api/tools/v2/core/execution/tool-executor.js');
+    const { cacheManager } = await import('../../api/tools/v2/core/cache/cache-manager.js');
+    const { circuitBreaker } = await import('../../api/tools/v2/core/resilience/circuit-breaker.js');
     const { getRedisClient, isRedisAvailable, closeRedisClient } = await import(
       '../../api/_clean/infrastructure/cache/redis-client.js'
     );

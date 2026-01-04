@@ -1,6 +1,6 @@
 /**
  * 工具执行器
- * 
+ *
  * 职责：
  * - 整合限流、缓存、熔断等保护机制
  * - 执行工具调用
@@ -8,32 +8,31 @@
  * - 实现降级链（参考 Netflix Hystrix）
  */
 
-import { toolRegistry } from './tool-registry.js';
-import { rateLimiter } from './rate-limiter.js';
-import { cacheManager } from './cache-manager.js';
-import { circuitBreaker } from './circuit-breaker.js';
-import type { ToolContext, ToolResult, ExecuteOptions, ToolMetrics, ToolStatus, ToolPlugin, FallbackStrategy } from './types.js';
+import { toolRegistry } from '../registry/tool-registry.js';
+import { rateLimiter } from '../limits/rate-limiter.js';
+import { cacheManager } from '../cache/cache-manager.js';
+import { toolRuntime } from '../runtime/tool-runtime.js';
+import type { ToolContext, ToolResult, ExecuteOptions, ToolMetrics, ToolStatus, ToolPlugin, FallbackStrategy } from '../types.js';
 
 export class ToolExecutor {
-  private metrics: Map<string, {
-    totalCalls: number;
-    successCalls: number;
-    failedCalls: number;
-    totalLatency: number;
-    cacheHits: number;
-  }> = new Map();
+  private metrics: Map<
+    string,
+    {
+      totalCalls: number;
+      successCalls: number;
+      failedCalls: number;
+      totalLatency: number;
+      cacheHits: number;
+    }
+  > = new Map();
 
   /**
    * 执行工具
    */
-  async execute(
-    toolName: string,
-    params: any,
-    context: ToolContext,
-    options: ExecuteOptions = {}
-  ): Promise<ToolResult> {
+  async execute(toolName: string, params: any, context: ToolContext, options: ExecuteOptions = {}): Promise<ToolResult> {
     const startTime = Date.now();
-    
+    const circuitBreaker = toolRuntime.getCircuitBreaker();
+
     // 1. 获取工具插件
     const plugin = toolRegistry.get(toolName);
     if (!plugin) {
@@ -63,10 +62,10 @@ export class ToolExecutor {
         if (cached) {
           metrics.successCalls++;
           metrics.cacheHits++;
-          
+
           const duration = Date.now() - startTime;
           metrics.totalLatency += duration;
-          
+
           return {
             ...cached,
             duration,
@@ -79,13 +78,19 @@ export class ToolExecutor {
       const cbCheck = circuitBreaker.canExecute(toolName);
       if (!cbCheck.allowed) {
         metrics.failedCalls++;
-        
-        // 🆕 熔断时触发降级
+
+        // 熔断时触发降级
         if (plugin.fallback?.enabled) {
           console.warn(`⚠️  工具 "${toolName}" 已熔断，尝试降级...`);
-          return await this.executeFallbackChain(toolName, params, context, plugin, new Error(cbCheck.reason || '工具已熔断'));
+          return await this.executeFallbackChain(
+            toolName,
+            params,
+            context,
+            plugin,
+            new Error(cbCheck.reason || '工具已熔断')
+          );
         }
-        
+
         return {
           success: false,
           error: cbCheck.reason || '工具不可用',
@@ -109,7 +114,7 @@ export class ToolExecutor {
             const validation = await plugin.validate(params);
             if (!validation.valid) {
               metrics.failedCalls++;
-              circuitBreaker.recordFailure(toolName);
+              circuitBreaker.recordFailure(toolName, { error: new Error('参数验证失败') });
               return {
                 success: false,
                 error: `参数验证失败: ${validation.errors?.join(', ')}`,
@@ -119,15 +124,11 @@ export class ToolExecutor {
 
           // 7. 执行工具（带超时控制）
           const timeout = options.timeout || plugin.rateLimit?.timeout || 30000;
-          const result = await this.executeWithTimeout(
-            plugin.execute(params, context),
-            timeout,
-            toolName
-          );
+          const result = await this.executeWithTimeout(plugin.execute(params, context), timeout, toolName);
 
           // 8. 记录成功
           metrics.successCalls++;
-          circuitBreaker.recordSuccess(toolName);
+          circuitBreaker.recordSuccess(toolName, { result });
 
           // 9. 缓存结果（如果成功）
           if (result.success && !options.skipCache) {
@@ -152,13 +153,13 @@ export class ToolExecutor {
       } else {
         // 跳过限流时的执行逻辑
         const result = await plugin.execute(params, context);
-        
+
         if (result.success) {
           metrics.successCalls++;
-          circuitBreaker.recordSuccess(toolName);
+          circuitBreaker.recordSuccess(toolName, { result });
         } else {
           metrics.failedCalls++;
-          circuitBreaker.recordFailure(toolName);
+          circuitBreaker.recordFailure(toolName, { result });
         }
 
         const duration = Date.now() - startTime;
@@ -173,14 +174,14 @@ export class ToolExecutor {
     } catch (error: any) {
       // 执行失败
       metrics.failedCalls++;
-      circuitBreaker.recordFailure(toolName);
+      circuitBreaker.recordFailure(toolName, { error });
 
       const duration = Date.now() - startTime;
       metrics.totalLatency += duration;
 
       console.error(`❌ 工具 "${toolName}" 执行失败:`, error);
 
-      // 🆕 主逻辑异常时也尝试降级链（参考 Hystrix：失败即 fallback）
+      // 主逻辑异常时也尝试降级链（参考 Hystrix：失败即 fallback）
       if (plugin.fallback?.enabled) {
         console.warn(`⚠️  工具 "${toolName}" 执行异常，尝试降级...`);
         const fallback = await this.executeFallbackChain(toolName, params, context, plugin, error);
@@ -201,11 +202,7 @@ export class ToolExecutor {
   /**
    * 带超时控制的执行
    */
-  private async executeWithTimeout<T>(
-    promise: Promise<T>,
-    timeout: number,
-    toolName: string
-  ): Promise<T> {
+  private async executeWithTimeout<T>(promise: Promise<T>, timeout: number, toolName: string): Promise<T> {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) => {
@@ -241,6 +238,8 @@ export class ToolExecutor {
     const metrics = this.metrics.get(toolName);
     if (!metrics) return null;
 
+    const circuitBreaker = toolRuntime.getCircuitBreaker();
+
     const rlStatus = rateLimiter.getStatus(toolName);
     const cbState = circuitBreaker.getState(toolName);
     const cacheStats = cacheManager.getToolStats(toolName);
@@ -256,19 +255,13 @@ export class ToolExecutor {
     }
 
     // 计算缓存命中率
-    const cacheHitRate = metrics.totalCalls > 0
-      ? (metrics.cacheHits / metrics.totalCalls * 100).toFixed(1)
-      : '0.0';
+    const cacheHitRate = metrics.totalCalls > 0 ? ((metrics.cacheHits / metrics.totalCalls) * 100).toFixed(1) : '0.0';
 
     // 计算错误率
-    const errorRate = metrics.totalCalls > 0
-      ? (metrics.failedCalls / metrics.totalCalls * 100).toFixed(1)
-      : '0.0';
+    const errorRate = metrics.totalCalls > 0 ? ((metrics.failedCalls / metrics.totalCalls) * 100).toFixed(1) : '0.0';
 
     // 计算平均延迟
-    const averageLatency = metrics.successCalls > 0
-      ? Math.round(metrics.totalLatency / metrics.successCalls)
-      : 0;
+    const averageLatency = metrics.successCalls > 0 ? Math.round(metrics.totalLatency / metrics.successCalls) : 0;
 
     return {
       name: toolName,
@@ -321,7 +314,7 @@ export class ToolExecutor {
     originalError: Error
   ): Promise<ToolResult> {
     const fallbackConfig = plugin.fallback;
-    
+
     if (!fallbackConfig?.enabled || !fallbackConfig.fallbackChain.length) {
       return {
         success: false,
@@ -337,14 +330,7 @@ export class ToolExecutor {
       console.log(`   ${i + 1}/${fallbackConfig.fallbackChain.length} 尝试降级策略: ${strategy.type}`);
 
       try {
-        const result = await this.executeFallbackStrategy(
-          strategy,
-          toolName,
-          params,
-          context,
-          plugin,
-          fallbackConfig
-        );
+        const result = await this.executeFallbackStrategy(strategy, toolName, params, context, plugin, fallbackConfig);
 
         if (result) {
           console.log(`   ✅ 降级策略 "${strategy.type}" 成功`);
@@ -400,9 +386,7 @@ export class ToolExecutor {
           console.log(`   ↪️  切换到备用工具: ${fallbackConfig.fallbackTool}`);
           return await Promise.race([
             this.execute(fallbackConfig.fallbackTool, params, context, { timeout }),
-            new Promise<ToolResult>((_, reject) =>
-              setTimeout(() => reject(new Error('备用工具超时')), timeout)
-            ),
+            new Promise<ToolResult>((_, reject) => setTimeout(() => reject(new Error('备用工具超时')), timeout)),
           ]);
         }
         return null;
@@ -415,16 +399,14 @@ export class ToolExecutor {
             ...params,
             ...fallbackConfig.simplifiedParams,
           };
-          
+
           // 跳过熔断检查，直接执行
           try {
             const result = await Promise.race([
               plugin.execute(simplifiedParams, context),
-              new Promise<ToolResult>((_, reject) =>
-                setTimeout(() => reject(new Error('简化调用超时')), timeout)
-              ),
+              new Promise<ToolResult>((_, reject) => setTimeout(() => reject(new Error('简化调用超时')), timeout)),
             ]);
-            
+
             if (result.success) {
               return result;
             }
@@ -454,4 +436,5 @@ export class ToolExecutor {
 
 // 单例实例
 export const toolExecutor = new ToolExecutor();
+
 
