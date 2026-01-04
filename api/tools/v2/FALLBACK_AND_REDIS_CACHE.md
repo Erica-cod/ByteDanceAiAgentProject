@@ -18,7 +18,7 @@
 - [x] 增强 `tool-executor.ts` 实现降级链
 - [x] 更新 `cache-manager.ts` 支持 Redis（自动降级到内存缓存）
 - [x] 更新 `search-web.plugin.ts` 添加降级策略示例
-- [x] 创建测试文件 (`test/test-tool-fallback-redis.js`)
+- [x] 创建 Jest 集成测试（`test/jest/tool-fallback-redis.int.test.ts`）
 
 ---
 
@@ -182,11 +182,11 @@ REDIS_PASSWORD=your_password  # 可选
 ### 运行测试
 
 ```bash
-# 确保 Redis 已启动
-redis-server
+# 确保 Redis 已启动（推荐：docker-compose）
+docker-compose up -d redis
 
-# 运行测试
-node test/test-tool-fallback-redis.js
+# 运行（会自动打开 RUN_TOOL_FALLBACK_REDIS_TEST=1 + 允许测试环境用 Redis）
+npm run test:fallback
 ```
 
 ### 测试覆盖

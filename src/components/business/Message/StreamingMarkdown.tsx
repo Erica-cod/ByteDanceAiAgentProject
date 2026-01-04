@@ -46,7 +46,7 @@ interface StreamingMarkdownProps {
 function removeJSONFromContent(content: string): string {
   const trimmedContent = content.trim();
   
-  // ⚡ 关键优化：如果内容以 `{` 开头，认为是 JSON metadata 正在流式输出
+  //  关键优化：如果内容以 `{` 开头，认为是 JSON metadata 正在流式输出
   // 直接返回空字符串，避免显示 JSON 字符
   if (trimmedContent.startsWith('{')) {
     // 检查是否有 JSON 之外的内容（换行后的文本）
@@ -96,7 +96,7 @@ function removeJSONFromContent(content: string): string {
     }
     
     // 如果 JSON 未完成（流式阶段），返回空或等待图标
-    return ''; // ⚡ 关键：流式阶段不显示任何内容，避免 JSON 字符闪现
+    return ''; //  关键：流式阶段不显示任何内容，避免 JSON 字符闪现
   }
   
   // 如果不是以 `{` 开头，检查是否包含嵌入的 JSON
@@ -178,7 +178,7 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({
 
   // 检测计划数据（单个计划或计划列表）
   const { planData, planListData, displayContent } = useMemo(() => {
-    // ✅ 始终先移除 JSON（适用于所有 agent 输出）
+    //  始终先移除 JSON（适用于所有 agent 输出）
     const cleanContent = removeJSONFromContent(content);
     
     // 优先检测计划列表（因为 list_plans 更常见）
@@ -215,7 +215,7 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({
     };
   }, [content]);
 
-  // ✅ 应用 Markdown 容错处理
+  //  应用 Markdown 容错处理
   const { fixedContent, shouldRenderAsPlainText } = useMemo(() => {
     if (!enableFixer || !displayContent) {
       return {
@@ -239,14 +239,14 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({
     };
   }, [displayContent, enableFixer]);
 
-  // ✅ 渲染 Markdown（带错误边界和降级方案）
+  //  渲染 Markdown（带错误边界和降级方案）
   const renderContent = () => {
     // 如果没有内容，不渲染
     if (!fixedContent) {
       return null;
     }
 
-    // ✅ 如果检测到严重格式错误，直接输出纯文本（不尝试渲染 Markdown）
+    //  如果检测到严重格式错误，直接输出纯文本（不尝试渲染 Markdown）
     if (shouldRenderAsPlainText) {
       return (
         <pre className="markdown-plain-text-fallback">

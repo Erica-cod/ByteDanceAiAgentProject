@@ -257,8 +257,8 @@ ARK_EMBEDDING_MODEL=doubao-embedding-text-240715
 
 ### 运行现有测试
 ```bash
-# 测试请求缓存（会使用共享的 embedding 服务）
-npx tsx test/test-request-cache.js
+# 测试请求缓存（Jest 集成测试，可选）
+npm run test:request-cache
 
 # 测试多 Agent（会使用共享的相似度计算）
 # (如果有多 Agent 测试脚本)

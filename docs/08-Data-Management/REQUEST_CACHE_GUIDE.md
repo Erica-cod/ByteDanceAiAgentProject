@@ -47,10 +47,11 @@ npm run dev
 
 ### 3. 测试缓存功能
 
-运行测试脚本：
+运行 Jest 集成测试（可选）：
 
 ```bash
-node test/test-request-cache.js
+# 需要 MongoDB 可用；如需真实 embedding 命中，还需配置 ARK_EMBEDDING_* 相关环境变量
+npm run test:request-cache
 ```
 
 ## 工作原理

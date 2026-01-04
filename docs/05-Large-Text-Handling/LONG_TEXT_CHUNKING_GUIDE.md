@@ -237,10 +237,14 @@ const DEFAULT_OPTIONS = {
 
 ## 🧪 测试
 
-运行测试脚本：
+运行 Jest 集成测试（可选）：
 
 ```bash
-node test/test-chunking.js
+# 需要服务端运行
+npm run dev
+
+# 另一个终端运行（脚本会自动打开 RUN_CHUNKING_TEST=1）
+npm run test:chunking
 ```
 
 测试脚本会：

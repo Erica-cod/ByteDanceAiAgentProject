@@ -35,13 +35,24 @@ export class CacheManager {
     sets: 0,
   };
   private useRedis: boolean = false;
+  private cleanupTimer: NodeJS.Timeout;
 
   constructor() {
     // 每 5 分钟清理一次过期缓存
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
-    
-    // 检查 Redis 是否可用
-    this.checkRedis();
+    this.cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    // Jest 环境不应被 interval 卡住退出
+    this.cleanupTimer.unref?.();
+
+    // 测试环境默认禁用 Redis（避免本地无 Redis/密码不一致导致日志噪音与 open handles）
+    // 但允许在 integration 场景显式打开（用于验证 tool cache 是否真的写入 Redis）
+    const allowRedisInTest = process.env.ALLOW_REDIS_IN_TEST === 'true';
+    const isTest = (process.env.NODE_ENV === 'test' || process.env.TEST_TYPE === 'unit') && !allowRedisInTest;
+
+    if (!isTest) {
+      void this.checkRedis();
+    } else {
+      this.useRedis = false;
+    }
   }
   
   /**

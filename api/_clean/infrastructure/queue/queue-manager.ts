@@ -43,6 +43,7 @@ interface InvalidTokenRecord {
   count: number;           // 无效 token 次数
   firstAttemptAt: number;  // 第一次无效尝试时间
   lastAttemptAt: number;   // 最后一次无效尝试时间
+  cooldownUntil?: number;  // 冷却结束时间（只有达到阈值后才会进入冷却）
 }
 const invalidTokenAttempts = new Map<string, InvalidTokenRecord>();
 
@@ -149,8 +150,8 @@ export function enqueue(
 
     if (record) {
       // 如果在冷却期内，直接拒绝
-      if (now - record.lastAttemptAt < INVALID_TOKEN_COOLDOWN_MS) {
-        const remainingSec = Math.ceil((INVALID_TOKEN_COOLDOWN_MS - (now - record.lastAttemptAt)) / 1000);
+      if (record.cooldownUntil && now < record.cooldownUntil) {
+        const remainingSec = Math.ceil((record.cooldownUntil - now) / 1000);
         console.warn(
           `🚫 [QueueManager] 用户 ${userId} 在冷却期内，拒绝入队（剩余 ${remainingSec}s）`
         );
@@ -168,6 +169,8 @@ export function enqueue(
         record.lastAttemptAt = now;
 
         if (record.count >= INVALID_TOKEN_MAX_COUNT) {
+          // ✅ 只有达到阈值才进入冷却
+          record.cooldownUntil = now + INVALID_TOKEN_COOLDOWN_MS;
           console.warn(
             `🚫 [QueueManager] 用户 ${userId} 在 ${INVALID_TOKEN_WINDOW_MS / 1000}s 内发送了 ${record.count} 次无效 token，触发冷却`
           );
@@ -182,6 +185,7 @@ export function enqueue(
         record.count = 1;
         record.firstAttemptAt = now;
         record.lastAttemptAt = now;
+        record.cooldownUntil = undefined;
       }
     } else {
       // 首次记录无效 token
@@ -189,6 +193,7 @@ export function enqueue(
         count: 1,
         firstAttemptAt: now,
         lastAttemptAt: now,
+        cooldownUntil: undefined,
       });
     }
 

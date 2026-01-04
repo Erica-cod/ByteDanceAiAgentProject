@@ -180,6 +180,16 @@ export class ToolExecutor {
 
       console.error(`❌ 工具 "${toolName}" 执行失败:`, error);
 
+      // 🆕 主逻辑异常时也尝试降级链（参考 Hystrix：失败即 fallback）
+      if (plugin.fallback?.enabled) {
+        console.warn(`⚠️  工具 "${toolName}" 执行异常，尝试降级...`);
+        const fallback = await this.executeFallbackChain(toolName, params, context, plugin, error);
+        return {
+          ...fallback,
+          duration,
+        };
+      }
+
       return {
         success: false,
         error: error.message || '工具执行失败',
