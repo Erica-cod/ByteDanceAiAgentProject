@@ -48,7 +48,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   const authLoggedIn = useAuthStore((s) => s.loggedIn);
   const canUseMultiAgent = useAuthStore((s) => s.canUseMultiAgent);
   const refreshMe = useAuthStore((s) => s.refreshMe);
-  const demoLogin = useAuthStore((s) => s.demoLogin);
+  const beginLogin = useAuthStore((s) => s.beginLogin);
   const logout = useAuthStore((s) => s.logout);
 
   // ===== 本地 UI 状态 =====
@@ -176,7 +176,7 @@ const ChatInterfaceRefactored: React.FC = () => {
           disabled={isLoading}
           loggedIn={authLoggedIn}
           canUseMultiAgent={canUseMultiAgent}
-          onDemoLogin={() => demoLogin('demo')}
+          onDemoLogin={() => beginLogin({ returnTo: window.location.pathname, deviceIdHash: useChatStore.getState().deviceId })}
           onLogout={() => logout()}
         />
       }

@@ -5,8 +5,8 @@
 
 import type { RequestOption } from '../../types/chat.js';
 import { handleOptionsRequest } from '../_utils/cors.js';
-import { getDemoSessionFromHeaders } from '../_utils/demoAuth.js';
 import { successResponse } from '../_utils/response.js';
+import { getBffSessionFromHeaders } from '../_utils/bffOidcAuth.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
@@ -15,7 +15,7 @@ export async function options({ headers }: RequestOption<any, any>) {
 
 export async function get({ headers }: RequestOption<any, any>) {
   const requestOrigin = headers?.origin;
-  const session = getDemoSessionFromHeaders(headers);
+  const session = await getBffSessionFromHeaders(headers);
 
   if (!session) {
     return successResponse(
@@ -32,7 +32,10 @@ export async function get({ headers }: RequestOption<any, any>) {
   return successResponse(
     {
       loggedIn: true,
-      user: session.user,
+      user: {
+        userId: session.user.sub,
+        username: session.user.username || session.user.name || session.user.sub,
+      },
       canUseMultiAgent: true,
     },
     undefined,

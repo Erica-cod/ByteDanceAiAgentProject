@@ -37,7 +37,7 @@ import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
-import { getDemoSessionFromHeaders } from './_utils/demoAuth.js';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -330,8 +330,8 @@ export async function post({
       
       // ==================== 多Agent模式 ====================
       if (mode === 'multi_agent') {
-        // ✅ 演示版登录控制：未登录禁止使用多 Agent
-        const session = getDemoSessionFromHeaders(headers);
+        // ✅ 登录控制：未登录禁止使用多 Agent
+        const session = await getBffSessionFromHeaders(headers);
         if (!session) {
           return errorResponseWithStatus('请先登录后再使用多 Agent 模式（演示版限制）', 403, requestOrigin);
         }

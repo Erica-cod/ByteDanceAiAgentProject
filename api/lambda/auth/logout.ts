@@ -5,7 +5,7 @@
 
 import type { RequestOption } from '../../types/chat.js';
 import { getCorsHeaders, handleOptionsRequest } from '../_utils/cors.js';
-import { buildClearSessionCookie, destroyDemoSessionFromHeaders } from '../_utils/demoAuth.js';
+import { buildClearBffSessionCookie, deleteBffSessionFromHeaders } from '../_utils/bffOidcAuth.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
@@ -16,7 +16,7 @@ export async function post({ headers }: RequestOption<any, any>) {
   const requestOrigin = headers?.origin;
   const corsHeaders = getCorsHeaders(requestOrigin);
 
-  destroyDemoSessionFromHeaders(headers);
+  await deleteBffSessionFromHeaders(headers);
 
   return new Response(
     JSON.stringify({
@@ -27,7 +27,7 @@ export async function post({ headers }: RequestOption<any, any>) {
       status: 200,
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
-        'Set-Cookie': buildClearSessionCookie(headers),
+        'Set-Cookie': buildClearBffSessionCookie(headers),
         ...corsHeaders,
       },
     }

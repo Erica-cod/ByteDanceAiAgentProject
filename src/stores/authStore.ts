@@ -18,7 +18,7 @@ interface AuthState {
   canUseMultiAgent: boolean;
 
   refreshMe: () => Promise<void>;
-  demoLogin: (username?: string) => Promise<void>;
+  beginLogin: (input?: { returnTo?: string; deviceIdHash?: string }) => void;
   logout: () => Promise<void>;
 }
 
@@ -47,26 +47,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  demoLogin: async (username?: string) => {
-    set({ isLoading: true });
-    try {
-      const res = await fetch('/api/auth/demo-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username || 'demo' }),
-      });
-      const json = await res.json();
-      const data = (json?.data || { loggedIn: false, user: null, canUseMultiAgent: false }) as MeResponse;
-      set({
-        loggedIn: !!data.loggedIn,
-        user: data.user ?? null,
-        canUseMultiAgent: !!data.canUseMultiAgent,
-      });
-    } catch (e) {
-      set({ loggedIn: false, user: null, canUseMultiAgent: false });
-    } finally {
-      set({ isLoading: false });
-    }
+  beginLogin: (input) => {
+    const returnTo = input?.returnTo || window.location.pathname;
+    const deviceIdHash = input?.deviceIdHash;
+    const qs = new URLSearchParams();
+    qs.set('returnTo', returnTo);
+    if (deviceIdHash) qs.set('deviceIdHash', deviceIdHash);
+    window.location.href = `/api/auth/login?${qs.toString()}`;
   },
 
   logout: async () => {

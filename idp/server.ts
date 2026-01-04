@@ -73,7 +73,8 @@ const configuration: Provider.Configuration = {
       client_secret: clientSecret,
       redirect_uris: redirectUris,
       response_types: ['code'],
-      grant_types: ['authorization_code', 'refresh_token'],
+      // 注意：oidc-provider 会根据 response_types / scopes 自动推导允许的 grant_types
+      // 这里显式配置 refresh_token 反而容易触发 invalid_client_metadata（演示环境先不写 grant_types）
       token_endpoint_auth_method: 'client_secret_basic',
     },
   ],
