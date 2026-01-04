@@ -100,7 +100,7 @@ describe('multi-agent resume (optional e2e)', () => {
     const ac1 = new AbortController();
     const r1 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Test-Auth': '1' },
       body: JSON.stringify({
         message: '什么是量子计算？请简要解释原理和应用。',
         modelType: 'volcano',
@@ -176,7 +176,7 @@ describe('multi-agent resume (optional e2e)', () => {
     const ac2 = new AbortController();
     const r2 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Test-Auth': '1' },
       body: JSON.stringify({
         message: '继续。',
         modelType: 'volcano',

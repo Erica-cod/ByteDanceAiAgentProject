@@ -331,9 +331,16 @@ export async function post({
       // ==================== 多Agent模式 ====================
       if (mode === 'multi_agent') {
         // ✅ 登录控制：未登录禁止使用多 Agent
-        const session = await getBffSessionFromHeaders(headers);
-        if (!session) {
-          return errorResponseWithStatus('请先登录后再使用多 Agent 模式（演示版限制）', 403, requestOrigin);
+        // 🧪 测试环境例外：允许通过 X-Test-Auth=1 绕过（仅用于 Jest E2E，不影响生产/开发）
+        const testBypass =
+          process.env.NODE_ENV === 'test'
+          && (headers?.['x-test-auth'] === '1' || headers?.['X-Test-Auth'] === '1');
+
+        if (!testBypass) {
+          const session = await getBffSessionFromHeaders(headers);
+          if (!session) {
+            return errorResponseWithStatus('请先登录后再使用多 Agent 模式（演示版限制）', 403, requestOrigin);
+          }
         }
 
         console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
