@@ -76,6 +76,47 @@ export const searchWebPlugin: ToolPlugin = {
     retryableErrors: ['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND'],
   },
 
+  // ============ 降级配置（参考 Netflix Hystrix） ============
+  fallback: {
+    enabled: true,
+    fallbackChain: [
+      // 1. 先尝试返回正常缓存
+      { type: 'cache' },
+      
+      // 2. 尝试返回过期缓存（即使过期也比没有好）
+      { type: 'stale-cache' },
+      
+      // 3. 简化搜索（只返回 3 条结果，使用快速模式）
+      { type: 'simplified' },
+      
+      // 4. 返回默认提示（兜底）
+      { type: 'default' },
+    ],
+    
+    // 简化参数（降级时使用）
+    simplifiedParams: {
+      max_results: 3,           // 降级时只返回 3 条
+      search_depth: 'basic',    // 使用快速搜索
+    },
+    
+    // 默认响应（所有策略失败时的兜底）
+    defaultResponse: {
+      success: true,
+      data: {
+        results: [],
+        count: 0,
+        message: '搜索服务暂时不可用，请稍后重试',
+      },
+      message: '搜索服务暂时不可用，请稍后重试',
+    },
+    
+    // 降级策略超时（3秒快速失败）
+    fallbackTimeout: 3000,
+    
+    // 允许返回过期缓存
+    allowStaleCache: true,
+  },
+
   // ============ 参数验证 ============
   validate: async (params) => {
     const errors: string[] = [];

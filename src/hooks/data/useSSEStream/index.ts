@@ -101,7 +101,7 @@
  * @see test/PERFORMANCE-OPTIMIZATION-SUMMARY.md - 详细性能分析报告
  */
 
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../../stores';
 import { getConversationDetails, type Conversation } from '../../../utils/conversationAPI';
 import { isLongText } from '../../../utils/textUtils';
@@ -141,10 +141,10 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const modelType = useUIStore((s) => s.modelType);
   const chatMode = useUIStore((s) => s.chatMode);
 
-  // ✅ RAF 批处理优化
+  //  RAF 批处理优化
   const { scheduleMessageUpdate, flushMessageUpdate } = useRAFBatching(appendToLastMessage);
 
-  const sendMessage = async (
+  const sendMessage = useCallback(async (
     messageText: string,
     userMessageId: string,
     assistantMessageId: string,
@@ -156,13 +156,13 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     const MAX_RETRY_DELAY_MS = 5000;
 
     try {
-      // ✅ 处理消息上传
+      //  处理消息上传
       const uploadPayload = await handleMessageUpload(messageText, userId, {
         updateProgress: (thinking) => updateMessage(assistantMessageId, { thinking }),
         markFailed: () => markMessageFailed(assistantMessageId),
       });
 
-      console.log(`🎯 [SSE] 发送消息，当前 chatMode:`, chatMode);
+      console.log(` [SSE] 发送消息，当前 chatMode:`, chatMode);
       
       // 初始化流状态
       const state: StreamState = {
@@ -236,7 +236,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
           if (newQueueToken) {
             setQueueToken(newQueueToken);
-            console.log(`🎫 收到队列 token: ${newQueueToken}，位置: ${queuePosition || '未知'}，预估等待: ${estimatedWait || '未知'}秒`);
+            console.log(`收到队列 token: ${newQueueToken}，位置: ${queuePosition || '未知'}，预估等待: ${estimatedWait || '未知'}秒`);
           }
 
           if (queuePosition) {
@@ -346,13 +346,13 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   // 轮次完成事件
                   if (parsed.type === 'round_complete') {
                     state.completedRounds = parsed.round;
-                    console.log(`✅ 第 ${state.completedRounds} 轮已完成`);
+                    console.log(`第 ${state.completedRounds} 轮已完成`);
                     continue;
                   }
 
                   // 恢复事件
                   if (parsed.type === 'resume') {
-                    console.log(`🔄 从第 ${parsed.resumedFromRound} 轮恢复，继续第 ${parsed.continueFromRound} 轮`);
+                    console.log(`从第 ${parsed.resumedFromRound} 轮恢复，继续第 ${parsed.continueFromRound} 轮`);
                     state.completedRounds = parsed.resumedFromRound;
                     updateMessage(assistantMessageId, {
                       thinking: `从第 ${parsed.resumedFromRound} 轮恢复，继续第 ${parsed.continueFromRound} 轮...`,
@@ -383,11 +383,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 const currentSources = parsed.sources;
 
                 if (chatMode === 'single') {
-                  // ✅ 使用 RAF 批处理更新（减少 10-25% 的渲染次数）
+                  //  使用 RAF 批处理更新（减少 10-25% 的渲染次数）
                   scheduleMessageUpdate(state.currentContent, state.currentThinking, currentSources);
                   
                   /* 
-                   * ❌ 原始方案（已废弃）：
+                   *  原始方案（已废弃）：
                    * appendToLastMessage(currentContent, currentThinking, currentSources);
                    * 
                    * 缺点：
@@ -433,7 +433,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         }
 
         const waitMs = result.retryAfterMs ?? computeBackoff(attempt);
-        console.warn(`⚠️ SSE 中断/限流，准备第 ${attempt + 1} 次重连，等待 ${waitMs}ms`);
+        console.warn(`SSE 中断/限流，准备第 ${attempt + 1} 次重连，等待 ${waitMs}ms`);
 
         updateMessage(assistantMessageId, {
           thinking: '连接中断，正在尝试重连...',
@@ -443,11 +443,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         attempt += 1;
       }
 
-      // ✅ 流式处理成功完成
+      //  流式处理成功完成
       flushMessageUpdate();
       
       if (queueToken) {
-        console.log(`🎫 清除队列 token: ${queueToken}`);
+        console.log(`清除队列 token: ${queueToken}`);
         setQueueToken(null);
       }
 
@@ -472,7 +472,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
           });
       }
     } catch (error: any) {
-      // ✅ 错误时也要立即执行待处理的更新
+      //  错误时也要立即执行待处理的更新
       flushMessageUpdate();
       
       if (error.name === 'AbortError') {
@@ -486,21 +486,37 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       }
       throw error;
     }
-  };
+  }, [
+    chatMode,
+    conversationId,
+    deviceId,
+    flushMessageUpdate,
+    markMessageFailed,
+    markMessageSuccess,
+    modelType,
+    options.onConversationCreated,
+    queueToken,
+    saveToCache,
+    scheduleMessageUpdate,
+    setConversationId,
+    setQueueToken,
+    updateMessage,
+    userId,
+  ]);
 
-  const abort = () => {
-    // ✅ 取消请求时也要立即执行待处理的更新
+  const abort = useCallback(() => {
+    //  取消请求时也要立即执行待处理的更新
     flushMessageUpdate();
     
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-  };
+  }, [flushMessageUpdate]);
 
-  const createAbortController = () => {
+  const createAbortController = useCallback(() => {
     abortControllerRef.current = new AbortController();
-  };
+  }, []);
 
   return {
     sendMessage,

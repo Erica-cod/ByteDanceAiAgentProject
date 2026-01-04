@@ -102,6 +102,47 @@ export interface RetryConfig {
 }
 
 /**
+ * 降级策略类型
+ */
+export type FallbackStrategyType = 'cache' | 'stale-cache' | 'fallback-tool' | 'simplified' | 'default';
+
+/**
+ * 降级策略配置
+ */
+export interface FallbackStrategy {
+  /** 策略类型 */
+  type: FallbackStrategyType;
+  /** 策略配置（根据类型不同而不同） */
+  config?: any;
+}
+
+/**
+ * 降级配置（参考 Netflix Hystrix）
+ */
+export interface FallbackConfig {
+  /** 是否启用降级 */
+  enabled: boolean;
+  
+  /** 降级策略链（按顺序尝试，参考 Hystrix Fallback Chain） */
+  fallbackChain: FallbackStrategy[];
+  
+  /** 备用工具名称（用于 fallback-tool 策略） */
+  fallbackTool?: string;
+  
+  /** 简化参数（用于 simplified 策略，降级时使用更少资源） */
+  simplifiedParams?: Record<string, any>;
+  
+  /** 默认响应（用于 default 策略，兜底方案） */
+  defaultResponse?: ToolResult;
+  
+  /** 降级超时（毫秒，快速失败） */
+  fallbackTimeout?: number;
+  
+  /** 是否允许返回过期缓存（用于 stale-cache 策略） */
+  allowStaleCache?: boolean;
+}
+
+/**
  * 工具执行上下文
  */
 export interface ToolContext {
@@ -137,6 +178,10 @@ export interface ToolResult {
   duration?: number;
   /** 是否来自缓存 */
   fromCache?: boolean;
+  /** 是否为降级响应 */
+  degraded?: boolean;
+  /** 降级策略类型（如果是降级响应） */
+  degradedBy?: FallbackStrategyType;
 }
 
 /**
@@ -172,6 +217,9 @@ export interface ToolPlugin {
   
   /** 重试配置（可选） */
   retry?: RetryConfig;
+  
+  /** 降级配置（可选，参考 Netflix Hystrix） */
+  fallback?: FallbackConfig;
   
   /**
    * 工具执行函数
