@@ -21,7 +21,7 @@ if (!toolSystemInitialized) {
   initializeToolSystem();
   toolSystemInitialized = true;
 }
-import { errorResponse } from './_utils/response.js';
+import { errorResponse, errorResponseWithStatus } from './_utils/response.js';
 import { getCorsHeaders, handleOptionsRequest } from './_utils/cors.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';
 import { getContainer } from '../_clean/di-container.js';
@@ -37,6 +37,7 @@ import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
+import { getDemoSessionFromHeaders } from './_utils/demoAuth.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -329,6 +330,12 @@ export async function post({
       
       // ==================== 多Agent模式 ====================
       if (mode === 'multi_agent') {
+        // ✅ 演示版登录控制：未登录禁止使用多 Agent
+        const session = getDemoSessionFromHeaders(headers);
+        if (!session) {
+          return errorResponseWithStatus('请先登录后再使用多 Agent 模式（演示版限制）', 403, requestOrigin);
+        }
+
         console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
         handoffToStream = true;
         return handleMultiAgentMode(

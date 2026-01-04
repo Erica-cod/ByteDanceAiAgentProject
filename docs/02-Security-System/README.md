@@ -82,6 +82,15 @@
 3. **第三版**：环境变量配置（生产阶段）
 4. **最终版**：动态域名验证（当前版本）
 
+### 4. SSO_OAUTH2_BFF_DESIGN.md（新增）⭐⭐
+**基于 OAuth2/OIDC + Modern.js BFF 的 SSO 登录体系设计**
+
+用于把当前“弱登录 + 设备防刷”升级为标准 SSO 登录体系，重点覆盖：
+- ✅ OIDC 授权码 + PKCE 标准流程
+- ✅ BFF 同源 Cookie Session（前端不落地敏感 Token）
+- ✅ state/nonce/CSRF/Cookie 安全细节
+- ✅ 与现有 `deviceIdHash` 风控信号融合、匿名数据迁移思路
+
 ## 🎯 关键技术点
 
 ### 设备指纹技术

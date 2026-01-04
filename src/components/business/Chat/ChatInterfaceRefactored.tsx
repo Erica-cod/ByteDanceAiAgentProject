@@ -22,6 +22,7 @@ import { initializeUser } from '../../../utils/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/privacyFirstFingerprint';
 import { useChatStore, useUIStore, useQueueStore } from '../../../stores';
 import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
+import { useAuthStore } from '../../../stores/authStore';
 import './ChatInterfaceRefactored.css';
 
 const ChatInterfaceRefactored: React.FC = () => {
@@ -42,6 +43,13 @@ const ChatInterfaceRefactored: React.FC = () => {
   const chatMode = useUIStore((s) => s.chatMode);
   const setLoading = useUIStore((s) => s.setLoading);
   const setChatMode = useUIStore((s) => s.setChatMode);
+
+  // ===== 演示登录态（用于多 Agent 解锁） =====
+  const authLoggedIn = useAuthStore((s) => s.loggedIn);
+  const canUseMultiAgent = useAuthStore((s) => s.canUseMultiAgent);
+  const refreshMe = useAuthStore((s) => s.refreshMe);
+  const demoLogin = useAuthStore((s) => s.demoLogin);
+  const logout = useAuthStore((s) => s.logout);
 
   // ===== 本地 UI 状态 =====
   const [inputValue, setInputValue] = useState('');
@@ -85,6 +93,18 @@ const ChatInterfaceRefactored: React.FC = () => {
   useEffect(() => {
     initializeUser(userId);
   }, [userId]);
+
+  // 初始化读取登录态（演示版）
+  useEffect(() => {
+    refreshMe().catch(() => {});
+  }, [refreshMe]);
+
+  // 未登录时，强制回退到单 Agent（防止用户误处于 multi_agent 状态）
+  useEffect(() => {
+    if (!canUseMultiAgent && chatMode === 'multi_agent') {
+      setChatMode('single');
+    }
+  }, [canUseMultiAgent, chatMode, setChatMode]);
 
   useEffect(() => {
     conversationManager.loadConversations().catch(console.error);
@@ -154,6 +174,10 @@ const ChatInterfaceRefactored: React.FC = () => {
           onModeChange={throttledSetChatMode}
           onSettingsClick={() => setIsSettingsOpen(true)}
           disabled={isLoading}
+          loggedIn={authLoggedIn}
+          canUseMultiAgent={canUseMultiAgent}
+          onDemoLogin={() => demoLogin('demo')}
+          onLogout={() => logout()}
         />
       }
     />

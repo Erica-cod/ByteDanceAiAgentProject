@@ -249,7 +249,22 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         }
 
         if (!response.ok) {
-          throw new Error(`请求失败: ${response.status}`);
+          // 尝试读取后端的错误信息（JSON）
+          let detail = '';
+          try {
+            const errJson = await response.json();
+            detail = errJson?.error || errJson?.message || '';
+          } catch {
+            // ignore
+          }
+
+          // 403：多 Agent 需要登录（演示版 gating）
+          if (response.status === 403 && chatMode === 'multi_agent') {
+            // 强制回退到单 Agent，避免用户持续卡在不可用模式
+            useUIStore.getState().setChatMode('single');
+          }
+
+          throw new Error(`请求失败: ${response.status}${detail ? `，原因：${detail}` : ''}`);
         }
 
         const reader = response.body?.getReader();

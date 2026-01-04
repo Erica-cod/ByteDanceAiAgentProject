@@ -21,6 +21,14 @@ export interface HeaderControlsProps {
   onSettingsClick: () => void;
   /** 是否禁用（加载中） */
   disabled?: boolean;
+  /** 是否已登录（演示版） */
+  loggedIn?: boolean;
+  /** 是否允许使用多 Agent（登录后才允许） */
+  canUseMultiAgent?: boolean;
+  /** 演示登录 */
+  onDemoLogin?: () => void;
+  /** 退出登录 */
+  onLogout?: () => void;
 }
 
 export const HeaderControls: React.FC<HeaderControlsProps> = ({
@@ -28,9 +36,16 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   onModeChange,
   onSettingsClick,
   disabled = false,
+  loggedIn = false,
+  canUseMultiAgent = true,
+  onDemoLogin,
+  onLogout,
 }) => {
   const { t } = useTranslation();
   
+  const multiDisabled = disabled || !canUseMultiAgent;
+  const multiTitle = canUseMultiAgent ? t('settings.multiAgent') : '登录后才能使用多 Agent（演示）';
+
   return (
     <div className="header-controls">
       {/* 模式切换 */}
@@ -47,13 +62,34 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
         <button
           className={`mode-btn ${chatMode === 'multi_agent' ? 'active' : ''}`}
           onClick={() => onModeChange('multi_agent')}
-          disabled={disabled}
-          title={t('settings.multiAgent')}
+          disabled={multiDisabled}
+          title={multiTitle}
         >
           🧠 {t('settings.multiAgent')}
         </button>
       </label>
       
+      {/* 演示登录/退出（方便你本地演示多Agent解锁） */}
+      {loggedIn ? (
+        <button
+          onClick={onLogout}
+          className="header-controls__settings-btn"
+          disabled={disabled}
+          title="退出登录（演示）"
+        >
+          退出
+        </button>
+      ) : (
+        <button
+          onClick={onDemoLogin}
+          className="header-controls__settings-btn"
+          disabled={disabled}
+          title="演示登录（解锁多 Agent）"
+        >
+          登录
+        </button>
+      )}
+
       {/* 设置按钮 */}
       <button 
         onClick={onSettingsClick} 
