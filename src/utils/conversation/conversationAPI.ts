@@ -1,5 +1,5 @@
 // 对话管理 API 工具函数
-import { fetchWithCsrf } from './fetchWithCsrf';
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 
 export interface Conversation {
   _id?: string;

@@ -436,7 +436,7 @@ import StreamingMarkdown from '@/components/business/Message/StreamingMarkdown';
 ### 手动使用容错工具
 
 ```typescript
-import { fixIncompleteMarkdown, safeFixMarkdown } from '@/utils/markdownFixer';
+import { fixIncompleteMarkdown, safeFixMarkdown } from '@/utils/markdown/markdownFixer';
 
 // 安全修复（推荐）
 const fixed = safeFixMarkdown(streamingContent);

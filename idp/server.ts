@@ -37,12 +37,22 @@ const redis = createRedisClient();
 await redis.connect();
 
 // 账号（演示版：任意用户名都可登录）
+/**
+ * **根据用户名生成 accountId（演示）**
+ * - 真实系统里通常来自数据库自增 id / UUID / snowflake 等
+ * - 这里用 hash 截断，保证同一用户名稳定映射到同一个 accountId
+ */
 function toAccountId(username: string) {
   return createHash('sha256').update(username).digest('hex').slice(0, 24);
 }
 
 const users = new Map<string, { accountId: string; username: string }>();
 
+/**
+ * **记录登录相关事件到 Redis（演示用审计/排查）**
+ * - 只用于 demo 观察流程：登录成功、触发 step-up、step-up 成功/失败等
+ * - 生产环境建议接入统一审计/风控埋点系统，并注意脱敏与采样
+ */
 async function recordLoginEvent(evt: Record<string, any>) {
   try {
     await redis.lpush('idp:login_events', JSON.stringify({ ...evt, ts: Date.now() }));
@@ -52,23 +62,39 @@ async function recordLoginEvent(evt: Record<string, any>) {
   }
 }
 
+/**
+ * **生成一次性验证码 OTP（演示）**
+ * - 这里只生成 6 位数字并直接展示在页面里，方便你本地演示
+ * - 生产环境应通过短信/邮件/Authenticator/硬件 key 等渠道下发，并做防爆破限制
+ */
 function generateOtp() {
   // 演示：6 位数字验证码
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+/** **OTP 存储 key：按 interaction uid 维度** */
 function mfaKey(uid: string) {
   return `idp:mfa:${uid}`;
 }
 
+/** **待完成登录上下文 key：按 interaction uid 维度** */
 function pendingLoginKey(uid: string) {
   return `idp:pending_login:${uid}`;
 }
 
+/**
+ * **保存“待完成登录”的临时上下文（用于 step-up / MFA）**
+ * - 当新设备触发 OTP 时，先把 accountId/username/deviceIdHash 暂存起来
+ * - OTP 验证通过后再从这里取出并完成 `interactionFinished(login)`
+ */
 async function savePendingLogin(uid: string, data: { accountId: string; username: string; deviceIdHash?: string }) {
   await redis.set(pendingLoginKey(uid), JSON.stringify({ ...data, createdAt: Date.now() }), 'EX', 10 * 60);
 }
 
+/**
+ * **读取“待完成登录”上下文**
+ * - OTP 流程里用于恢复 accountId/username/deviceIdHash
+ */
 async function loadPendingLogin(uid: string): Promise<{ accountId: string; username: string; deviceIdHash?: string } | null> {
   const raw = await redis.get(pendingLoginKey(uid));
   if (!raw) return null;
@@ -84,24 +110,43 @@ async function loadPendingLogin(uid: string): Promise<{ accountId: string; usern
   }
 }
 
+/**
+ * **清理 step-up 相关临时数据**
+ * - OTP 成功/失败或超时后都应清理，避免脏数据影响下一次交互
+ */
 async function clearPendingLogin(uid: string) {
   await redis.del(pendingLoginKey(uid));
   await redis.del(mfaKey(uid));
 }
 
+/**
+ * **保存 OTP（演示）**
+ * - 按 interaction uid 绑定：保证 OTP 只对当前这次登录交互有效
+ */
 async function saveOtp(uid: string, otp: string) {
   await redis.set(mfaKey(uid), otp, 'EX', 5 * 60); // 5 分钟
 }
 
+/** **读取 OTP（演示）** */
 async function loadOtp(uid: string) {
   return await redis.get(mfaKey(uid));
 }
 
+/**
+ * **绑定“账号-设备”关系（风控信号沉淀）**
+ * - 当某设备成功登录后，把 deviceIdHash 记为“已见过”
+ * - 后续同账号同设备登录就不再触发 step-up（演示：30 天有效）
+ */
 async function bindDevice(accountId: string, deviceIdHash: string) {
   const key = `idp:account_device:${accountId}:${deviceIdHash}`;
   await redis.set(key, String(Date.now()), 'EX', 30 * 24 * 3600); // 30 天
 }
 
+/**
+ * **判断该账号是否见过该设备（风控：新设备识别）**
+ * - 这里用最简单的：Redis 是否存在绑定 key
+ * - 生产环境可以接入更丰富的风险策略（IP、地理位置、行为画像等）
+ */
 async function hasSeenDevice(accountId: string, deviceIdHash: string) {
   const key = `idp:account_device:${accountId}:${deviceIdHash}`;
   const v = await redis.get(key);
@@ -169,6 +214,11 @@ const configuration: Provider.Configuration = {
   },
 };
 
+/**
+ * **创建 OIDC Provider 实例**
+ * - `oidc-provider` 会根据 configuration 自动挂载标准协议端点（discovery/JWKS/auth/token 等）
+ * - 我们只需要额外实现交互页（interaction）以及账号/风控逻辑
+ */
 const provider = new Provider(issuer, configuration);
 
 // 自定义交互页（login / consent）
@@ -179,6 +229,11 @@ provider.use(async (ctx, next) => {
 });
 
 provider.use(async (ctx, next) => {
+  /**
+   * **interaction 路由总入口**
+   * - `oidc-provider` 遇到需要用户参与的环节，会把用户带到 `/interaction/:uid`
+   * - 我们在这里根据 prompt（login/consent）渲染页面，并处理表单提交
+   */
   const match = ctx.path.match(/^\/interaction\/([^/]+)(\/.*)?$/);
   if (!match) return next();
 
@@ -194,6 +249,7 @@ provider.use(async (ctx, next) => {
   if (ctx.method === 'GET' && rest === '') {
     // 登录页 / 同意页
     if (prompt.name === 'login') {
+      // **渲染登录页（演示）**：展示 client_id/redirect_uri/deviceIdHash，并提交 username
       const body = `
         <h2>简化 IdP（演示）登录</h2>
         <div class="muted">本页面是演示用 IdP 的交互页。实际生产请接入真实账号体系与验证码/MFA。</div>
@@ -216,6 +272,7 @@ provider.use(async (ctx, next) => {
     }
 
     if (prompt.name === 'consent') {
+      // **渲染同意页（演示）**：展示 scope，并让用户同意/拒绝
       const body = `
         <h2>授权确认（演示）</h2>
         <div class="muted">为方便演示，这里默认只展示 scopes，不做复杂同意项管理。</div>
@@ -235,6 +292,7 @@ provider.use(async (ctx, next) => {
   }
 
   if (ctx.method === 'POST' && rest === '/login') {
+    // **处理登录表单提交**：创建/查找账号 + 风控判定 + 可能触发 step-up + 结束 login prompt
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
       ctx.req.on('data', (c) => chunks.push(Buffer.from(c)));
@@ -257,6 +315,7 @@ provider.use(async (ctx, next) => {
 
     // ✅ 新设备：强制二次确认（演示）
     if (risk === 'medium') {
+      // **进入 step-up**：生成 OTP + 暂存登录上下文，等待 `/mfa` 验证
       const otp = generateOtp();
       await saveOtp(uid, otp);
       await savePendingLogin(uid, { accountId, username, deviceIdHash: deviceIdHash || undefined });
@@ -308,11 +367,13 @@ provider.use(async (ctx, next) => {
       login: { accountId },
     };
 
+    // **结束 login prompt**：交给 oidc-provider 继续后续流程（例如 consent 或直接重定向）
     await provider.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
     return;
   }
 
   if (ctx.method === 'POST' && rest === '/mfa') {
+    // **处理 OTP 二次确认提交**：校验 OTP，通过后完成登录并绑定设备
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
       ctx.req.on('data', (c) => chunks.push(Buffer.from(c)));
@@ -333,6 +394,7 @@ provider.use(async (ctx, next) => {
     }
 
     if (otp !== expected) {
+      // OTP 不匹配：返回可重试页面（演示）
       await recordLoginEvent({
         type: 'login_step_up_failed',
         accountId: pending.accountId,
@@ -371,11 +433,13 @@ provider.use(async (ctx, next) => {
       login: { accountId: pending.accountId },
     };
 
+    // **结束 login prompt（step-up 成功路径）**
     await provider.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
     return;
   }
 
   if (ctx.method === 'POST' && rest === '/confirm') {
+    // **处理同意页提交**：用户同意 -> 生成 Grant；用户拒绝 -> 返回 access_denied
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
       ctx.req.on('data', (c) => chunks.push(Buffer.from(c)));
@@ -387,6 +451,7 @@ provider.use(async (ctx, next) => {
     const deny = form.get('deny') === '1';
 
     if (deny) {
+      // 用户拒绝授权：结束 consent prompt，并返回 OAuth 标准错误
       await provider.interactionFinished(
         ctx.req,
         ctx.res,
@@ -405,6 +470,7 @@ provider.use(async (ctx, next) => {
     grant.addOIDCScope(String((params as any)?.scope || 'openid profile email'));
     const grantId = await grant.save();
 
+    // **结束 consent prompt**：把 grantId 交给 oidc-provider，继续回到 /auth 产生 code
     await provider.interactionFinished(
       ctx.req,
       ctx.res,
@@ -418,12 +484,13 @@ provider.use(async (ctx, next) => {
 });
 
 const server = provider.listen(port, () => {
-  // 这里输出一行就够了，方便你复制访问
+  // 这里输出一行就够了，方便复制访问
   // eslint-disable-next-line no-console
-  console.log(`✅ [IdP] OIDC Provider running: ${issuer} (port ${port})`);
+  console.log(` [IdP] OIDC Provider running: ${issuer} (port ${port})`);
 });
 
 process.on('SIGINT', async () => {
+  // **优雅退出**：关闭 http server + 断开 Redis（方便本地开发）
   server.close(() => {});
   try { await redis.quit(); } catch {}
   process.exit(0);

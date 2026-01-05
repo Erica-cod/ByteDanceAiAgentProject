@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchWithCsrf } from '../utils/fetchWithCsrf';
+import { fetchWithCsrf } from '../utils/auth/fetchWithCsrf';
 
 export type AuthUser = {
   userId: string;

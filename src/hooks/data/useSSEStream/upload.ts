@@ -3,10 +3,10 @@
  * 处理文本上传、压缩上传、分片上传等
  */
 
-import { selectUploadStrategy } from '../../../utils/uploadStrategy';
-import { compressText } from '../../../utils/compression';
-import { ChunkUploader } from '../../../utils/chunkUploader';
-import { fetchWithCsrf } from '../../../utils/fetchWithCsrf';
+import { selectUploadStrategy } from '../../../utils/upload/uploadStrategy';
+import { compressText } from '../../../utils/upload/compression';
+import { ChunkUploader } from '../../../utils/upload/chunkUploader';
+import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
 import type { UploadPayload } from './types';
 
 /**

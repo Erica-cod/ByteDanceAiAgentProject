@@ -2,7 +2,7 @@
  * 归档对话 API 调用函数
  */
 
-import { fetchWithCsrf } from './fetchWithCsrf';
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 
 export interface ArchivedConversation {
   _id?: string;

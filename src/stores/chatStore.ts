@@ -5,11 +5,11 @@ import {
   writeConversationCache,
   mergeServerMessagesWithCache,
   type CachedMessage,
-} from '../utils/secureConversationCache';
-import { getUserId } from '../utils/userManager';
-import { getConversationMessages, type Conversation } from '../utils/conversationAPI';
-import { createEventManager } from '../utils/eventManager';
-import { touchConversationCache, smartCleanupConversationCache } from '../utils/localStorageLRU';
+} from '../utils/conversation/secureConversationCache';
+import { getUserId } from '../utils/auth/userManager';
+import { getConversationMessages, type Conversation } from '../utils/conversation/conversationAPI';
+import { createEventManager } from '../utils/events/eventManager';
+import { touchConversationCache, smartCleanupConversationCache } from '../utils/storage/localStorageLRU';
 
 export interface Message {
   id: string;

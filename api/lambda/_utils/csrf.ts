@@ -31,9 +31,9 @@ function redis(): Redis {
 function base64url(input: Buffer) {
   return input
     .toString('base64')
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replaceAll('=', '');
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 }
 
 function isHttps(headers?: Record<string, any>) {

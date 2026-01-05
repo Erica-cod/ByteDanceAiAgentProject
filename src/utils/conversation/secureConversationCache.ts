@@ -11,7 +11,7 @@
  * - API 完全兼容，无需修改调用代码
  */
 
-import { encryptData, decryptData, isCryptoSupported } from './deviceCrypto.js';
+import { encryptData, decryptData, isCryptoSupported } from '../device/deviceCrypto.js';
 
 // ===================== 类型定义 =====================
 

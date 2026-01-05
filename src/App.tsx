@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useThemeStore } from './stores/themeStore';
-import { initLocalStorageLRU } from './utils/localStorageLRU';
+import { initLocalStorageLRU } from './utils/storage/localStorageLRU';
 import { AppRoutes } from './router/AppRoutes';
 
 const App: React.FC = () => {
@@ -15,7 +15,7 @@ const App: React.FC = () => {
   useEffect(() => {
     console.log('🚀 初始化 LocalStorage LRU 管理...');
     // 获取用户 ID 并初始化 LRU
-    import('./utils/userManager').then(({ getUserId }) => {
+    import('./utils/auth/userManager').then(({ getUserId }) => {
       const userId = getUserId();
       initLocalStorageLRU(userId);
     });

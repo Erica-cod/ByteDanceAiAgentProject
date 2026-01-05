@@ -19,7 +19,7 @@
  * - 相同硬件冲突率：< 1%
  */
 
-import { fetchWithCsrf } from './fetchWithCsrf';
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 
 const SITE_SALT = 'ai_chat_salt_2024_v1'; // L2：网站专属盐值
 const STORAGE_KEY = 'device_id_hash';

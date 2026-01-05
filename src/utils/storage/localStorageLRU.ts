@@ -8,7 +8,7 @@
  * 4. 优雅降级（存储满时的处理）
  */
 
-import { fetchWithCsrf } from './fetchWithCsrf';
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 
 interface ConversationAccessRecord {
   conversationId: string;

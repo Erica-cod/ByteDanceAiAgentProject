@@ -103,8 +103,8 @@
 
 import { useRef, useCallback } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../../stores';
-import { getConversationDetails, type Conversation } from '../../../utils/conversationAPI';
-import { isLongText } from '../../../utils/textUtils';
+import { getConversationDetails, type Conversation } from '../../../utils/conversation/conversationAPI';
+import { isLongText } from '../../../utils/text/textUtils';
 import { useRAFBatching } from './raf-batching';
 import { handleMessageUpload } from './upload';
 import {
@@ -121,7 +121,7 @@ import {
   handleChunkingChunk,
 } from './chunking-handlers';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
-import { fetchWithCsrf } from '../../../utils/fetchWithCsrf';
+import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);

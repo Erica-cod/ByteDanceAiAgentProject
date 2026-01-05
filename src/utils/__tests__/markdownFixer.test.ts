@@ -11,7 +11,7 @@ import {
   hasSevereFormatError,
   isLikelyStreaming,
   safeFixMarkdown,
-} from '../markdownFixer.js';
+} from '../markdown/markdownFixer.js';
 
 describe('markdownFixer', () => {
   test('未闭合的代码块：应自动补全结束标记', () => {

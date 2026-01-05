@@ -6,7 +6,7 @@ import {
   UPLOAD_THRESHOLDS, 
   UploadStrategy, 
   UploadStrategyResult 
-} from '../constants/uploadThresholds';
+} from '../../constants/uploadThresholds';
 import { isCompressionSupported } from './compression';
 
 /**

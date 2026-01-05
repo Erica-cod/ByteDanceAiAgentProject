@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createEventManager } from '../utils/eventManager';
+import { createEventManager } from '../utils/events/eventManager';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
