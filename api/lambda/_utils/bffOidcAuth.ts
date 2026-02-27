@@ -303,7 +303,7 @@ export async function deleteBffSessionFromHeaders(headers?: Record<string, any>)
 }
 
 const DEFAULT_POST_LOGOUT_REDIRECT_URI =
-  process.env.OIDC_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8000/api/auth/logout/callback';
+  process.env.OIDC_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8080/api/auth/logout/callback';
 
 export async function buildEndSessionUrl(input: { id_token_hint: string; state?: string }) {
   const discovery = await getDiscovery();

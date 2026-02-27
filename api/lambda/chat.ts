@@ -119,6 +119,15 @@ export async function post({
       resumeFrom, // 续流参数：{ messageId, position }
     } = data;
 
+    // 如果已登录，后端统一以会话里的 sub 作为 userId，避免前端残留 userId 导致串数据
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      if (userId && userId !== session.user.sub) {
+        console.warn('⚠️ 检测到 userId 与登录会话不一致，已自动切换到会话用户');
+      }
+      userId = session.user.sub;
+    }
+
     // ✅ Clean Architecture: 处理上传会话（压缩或分片上传）
     if (uploadSessionId) {
       console.log(`📦 [Upload] 检测到上传会话: ${uploadSessionId}`);

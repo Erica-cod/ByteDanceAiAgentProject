@@ -18,7 +18,7 @@ import { ChatLayout } from '../../base/Layout';
 import { ChatHeader } from '../../base/Layout';
 import { HeaderControls } from './HeaderControls';
 import { ChatInputArea } from './ChatInputArea';
-import { initializeUser } from '../../../utils/auth/userManager';
+import { getUserId, initializeUser } from '../../../utils/auth/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/device/privacyFirstFingerprint';
 import { useChatStore, useUIStore, useQueueStore } from '../../../stores';
 import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
@@ -32,6 +32,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   const messages = useChatStore((s) => s.messages);
   const conversationId = useChatStore((s) => s.conversationId);
   const userId = useChatStore((s) => s.userId);
+  const setUserId = useChatStore((s) => s.setUserId);
   const setDeviceId = useChatStore((s) => s.setDeviceId);
   const firstItemIndex = useChatStore((s) => s.firstItemIndex);
   const hasMoreMessages = useChatStore((s) => s.hasMoreMessages);
@@ -46,6 +47,7 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // ===== 演示登录态（用于多 Agent 解锁） =====
   const authLoggedIn = useAuthStore((s) => s.loggedIn);
+  const authUser = useAuthStore((s) => s.user);
   const canUseMultiAgent = useAuthStore((s) => s.canUseMultiAgent);
   const refreshMe = useAuthStore((s) => s.refreshMe);
   const beginLogin = useAuthStore((s) => s.beginLogin);
@@ -98,6 +100,23 @@ const ChatInterfaceRefactored: React.FC = () => {
   useEffect(() => {
     refreshMe().catch(() => {});
   }, [refreshMe]);
+
+  // 登录用户切换时，同步业务 userId，确保会按账号隔离加载数据
+  useEffect(() => {
+    const nextUserId = authLoggedIn && authUser?.userId
+      ? authUser.userId
+      : getUserId();
+    if (nextUserId === userId) return;
+
+    setUserId(nextUserId);
+    useChatStore.setState({
+      conversationId: null,
+      messages: [],
+      firstItemIndex: 0,
+      hasMoreMessages: false,
+      totalMessages: 0,
+    });
+  }, [authLoggedIn, authUser, userId, setUserId]);
 
   // 未登录时，强制回退到单 Agent（防止用户误处于 multi_agent 状态）
   useEffect(() => {

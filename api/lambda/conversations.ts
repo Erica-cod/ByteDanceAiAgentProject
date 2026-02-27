@@ -17,6 +17,7 @@ import { getContainer } from '../_clean/di-container.js';
 import { successResponse, errorResponse, errorResponseWithStatus } from './_utils/response.js';
 import { handleOptionsRequest } from './_utils/cors.js';
 import { requireCsrf } from './_utils/csrf.js';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -67,7 +68,11 @@ export async function post({
       return errorResponse('请求数据不能为空', requestOrigin);
     }
     
-    const { userId, title } = data;
+    let { userId, title } = data;
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
 
     // 参数验证
     if (!userId) {
@@ -106,7 +111,11 @@ export async function get({
       return errorResponse('查询参数不能为空', requestOrigin);
     }
     
-    const { userId, limit = '20', skip = '0' } = query;
+    let { userId, limit = '20', skip = '0' } = query;
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
 
     // 参数验证
     if (!userId) {

@@ -166,7 +166,7 @@ const configuration: Provider.Configuration = {
       //  RP-Initiated Logout（OIDC end_session_endpoint）
       // BFF 在登出时会携带 id_token_hint，并要求 IdP 清理自己的 session
       post_logout_redirect_uris: [
-        process.env.IDP_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8000/api/auth/logout/callback',
+        process.env.IDP_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8080/api/auth/logout/callback',
       ],
       response_types: ['code'],
       // 注意：oidc-provider 会根据 response_types / scopes 自动推导允许的 grant_types
@@ -285,7 +285,21 @@ provider.use(async (ctx, next) => {
   const rest = match[2] || '';
 
   // 读取交互详情
-  const details = await provider.interactionDetails(ctx.req, ctx.res);
+  // 某些情况下（例如刷新旧的 /interaction/:uid 地址、浏览器丢失短期 cookie）
+  // interactionDetails 会抛 "interaction session not found"，这里兜底回到登录入口重拉流程。
+  let details: Awaited<ReturnType<typeof provider.interactionDetails>>;
+  try {
+    details = await provider.interactionDetails(ctx.req, ctx.res);
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    const description = String(error?.error_description || '');
+    if (message.includes('interaction session not found') || description.includes('interaction session not found')) {
+      ctx.status = 302;
+      ctx.redirect('/api/auth/login?returnTo=/');
+      return;
+    }
+    throw error;
+  }
   const { prompt, params } = details;
 
   const deviceIdHash = String((params as any)?.deviceIdHash || '').slice(0, 128);

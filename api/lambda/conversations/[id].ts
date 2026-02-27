@@ -16,6 +16,7 @@ import { getContainer } from '../../_clean/di-container.js';
 // 工具
 import { successResponse, errorResponse, messageResponse, errorResponseWithStatus } from '../_utils/response.js';
 import { requireCsrf } from '../_utils/csrf.js';
+import { getBffSessionFromHeaders } from '../_utils/bffOidcAuth.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -71,6 +72,11 @@ export async function del(
         userId = context.req.query.userId;
       }
     }
+
+    const session = await getBffSessionFromHeaders(reqHeaders);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
     
     console.log('🗑️ DELETE /api/conversations/:id - Debug:', { id, userId });
 
@@ -120,7 +126,11 @@ export async function put(
 
     // 防御性获取 data
     const data = context.data || context.body || context.req?.body || {};
-    const { userId, title } = data;
+    let { userId, title } = data;
+    const session = await getBffSessionFromHeaders(reqHeaders);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
     
     console.log('✏️ PUT /api/conversations/:id - Debug:', { id, userId, title });
 
@@ -193,6 +203,12 @@ export async function get(
       } else {
         userId = context.req.query.userId;
       }
+    }
+
+    const reqHeaders = context?.headers || context?.req?.headers || {};
+    const session = await getBffSessionFromHeaders(reqHeaders);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
     }
     
     console.log('🔍 GET /api/conversations/:id - Debug:', {
