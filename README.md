@@ -24,6 +24,9 @@
 - 自动构建触发:  启用
 
 ###  相关文档
+- [环境变量配置指南](./ENV_SETUP_GUIDE.md) - 🔑 环境变量配置详细说明
+- [安全指南](./SECURITY.md) - 🔒 安全最佳实践和密钥管理
+- [MongoDB 连接修复](./DOCKER_FIX_MONGODB.md) - 🔧 Docker MongoDB 连接问题修复
 - [完整部署指南](./DEPLOYMENT_GUIDE.md) - Jenkins 和 Docker CI/CD 配置
 - [ngrok Webhook 配置指南](./docs/NGROK_GITHUB_WEBHOOK_GUIDE.md) - 本地开发环境接收 GitHub webhook
 - [Tavily 搜索工具指南](./docs/TAVILY_SEARCH_GUIDE.md) - AI 联网搜索功能配置和使用
@@ -71,6 +74,8 @@ cp .env.example .env.local
 - 请勿将包含真实 API 密钥的 `.env.local` 或 `.env.production` 文件提交到 Git
 - 这些文件已在 `.gitignore` 中配置忽略
 - 仅提交 `.env.example` 模板文件
+- 详细配置说明请参考 [环境变量配置指南](./ENV_SETUP_GUIDE.md)
+- 安全相关内容请参考 [安全指南](./SECURITY.md)
 
 ## 开发
 
@@ -90,7 +95,21 @@ npm run build
 
 # 启动生产服务
 npm run serve
+
+# 🔒 提交代码前运行安全检查（推荐）
+npm run check:secrets
 ```
+
+### 安全检查
+
+为了防止敏感信息（如 API 密钥）被提交到 Git，项目提供了安全检查脚本：
+
+```bash
+# 运行安全检查
+npm run check:secrets
+```
+
+**建议：** 在每次提交代码前运行此命令，确保没有敏感信息泄露。
 
 ## Docker 部署
 
@@ -106,7 +125,17 @@ npm run docker:logs
 
 # 停止容器
 npm run docker:stop
+
+# 修复 MongoDB 连接问题（如果容器无法连接数据库）
+npm run docker:fix-mongo
 ```
+
+**⚠️ MongoDB 连接问题？**  
+如果 Docker 容器无法连接到 MongoDB，请运行：
+```bash
+npm run docker:fix-mongo
+```
+详细说明请参考 [MongoDB 连接修复指南](./DOCKER_FIX_MONGODB.md)
 
 ## 技术栈
 

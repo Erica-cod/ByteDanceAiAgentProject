@@ -72,13 +72,14 @@ async function createIndexes() {
     await db.collection('messages').createIndex({ conversationId: 1, timestamp: 1 });
     await db.collection('messages').createIndex({ userId: 1 });
     // 幂等写入用：同一会话/用户下，同一个 clientMessageId 只允许出现一次（只对有 clientMessageId 的文档建索引）
+    // 注意：partialFilterExpression 不支持 $ne，使用 $type 来确保字段存在且为字符串类型
     await db
       .collection('messages')
       .createIndex(
         { conversationId: 1, userId: 1, clientMessageId: 1 }, 
         { 
           unique: true, 
-          partialFilterExpression: { clientMessageId: { $exists: true, $ne: null } }
+          partialFilterExpression: { clientMessageId: { $type: "string" } }
         }
       );
 

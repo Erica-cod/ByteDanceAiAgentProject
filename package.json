@@ -11,6 +11,7 @@
     "dev": "node scripts/dev-with-idp.js",
     "dev:app": "cross-env NODE_ENV=development modern dev",
     "dev:idp": "cross-env NODE_ENV=development tsx idp/server.ts",
+    "start:idp": "cross-env NODE_ENV=production tsx idp/server.ts",
     "build": "cross-env NODE_ENV=production modern build",
     "start": "cross-env NODE_ENV=production modern start",
     "serve": "cross-env NODE_ENV=production modern serve",
@@ -26,10 +27,13 @@
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
     "docker:logs": "docker-compose logs -f app",
+    "docker:fix-mongo": "powershell -ExecutionPolicy Bypass -File scripts/fix-mongodb-connection.ps1",
     "db:status": "docker ps -a | findstr mongodb-global",
     "db:logs": "docker logs -f mongodb-global",
     "db:shell": "docker exec -it mongodb-global mongosh ai-agent",
     "ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
+    "check:secrets": "node -e \"const { execSync } = require('child_process'); const isWin = process.platform === 'win32'; try { execSync(isWin ? 'powershell -ExecutionPolicy Bypass -File scripts/check-secrets.ps1' : 'bash scripts/check-secrets.sh', { stdio: 'inherit' }); } catch (e) { process.exit(e.status || 1); }\"",
+    "precommit": "npm run check:secrets",
     "test:volcengine": "cross-env NODE_ENV=test TEST_TYPE=integration RUN_VOLCENGINE_API_TEST=1 node --experimental-vm-modules ./node_modules/jest/bin/jest.js test/jest/volcengine-api.int.test.ts",
     "test:planning": "node test-planning-tools.js",
     "test:redis": "cross-env NODE_ENV=test TEST_TYPE=integration node --experimental-vm-modules ./node_modules/jest/bin/jest.js test/jest/redis-connection.int.test.ts",
@@ -99,5 +103,10 @@
     "ts-jest": "^29.2.6",
     "tsx": "^4.20.6",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "is-generator-function": "1.0.10",
+    "has-symbols": "1.1.0",
+    "koa": "2.15.3"
   }
 }

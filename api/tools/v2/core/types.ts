@@ -68,7 +68,7 @@ export interface CacheConfig {
   /** 缓存键生成策略 */
   keyStrategy?: 'params' | 'user' | 'custom';
   /** 自定义缓存键生成函数 */
-  keyGenerator?: (params: any, context: ToolContext) => string;
+  keyGenerator?: (params: any, context: ToolContext, toolName?: string) => string;
 }
 
 /**

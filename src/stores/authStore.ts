@@ -60,7 +60,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
-      await fetchWithCsrf('/api/auth/logout', { method: 'POST' });
+      const res = await fetchWithCsrf('/api/auth/logout', { method: 'POST' });
+      const json = await res.json().catch(() => null);
+      const idpLogoutUrl: string | null = json?.data?.idpLogoutUrl || null;
+
+      //  完整登出：如果后端给了 IdP logout URL，则做整页跳转（清掉 IdP 自己的 session）
+      if (idpLogoutUrl) {
+        window.location.assign(idpLogoutUrl);
+        return;
+      }
     } finally {
       // 不论后端是否成功，都在前端清空状态（避免“假登录”）
       set({ loggedIn: false, user: null, canUseMultiAgent: false, isLoading: false });

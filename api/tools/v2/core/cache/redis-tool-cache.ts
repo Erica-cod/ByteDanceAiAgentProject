@@ -32,7 +32,8 @@ function generateCacheKey(
     case 'custom':
       // 自定义策略
       if (config.keyGenerator) {
-        return `tool:cache:${config.keyGenerator(params, context)}`;
+        // 约定：Redis key 必须包含 toolName，避免不同工具的 key 冲突
+        return `tool:cache:${toolName}:${config.keyGenerator(params, context, toolName)}`;
       }
       // 降级到默认策略
       keyData = params;

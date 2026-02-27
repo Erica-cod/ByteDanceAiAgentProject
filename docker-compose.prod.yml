@@ -1,0 +1,136 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis-ai-agent
+    command: ["sh", "-lc", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: mongo-ai-agent
+    restart: unless-stopped
+    networks:
+      - app-net
+    volumes:
+      - mongo-data:/data/db
+    # If you want Mongo auth, uncomment and update MONGODB_URI accordingly
+    # environment:
+    #   - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+    #   - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 })' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  ollama:
+    # If you already have a custom "ollama+model" image, replace this image name.
+    image: ollama/ollama:latest
+    container_name: ollama-ai-agent
+    restart: unless-stopped
+    networks:
+      - app-net
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  idp:
+    build:
+      context: .
+      dockerfile: dockerfiles/idp.Dockerfile
+    image: ${IDP_IMAGE:-bytedance-idp:latest}
+    container_name: idp-ai-agent
+    restart: unless-stopped
+    networks:
+      - app-net
+    env_file:
+      - ./deploy/.env
+    environment:
+      - NODE_ENV=production
+      - IDP_PORT=${IDP_PORT}
+      - IDP_ISSUER=${IDP_ISSUER}
+      - IDP_CLIENT_ID=${IDP_CLIENT_ID}
+      - IDP_CLIENT_SECRET=${IDP_CLIENT_SECRET}
+      - IDP_REDIRECT_URIS=${IDP_REDIRECT_URIS}
+      - IDP_POST_LOGOUT_REDIRECT_URI=${IDP_POST_LOGOUT_REDIRECT_URI}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "start:idp"]
+    ports:
+      - "9000:9000"
+
+  app:
+    build:
+      context: .
+      dockerfile: dockerfiles/app.Dockerfile
+    image: ${APP_IMAGE:-bytedance-ai-agent:latest}
+    container_name: bytedance-ai-agent
+    restart: unless-stopped
+    networks:
+      - app-net
+    env_file:
+      - ./deploy/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - MONGODB_URI=${MONGODB_URI}
+      - OLLAMA_API_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - ARK_API_KEY=${ARK_API_KEY}
+      - ARK_API_URL=${ARK_API_URL}
+      - ARK_MODEL=${ARK_MODEL}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_INTERNAL_ISSUER=${OIDC_INTERNAL_ISSUER}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI}
+      - OIDC_POST_LOGOUT_REDIRECT_URI=${OIDC_POST_LOGOUT_REDIRECT_URI}
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      idp:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  redis-data:
+  mongo-data:
+  ollama-data:
+
+

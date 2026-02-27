@@ -12,6 +12,7 @@ import { handleOptionsRequest } from '../_utils/cors.js';
 import {
   loadLoginState,
   deleteLoginState,
+  acquireLoginStateLock,
   exchangeCodeForTokens,
   verifyIdTokenNonce,
   createBffSession,
@@ -48,6 +49,13 @@ export async function get({
       // 这里用 403 更贴近“拒绝”，避免泄露细节
       return new Response('登录上下文不匹配（可能是回调链接被复用/泄露）', { status: 403 });
     }
+  }
+
+  // ✅ 并发/重复 callback 防护：只允许一个请求“拿到处理权”
+  // 注意：放在 csrfSid 校验之后，避免外部用泄露的 state 抢占并导致合法用户无法登录
+  const locked = await acquireLoginStateLock(state);
+  if (!locked) {
+    return new Response('登录 state 已被使用或正在处理中，请重新发起登录', { status: 409 });
   }
 
   // 单次使用，先删掉（避免重放）

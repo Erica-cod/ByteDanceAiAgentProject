@@ -43,10 +43,14 @@ type LoginStateRecord = {
   createdAt: number;
 };
 
+// OIDC_ISSUER: 浏览器可访问的公开地址（用于登录跳转与iss校验）
+// OIDC_INTERNAL_ISSUER: 容器内可访问的内部地址（用于发现文档、token、jwks请求）
 const DEFAULT_ISSUER = process.env.OIDC_ISSUER || 'http://localhost:9000';
+const DEFAULT_INTERNAL_ISSUER = process.env.OIDC_INTERNAL_ISSUER || DEFAULT_ISSUER;
 const DEFAULT_CLIENT_ID = process.env.OIDC_CLIENT_ID || 'ai-agent-bff';
 const DEFAULT_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || 'dev_secret_change_me';
 const DEFAULT_REDIRECT_URI = process.env.OIDC_REDIRECT_URI || 'http://localhost:8080/api/auth/callback';
+const FORCE_PROMPT_LOGIN = process.env.OIDC_FORCE_PROMPT_LOGIN === 'true';
 
 const LOGIN_STATE_TTL_SEC = 10 * 60; // 10分钟
 const SESSION_TTL_SEC = 7 * 24 * 3600; // 7天
@@ -124,6 +128,10 @@ function loginKey(state: string) {
   return `bff:oidc:login:${state}`;
 }
 
+function loginLockKey(state: string) {
+  return `bff:oidc:login_lock:${state}`;
+}
+
 function sessionKey(sid: string) {
   return `bff:session:${sid}`;
 }
@@ -131,11 +139,28 @@ function sessionKey(sid: string) {
 let discoveryCache: any | null = null;
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
+function joinIssuerPath(issuer: string, path: string) {
+  const cleanIssuer = issuer.replace(/\/+$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${cleanIssuer}${cleanPath}`;
+}
+
 export async function getDiscovery() {
   if (discoveryCache) return discoveryCache;
-  const res = await fetch(`${DEFAULT_ISSUER}/.well-known/openid-configuration`);
+  const res = await fetch(`${DEFAULT_INTERNAL_ISSUER}/.well-known/openid-configuration`);
   if (!res.ok) throw new Error(`OIDC discovery 失败: ${res.status}`);
-  discoveryCache = await res.json();
+  const raw = await res.json();
+  // 对外（浏览器）用公开地址；对内（容器）走内部地址，避免把容器域名返回给浏览器
+  discoveryCache = {
+    ...(raw as Record<string, any>),
+    issuer: DEFAULT_ISSUER,
+    authorization_endpoint: joinIssuerPath(DEFAULT_ISSUER, '/auth'),
+    end_session_endpoint: joinIssuerPath(DEFAULT_ISSUER, '/session/end'),
+    token_endpoint: joinIssuerPath(DEFAULT_INTERNAL_ISSUER, '/token'),
+    jwks_uri: joinIssuerPath(DEFAULT_INTERNAL_ISSUER, '/jwks'),
+    userinfo_endpoint: joinIssuerPath(DEFAULT_INTERNAL_ISSUER, '/me'),
+    pushed_authorization_request_endpoint: joinIssuerPath(DEFAULT_INTERNAL_ISSUER, '/request'),
+  };
   return discoveryCache;
 }
 
@@ -196,6 +221,20 @@ export async function loadLoginState(state: string): Promise<LoginStateRecord | 
 
 export async function deleteLoginState(state: string) {
   await redis().del(loginKey(state));
+}
+
+/**
+ * 尝试抢占“登录中间态”的处理权（一次性）。
+ *
+ * 目的：
+ * - 防止 callback 并发/重复请求导致同一个 state 被处理多次
+ * - 只在通过“浏览器绑定校验（csrfSid）”之后才抢占，避免外部耗尽 state
+ */
+export async function acquireLoginStateLock(state: string): Promise<boolean> {
+  // ioredis 的类型定义对 set(NX/EX) 的重载比较严格，这里用宽松类型避免 TS 误报
+  const client: any = redis();
+  const res = (await client.set(loginLockKey(state), '1', 'NX', 'EX', 60)) as unknown;
+  return res === 'OK';
 }
 
 export async function createBffSession(input: {
@@ -263,13 +302,28 @@ export async function deleteBffSessionFromHeaders(headers?: Record<string, any>)
   await redis().del(sessionKey(sid));
 }
 
+const DEFAULT_POST_LOGOUT_REDIRECT_URI =
+  process.env.OIDC_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8000/api/auth/logout/callback';
+
+export async function buildEndSessionUrl(input: { id_token_hint: string; state?: string }) {
+  const discovery = await getDiscovery();
+  const endSessionEndpoint = discovery.end_session_endpoint as string | undefined;
+  if (!endSessionEndpoint) return null;
+
+  const url = new URL(endSessionEndpoint);
+  url.searchParams.set('id_token_hint', input.id_token_hint);
+  url.searchParams.set('post_logout_redirect_uri', DEFAULT_POST_LOGOUT_REDIRECT_URI);
+  if (input.state) url.searchParams.set('state', input.state);
+  return url.toString();
+}
+
 export function buildAuthorizationUrl(input: {
   state: string;
   nonce: string;
   code_challenge: string;
   deviceIdHash?: string;
 }) {
-  const url = new URL(`${DEFAULT_ISSUER}/auth`);
+  const url = new URL(joinIssuerPath(DEFAULT_ISSUER, '/auth'));
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', DEFAULT_CLIENT_ID);
   url.searchParams.set('redirect_uri', DEFAULT_REDIRECT_URI);
@@ -278,6 +332,10 @@ export function buildAuthorizationUrl(input: {
   url.searchParams.set('nonce', input.nonce);
   url.searchParams.set('code_challenge', input.code_challenge);
   url.searchParams.set('code_challenge_method', 'S256');
+  // 在调试/演示环境可强制每次展示登录页，避免因已有IdP会话直接跳callback
+  if (FORCE_PROMPT_LOGIN) {
+    url.searchParams.set('prompt', 'login');
+  }
   if (input.deviceIdHash) url.searchParams.set('deviceIdHash', input.deviceIdHash);
   return url.toString();
 }

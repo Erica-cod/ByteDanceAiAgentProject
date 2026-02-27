@@ -89,7 +89,8 @@ export class CacheManager {
       case 'custom':
         // 自定义策略
         if (config.keyGenerator) {
-          return config.keyGenerator(params, context);
+          // 约定：自定义 key 仍然必须带 toolName 前缀，便于按工具清理内存缓存
+          return `${toolName}:${config.keyGenerator(params, context, toolName)}`;
         }
         // 降级到默认策略
         keyData = params;

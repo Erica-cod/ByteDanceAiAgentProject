@@ -25,6 +25,7 @@ import { createHash } from 'crypto';
 
 const issuer = process.env.IDP_ISSUER || 'http://localhost:9000';
 const port = Number.parseInt(process.env.IDP_PORT || new URL(issuer).port || '9000', 10);
+const isHttpsIssuer = issuer.startsWith('https://');
 
 const clientId = process.env.IDP_CLIENT_ID || 'ai-agent-bff';
 const clientSecret = process.env.IDP_CLIENT_SECRET || 'dev_secret_change_me';
@@ -162,6 +163,11 @@ const configuration: Provider.Configuration = {
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uris: redirectUris,
+      //  RP-Initiated Logout（OIDC end_session_endpoint）
+      // BFF 在登出时会携带 id_token_hint，并要求 IdP 清理自己的 session
+      post_logout_redirect_uris: [
+        process.env.IDP_POST_LOGOUT_REDIRECT_URI || 'http://localhost:8000/api/auth/logout/callback',
+      ],
       response_types: ['code'],
       // 注意：oidc-provider 会根据 response_types / scopes 自动推导允许的 grant_types
       // 这里显式配置 refresh_token 反而容易触发 invalid_client_metadata（演示环境先不写 grant_types）
@@ -193,8 +199,11 @@ const configuration: Provider.Configuration = {
   },
 
   cookies: {
-    long: { signed: true },
-    short: { signed: true },
+    // 反向代理 + 本地 http 调试时，SameSite=None 会被现代浏览器拒收（必须同时 Secure）
+    // 导致 interaction/session 丢失，出现 "interaction session not found"。
+    // 这里统一使用 Lax；若 issuer 为 https，则启用 Secure。
+    long: { signed: true, sameSite: 'lax', secure: isHttpsIssuer },
+    short: { signed: true, sameSite: 'lax', secure: isHttpsIssuer },
     keys: [
       process.env.IDP_COOKIE_KEY_1 || 'dev_cookie_key_1_change_me',
       process.env.IDP_COOKIE_KEY_2 || 'dev_cookie_key_2_change_me',
@@ -211,6 +220,31 @@ const configuration: Provider.Configuration = {
 
   features: {
     devInteractions: { enabled: false },
+    // ✅ 开启标准的 OIDC RP-Initiated Logout（会暴露 end_session_endpoint，默认路径通常为 /session/end）
+    rpInitiatedLogout: { enabled: true },
+  },
+  // 交互会话丢失时自动回到登录入口，避免用户停留在 invalid_request 错误页
+  renderError(ctx, out) {
+    const errorDescription = String((out as any)?.error_description || '');
+    if (errorDescription.includes('interaction session not found')) {
+      ctx.status = 302;
+      ctx.redirect('/api/auth/login?returnTo=/');
+      return;
+    }
+    const errorCode = String((out as any)?.error || 'invalid_request');
+    const body = `
+      <h2>IdP 请求失败</h2>
+      <div class="muted">error: <code>${escapeHtml(errorCode)}</code></div>
+      <div class="muted">error_description: <code>${escapeHtml(errorDescription || 'unknown')}</code></div>
+      <div style="margin-top:16px" class="row">
+        <a href="/api/auth/login?returnTo=/" style="text-decoration:none">
+          <button type="button">重新登录</button>
+        </a>
+      </div>
+    `;
+    ctx.status = Number((out as any)?.status || 400);
+    ctx.type = 'html';
+    ctx.body = page('IdP 错误', body);
   },
 };
 
@@ -229,6 +263,16 @@ provider.use(async (ctx, next) => {
 });
 
 provider.use(async (ctx, next) => {
+  // 如果用户直接访问 /auth/:uid 但缺少交互恢复 cookie，直接回到登录入口重新拉起流程
+  if (ctx.method === 'GET' && /^\/auth\/[^/]+$/.test(ctx.path)) {
+    const hasResume = !!ctx.cookies.get('_interaction_resume') && !!ctx.cookies.get('_interaction_resume.sig');
+    if (!hasResume) {
+      ctx.status = 302;
+      ctx.redirect('/api/auth/login?returnTo=/');
+      return;
+    }
+  }
+
   /**
    * **interaction 路由总入口**
    * - `oidc-provider` 遇到需要用户参与的环节，会把用户带到 `/interaction/:uid`

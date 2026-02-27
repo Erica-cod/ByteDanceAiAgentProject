@@ -91,7 +91,7 @@ async function writeStored(redis: Redis, key: string, value: StoredValue, expire
 
 export function createRedisAdapterFactory(redis: Redis) {
   /**
-   * **适配器工厂：让 oidc-provider 用我们提供的 Redis 作为存储层**
+   * **适配器工厂：让 oidc-provider 用提供的 Redis 作为存储层**
    * - oidc-provider 会 `new Adapter('Session') / new Adapter('AccessToken') ...`
    * - 所以这里返回一个 class，构造函数接收 model name
    */
