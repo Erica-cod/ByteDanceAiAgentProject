@@ -6,6 +6,14 @@
 
 import { searchWeb } from '../../tavilySearch.js';
 import type { ToolPlugin } from '../core/types.js';
+import crypto from 'crypto';
+
+function normalizeQuery(q: string) {
+  // 缓存命中率提升的关键在于“查询归一化”
+  // - 去首尾空白
+  // - 多空白折叠
+  return q.trim().replace(/\s+/g, ' ');
+}
 
 export const searchWebPlugin: ToolPlugin = {
   // ============ 元数据 ============
@@ -56,7 +64,16 @@ export const searchWebPlugin: ToolPlugin = {
   cache: {
     enabled: true,
     ttl: 300,              // 缓存5分钟（搜索结果时效性）
-    keyStrategy: 'params', // 按参数缓存（不区分用户）
+    //  注意：ToolExecutor 的缓存检查发生在 validate 之前，所以“归一化”必须放到 keyGenerator 里
+    keyStrategy: 'custom',
+    keyGenerator: (params) => {
+      const q = normalizeQuery(String(params?.query || ''));
+      const max_results = Number(params?.max_results ?? 5);
+      const search_depth = String(params?.search_depth ?? 'basic');
+      const keyPayload = JSON.stringify({ q, max_results, search_depth });
+      const hash = crypto.createHash('md5').update(keyPayload).digest('hex');
+      return `v1:${hash}`;
+    },
   },
 
   // ============ 熔断器配置 ============

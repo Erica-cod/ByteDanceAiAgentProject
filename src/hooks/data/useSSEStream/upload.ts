@@ -3,9 +3,10 @@
  * 处理文本上传、压缩上传、分片上传等
  */
 
-import { selectUploadStrategy } from '../../../utils/uploadStrategy';
-import { compressText } from '../../../utils/compression';
-import { ChunkUploader } from '../../../utils/chunkUploader';
+import { selectUploadStrategy } from '../../../utils/upload/uploadStrategy';
+import { compressText } from '../../../utils/upload/compression';
+import { ChunkUploader } from '../../../utils/upload/chunkUploader';
+import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
 import type { UploadPayload } from './types';
 
 /**
@@ -17,7 +18,7 @@ export async function uploadCompressedBlob(blob: Blob, userId: string): Promise<
   formData.append('data', blob);
   formData.append('isCompressed', 'true');
 
-  const response = await fetch('/api/upload/compressed', {
+  const response = await fetchWithCsrf('/api/upload/compressed', {
     method: 'POST',
     body: formData,
   });

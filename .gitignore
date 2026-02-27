@@ -4,7 +4,18 @@ dist/
 .cache/
 .DS_Store
 *.log
+
+# 环境变量文件（包含敏感信息，不应提交到 Git）
 .env
 .env.local
 .env.production
+.env.development
+deploy/.env
+
+# 其他敏感文件
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
 

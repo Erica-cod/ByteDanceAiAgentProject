@@ -2,8 +2,9 @@
  * 分片上传器（支持hash校验、断点续传、失败重试）
  */
 
-import { UPLOAD_THRESHOLDS } from '../constants/uploadThresholds';
+import { UPLOAD_THRESHOLDS } from '../../constants/uploadThresholds';
 import { calculateHash } from './compression';
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 
 /**
  * 分片元数据
@@ -166,7 +167,7 @@ export class ChunkUploader {
     totalChunks: number,
     fileSize: number
   ): Promise<string> {
-    const response = await fetch('/api/upload/session', {
+    const response = await fetchWithCsrf('/api/upload/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -234,7 +235,7 @@ export class ChunkUploader {
     formData.append('chunk', chunk);
     formData.append('hash', hash);
     
-    const response = await fetch('/api/upload/chunk', {
+    const response = await fetchWithCsrf('/api/upload/chunk', {
       method: 'POST',
       body: formData,
     });
@@ -273,7 +274,7 @@ export class ChunkUploader {
    * 完成上传
    */
   private static async completeUpload(sessionId: string): Promise<void> {
-    const response = await fetch('/api/upload/complete', {
+    const response = await fetchWithCsrf('/api/upload/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId }),

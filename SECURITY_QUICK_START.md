@@ -238,11 +238,11 @@ const token = await getDeviceToken();
 
 // ❌ 之前
 import { readConversationCache, writeConversationCache } 
-  from '@/utils/conversationCache';
+  from '@/utils/conversation/conversationCache';
 
 // ✅ 现在
 import { readConversationCache, writeConversationCache } 
-  from '@/utils/secureConversationCache';
+  from '@/utils/conversation/secureConversationCache';
 
 // 其他代码无需修改！
 ```
@@ -253,11 +253,11 @@ import { readConversationCache, writeConversationCache }
 // 找到获取设备ID的地方，替换为新的 Token 管理
 
 // ❌ 之前
-import { getPrivacyFirstDeviceId } from '@/utils/privacyFirstFingerprint';
+import { getPrivacyFirstDeviceId } from '@/utils/device/privacyFirstFingerprint';
 const deviceId = await getPrivacyFirstDeviceId();
 
 // ✅ 现在
-import { getDeviceToken } from '@/utils/secureDeviceToken';
+import { getDeviceToken } from '@/utils/device/secureDeviceToken';
 const deviceId = await getDeviceToken();  // 自动验证和刷新
 ```
 
@@ -344,11 +344,11 @@ V1 缓存（明文）: XX 个
 
 ```typescript
 // 示例：在实际组件中使用
-import { encryptData, decryptData } from '@/utils/deviceCrypto';
+import { encryptData, decryptData } from '@/utils/device/deviceCrypto';
 import { 
   readConversationCache, 
   writeConversationCache 
-} from '@/utils/secureConversationCache';
+} from '@/utils/conversation/secureConversationCache';
 
 function MyComponent() {
   // 使用加密缓存（API 完全兼容旧版）

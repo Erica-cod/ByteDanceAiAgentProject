@@ -9,9 +9,11 @@
 import '../config/env.js';
 import type { RequestOption } from '../types/chat.js';
 import { connectToDatabase } from '../db/connection.js';
-import { successResponse, errorResponse } from './_utils/response.js';
+import { successResponse, errorResponse, errorResponseWithStatus } from './_utils/response.js';
 import { getContainer } from '../_clean/di-container.js';
 import { handleOptionsRequest } from './_utils/cors.js';
+import { requireCsrf } from './_utils/csrf.js';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
 
 // Initialize database connection
 connectToDatabase().catch(console.error);
@@ -49,13 +51,22 @@ export async function post({
 }: RequestOption<any, CreateUserData>) {
   try {
     const requestOrigin = headers?.origin;
+
+    const csrf = await requireCsrf(headers);
+    if (csrf.ok === false) {
+      return errorResponseWithStatus(csrf.message, csrf.status, requestOrigin);
+    }
     
     // ✅ 类型检查：确保 data 存在
     if (!data) {
       return errorResponse('请求数据不能为空', requestOrigin);
     }
     
-    const { userId, metadata } = data;
+    let { userId, metadata } = data;
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
 
     // 参数验证
     if (!userId) {
@@ -98,7 +109,11 @@ export async function get({
       return errorResponse('查询参数不能为空', requestOrigin);
     }
     
-    const { userId } = query;
+    let { userId } = query;
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      userId = session.user.sub;
+    }
 
     // 参数验证
     if (!userId) {

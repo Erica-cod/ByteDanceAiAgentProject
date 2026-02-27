@@ -35,21 +35,41 @@ fix-ollama-gpu.ps1
 
 # Documentation
 docs
+*.md
+!README.md
+!dockerfiles/README.md
 DEPLOYMENT_GUIDE.md
 ENV_CONFIG.md
 MONGODB_FEATURE_SUMMARY.md
 PROGRESS.md
 RESUME_PROJECT_DESCRIPTION.md
 
+# Docker related (不需要在镜像中)
+docker-compose*.yml
+Dockerfile
+dockerfiles/
+
+# Deployment
+deploy/
+
 # Old backups
 api/_old_backup
 
 # Test files
+test/
 *.test.ts
 *.test.tsx
 *.spec.ts
 *.spec.tsx
+jest.config.cjs
 
 # Logs
 logs
 *.log
+
+# CI/CD
+.github/
+Jenkinsfile
+
+# Terminal files
+terminals/

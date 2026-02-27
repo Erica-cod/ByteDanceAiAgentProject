@@ -103,8 +103,8 @@
 
 import { useRef, useCallback } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../../stores';
-import { getConversationDetails, type Conversation } from '../../../utils/conversationAPI';
-import { isLongText } from '../../../utils/textUtils';
+import { getConversationDetails, type Conversation } from '../../../utils/conversation/conversationAPI';
+import { isLongText } from '../../../utils/text/textUtils';
 import { useRAFBatching } from './raf-batching';
 import { handleMessageUpload } from './upload';
 import {
@@ -121,6 +121,7 @@ import {
   handleChunkingChunk,
 } from './chunking-handlers';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
+import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -218,7 +219,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         };
 
         const signal = abortControllerRef.current?.signal;
-        const response = await fetch('/api/chat', {
+        const response = await fetchWithCsrf('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
@@ -249,7 +250,22 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         }
 
         if (!response.ok) {
-          throw new Error(`请求失败: ${response.status}`);
+          // 尝试读取后端的错误信息（JSON）
+          let detail = '';
+          try {
+            const errJson = await response.json();
+            detail = errJson?.error || errJson?.message || '';
+          } catch {
+            // ignore
+          }
+
+          // 403：多 Agent 需要登录（演示版 gating）
+          if (response.status === 403 && chatMode === 'multi_agent') {
+            // 强制回退到单 Agent，避免用户持续卡在不可用模式
+            useUIStore.getState().setChatMode('single');
+          }
+
+          throw new Error(`请求失败: ${response.status}${detail ? `，原因：${detail}` : ''}`);
         }
 
         const reader = response.body?.getReader();

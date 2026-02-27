@@ -1,5 +1,7 @@
 // User ID management utilities
 
+import { fetchWithCsrf } from './fetchWithCsrf';
+
 const USER_ID_KEY = 'ai_agent_user_id';
 
 /**
@@ -24,7 +26,7 @@ export function getUserId(): string {
  */
 export async function initializeUser(userId: string): Promise<boolean> {
   try {
-    const response = await fetch('/api/user', {
+    const response = await fetchWithCsrf('/api/user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

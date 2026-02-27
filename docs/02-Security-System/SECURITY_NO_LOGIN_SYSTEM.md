@@ -434,11 +434,11 @@ async function detectAnomaly(deviceIdHash: string, request: Request) {
 
 ```typescript
 // 1. 设备 Token 管理
-import { getDeviceToken } from '@/utils/secureDeviceToken';
+import { getDeviceToken } from '@/utils/device/secureDeviceToken';
 const token = await getDeviceToken();  // 自动验证、刷新、风险检测
 
 // 2. 对话数据加密
-import { writeConversationCache } from '@/utils/secureConversationCache';
+import { writeConversationCache } from '@/utils/conversation/secureConversationCache';
 await writeConversationCache(id, messages);  // 自动加密
 
 // 3. 发送请求时携带 Token
@@ -505,21 +505,21 @@ export async function post({ data, headers }) {
 ```typescript
 // 修改导入路径
 // 之前
-import { readConversationCache } from '@/utils/conversationCache';
+import { readConversationCache } from '@/utils/conversation/conversationCache';
 
 // 之后
-import { readConversationCache } from '@/utils/secureConversationCache';
+import { readConversationCache } from '@/utils/conversation/secureConversationCache';
 ```
 
 ### Step 3: 替换 Token 管理
 
 ```typescript
 // 之前
-import { getPrivacyFirstDeviceId } from '@/utils/privacyFirstFingerprint';
+import { getPrivacyFirstDeviceId } from '@/utils/device/privacyFirstFingerprint';
 const deviceId = await getPrivacyFirstDeviceId();
 
 // 之后
-import { getDeviceToken } from '@/utils/secureDeviceToken';
+import { getDeviceToken } from '@/utils/device/secureDeviceToken';
 const deviceId = await getDeviceToken();  // 自动验证和刷新
 ```
 
@@ -618,7 +618,7 @@ worker.onmessage = (e) => {
 ### 测试1：加密功能
 
 ```typescript
-import { testEncryption } from '@/utils/deviceCrypto';
+import { testEncryption } from '@/utils/device/deviceCrypto';
 
 // 运行测试
 await testEncryption();
@@ -706,7 +706,7 @@ if (currentIP !== tokenData.ipHash) {
 **A:** 可以，但不推荐：
 
 ```typescript
-import { setEncryptionEnabled } from '@/utils/secureConversationCache';
+import { setEncryptionEnabled } from '@/utils/conversation/secureConversationCache';
 
 // 关闭加密（开发调试时）
 setEncryptionEnabled(false);

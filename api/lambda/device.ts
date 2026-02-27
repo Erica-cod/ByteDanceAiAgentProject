@@ -8,6 +8,7 @@
 
 import { getContainer } from '../_clean/di-container.js';
 import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
+import { requireCsrf } from './_utils/csrf.js';
 
 // ✅ Clean Architecture: 启动定期清理
 const container = getContainer();
@@ -38,6 +39,10 @@ export async function options(req: RequestOption) {
  */
 export async function post(req: RequestOption<TrackDeviceRequest>) {
   const requestOrigin = req.headers?.origin;
+  const csrf = await requireCsrf(req.headers);
+  if (csrf.ok === false) {
+    return createJsonResponse({ success: false, error: csrf.message }, csrf.status, requestOrigin);
+  }
   const { deviceIdHash } = req.data || {};
   
   // 参数校验
@@ -113,6 +118,10 @@ export async function get(req: RequestOption) {
  */
 export async function del(req: RequestOption<TrackDeviceRequest>) {
   const requestOrigin = req.headers?.origin;
+  const csrf = await requireCsrf(req.headers);
+  if (csrf.ok === false) {
+    return createJsonResponse({ success: false, error: csrf.message }, csrf.status, requestOrigin);
+  }
   const { deviceIdHash } = req.data || {};
   
   if (!deviceIdHash || typeof deviceIdHash !== 'string') {

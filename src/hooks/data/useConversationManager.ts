@@ -4,7 +4,7 @@ import {
   createConversation,
   deleteConversation,
   type Conversation,
-} from '../../utils/conversationAPI';
+} from '../../utils/conversation/conversationAPI';
 import { useChatStore } from '../../stores';
 
 export function useConversationManager(userId: string, onAbort: () => void) {

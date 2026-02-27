@@ -82,6 +82,31 @@
 3. **第三版**：环境变量配置（生产阶段）
 4. **最终版**：动态域名验证（当前版本）
 
+### 4. SSO_OAUTH2_BFF_DESIGN.md（新增）⭐⭐
+**基于 OAuth2/OIDC + Modern.js BFF 的 SSO 登录体系设计**
+
+用于把当前“弱登录 + 设备防刷”升级为标准 SSO 登录体系，重点覆盖：
+- ✅ OIDC 授权码 + PKCE 标准流程
+- ✅ BFF 同源 Cookie Session（前端不落地敏感 Token）
+- ✅ state/nonce/CSRF/Cookie 安全细节
+- ✅ 与现有 `deviceIdHash` 风控信号融合、匿名数据迁移思路
+
+### 5. SIMPLIFIED_IDP_BFF_RISK.md（新增）⭐⭐
+**自研简化版 IdP（OIDC/OAuth2）+ BFF 管 Token + 设备指纹风控**
+
+用于“暂时接不了企业 IdP，但想演示/可控地跑通 SSO”的场景，重点覆盖：
+- ✅ 最小 OIDC Provider 端点集合（Discovery/JWKS/Authorize/Token/UserInfo）
+- ✅ 推荐用 `oidc-provider`/ORY Hydra/Keycloak 的取舍与落地路线
+- ✅ refresh token 轮换、会话 Cookie、CSRF 等安全要点
+- ✅ 将你现有 `deviceIdHash` 融入登录风控与账号保护（设备绑定/异常登录）
+
+### 6. IDP_OIDC_PROVIDER_QUICKSTART.md（新增）
+**路线 A（`oidc-provider` + Redis）快速启动指南**
+
+用于你本地快速跑通自研 IdP，并验证：
+- ✅ OIDC Discovery：`/.well-known/openid-configuration`
+- ✅ Redis 存储与最小交互页
+
 ## 🎯 关键技术点
 
 ### 设备指纹技术

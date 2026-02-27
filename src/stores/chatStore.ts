@@ -5,11 +5,11 @@ import {
   writeConversationCache,
   mergeServerMessagesWithCache,
   type CachedMessage,
-} from '../utils/secureConversationCache';
-import { getUserId } from '../utils/userManager';
-import { getConversationMessages, type Conversation } from '../utils/conversationAPI';
-import { createEventManager } from '../utils/eventManager';
-import { touchConversationCache, smartCleanupConversationCache } from '../utils/localStorageLRU';
+} from '../utils/conversation/secureConversationCache';
+import { getUserId } from '../utils/auth/userManager';
+import { getConversationMessages, type Conversation } from '../utils/conversation/conversationAPI';
+import { createEventManager } from '../utils/events/eventManager';
+import { touchConversationCache, smartCleanupConversationCache } from '../utils/storage/localStorageLRU';
 
 export interface Message {
   id: string;
@@ -49,6 +49,7 @@ interface ChatState {
   updateMessage: (id: string, updates: Partial<Message>) => void;
   removeMessage: (id: string) => void;
   setConversationId: (id: string | null) => void;
+  setUserId: (userId: string) => void;
   setDeviceId: (deviceId: string) => void; //  新增
   setConversations: (conversations: Conversation[]) => void;
   setFirstItemIndex: (index: number) => void;
@@ -118,6 +119,7 @@ export const useChatStore = create<ChatState>()(
       }),
 
     setConversationId: (id) => set({ conversationId: id }),
+    setUserId: (userId) => set({ userId }),
     setDeviceId: (deviceId) => set({ deviceId }), //  新增
     setConversations: (conversations) => set({ conversations }),
     setFirstItemIndex: (index) => set({ firstItemIndex: index }),

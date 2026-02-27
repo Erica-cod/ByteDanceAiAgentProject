@@ -19,6 +19,8 @@
  * - 相同硬件冲突率：< 1%
  */
 
+import { fetchWithCsrf } from '../auth/fetchWithCsrf';
+
 const SITE_SALT = 'ai_chat_salt_2024_v1'; // L2：网站专属盐值
 const STORAGE_KEY = 'device_id_hash';
 const IP_CACHE_KEY = 'device_ip_hash'; // IP 地址缓存（5 分钟有效期）
@@ -253,7 +255,7 @@ async function hashString(str: string): Promise<string> {
  */
 async function trackDevice(deviceIdHash: string): Promise<void> {
   try {
-    await fetch('/api/device/track', {
+    await fetchWithCsrf('/api/device/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceIdHash }),

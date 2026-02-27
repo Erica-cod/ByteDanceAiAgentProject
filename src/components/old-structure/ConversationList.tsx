@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Conversation } from '../../utils/conversationAPI';
+import { Conversation } from '../../utils/conversation/conversationAPI';
 import { useDateFormat, useThrottle } from '../../hooks';
 import VirtualList, { VirtualListHandle } from './VirtualList';
 import './ConversationList.css';

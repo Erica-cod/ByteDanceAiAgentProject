@@ -1,10 +1,18 @@
-### i18n（国际化）60–90 秒话术版
+## i18n + Theme（面试话术整理版）
+
+> 目标：**60–90 秒能讲清主线**，追问时也能按点展开；最后附“10 秒文件速记”和“决策口诀”。
+
+---
+
+## i18n（国际化）
+
+### 60–90 秒话术版
 
 我们项目的国际化用的是 `i18next` + `react-i18next`。入口 `src/index.tsx` 会同步 `import './i18n/config'`，确保 React 渲染前 i18n 已初始化，避免首屏出现 key 闪一下。  
 配置在 `src/i18n/config.ts`：把 `zh.json/en.json` 作为 resources 注册，语言选择逻辑是：优先读 `localStorage` 的 `language`，没有就读 `navigator.language`，`zh*` 走中文，否则英文；`fallbackLng` 设成 `zh`，保证缺失文案也能兜底。  
 业务组件里用 `useTranslation()` 取 `t()` 来渲染文案，比如设置面板 `SettingsPanel.tsx`；切换语言时调用 `i18n.changeLanguage('zh'|'en')`，同时把选择写回 `localStorage`，这样刷新/下次打开仍保持用户选择。我们现在是轻量实现：没有引入 `i18next-browser-languagedetector`，而是自己写了一个最小可控的检测函数；后续如果要扩展多语言、按模块分包，可以把 resources 做成懒加载并拆分命名空间。
 
-### i18n 面试追问点（每点 60–90 秒）
+### 面试追问点（每点 60–90 秒）
 
 #### 1) 为什么要在 `index.tsx` 同步导入 i18n？
 因为 i18n 初始化会决定 `lng` 和 `resources`，如果晚于首屏渲染，React 组件第一次渲染可能拿不到翻译，出现 `settings.title` 这种 key 的闪烁。同步 `import` 能保证 i18next ready 后再渲染，体验更稳定。
@@ -37,13 +45,15 @@
 
 ---
 
-### 明暗主题切换 60–90 秒话术版
+## Theme（明暗主题切换）
+
+### 60–90 秒话术版
 
 主题切换我们用 Zustand 做状态管理，核心文件是 `src/stores/themeStore.ts`。状态拆成两层：用户选择的 `theme`（`light/dark/auto`）和实际生效的 `effectiveTheme`（`light/dark`）。这样 `auto` 模式下我们可以根据系统主题计算实际主题，并且在系统主题变化时更新。  
 每次切换主题，会把 `effectiveTheme` 写到 `document.documentElement`：设置 `data-theme=dark|light`，并切换 `dark-theme/light-theme` class。CSS 侧用 `[data-theme="dark"]` 作为总开关：`src/index.css` 控制全局背景和过渡，`src/themes/dark-theme.css` 定义暗色 CSS 变量和组件样式。  
 为了解决刷新时的闪烁，我们在 `persist` 的 `onRehydrateStorage` 回调里，store 恢复后第一时间把主题写到 DOM，尽量保证首屏就命中正确主题。`auto` 跟随系统则用 `matchMedia('(prefers-color-scheme: dark)')` 监听变化，但只有当用户选择 `auto` 时才会触发更新，避免不必要的重渲染。
 
-### 主题面试追问点（每点 60–90 秒）
+### 面试追问点（每点 60–90 秒）
 
 #### 1) 为什么要 `theme` + `effectiveTheme` 两层？
 因为 `auto` 本质是策略，不是具体主题。UI 上用户选择的是“跟随系统”，但落到 CSS 必须是确定的 `dark/light`。分两层能清晰表达：`theme` 负责记录用户意图，`effectiveTheme` 负责驱动 DOM/CSS 渲染；也方便打点和 debug：一眼能看出用户选了 `auto` 还是手动。
@@ -74,7 +84,7 @@
 
 ---
 
-### 快速文件速记（面试最后 10 秒收尾）
+## 快速文件速记（面试最后 10 秒收尾）
 
 - **i18n**：`src/index.tsx`（同步初始化）→ `src/i18n/config.ts`（语言选择+资源注册）→ `src/i18n/locales/*.json`（字典）→ `SettingsPanel.tsx`（切换语言并持久化）
 - **Theme**：`src/stores/themeStore.ts`（`theme/effectiveTheme` + `persist` + `matchMedia` 监听）→ `src/index.css` / `src/themes/dark-theme.css`（CSS 选择器与变量）→ `App.tsx`（启动兜底更新）

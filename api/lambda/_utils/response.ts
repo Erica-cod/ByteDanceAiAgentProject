@@ -48,6 +48,18 @@ export function errorResponse(error: string, requestOrigin?: string): Response {
   return createJsonResponse(body, 400, requestOrigin);
 }
 
+/**
+ * 创建指定 HTTP 状态码的错误响应
+ * - 例如：401 未登录、403 无权限、429 限流等
+ */
+export function errorResponseWithStatus(error: string, status: number, requestOrigin?: string): Response {
+  const body: ApiResponse = {
+    success: false,
+    error,
+  };
+  return createJsonResponse(body, status, requestOrigin);
+}
+
 export function messageResponse(message: string, requestOrigin?: string): Response {
   const body: ApiResponse = {
     success: true,

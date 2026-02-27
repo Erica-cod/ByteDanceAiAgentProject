@@ -1,3 +1,14 @@
+# ⚠️ 废弃警告：此 Dockerfile 已被拆分为多个独立文件
+# 
+# 新的 Dockerfile 位置：
+# - dockerfiles/app.Dockerfile (主应用服务)
+# - dockerfiles/idp.Dockerfile (IDP 认证服务)
+#
+# 此文件保留仅用于向后兼容，建议使用新的 Dockerfile。
+# 详见：DOCKER_MIGRATION_GUIDE.md
+#
+# ============================================================
+
 # Multi-stage build for Modern.js application
 
 # Stage 1: Build stage
@@ -43,14 +54,16 @@ EXPOSE 8080
 
 # Set environment to production
 ENV NODE_ENV=production
-# Set environment variables in Dockerfile to ensure they are available
-ENV OLLAMA_API_URL=http://host.docker.internal:11434
-ENV OLLAMA_MODEL=deepseek-r1:7b
-ENV MONGODB_URI=mongodb://mongodb-global:27017/ai-agent
-ENV TAVILY_API_KEY=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
-ENV ARK_API_KEY=9a75dc8d-4bde-4094-90f0-19e13071f275
-ENV ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
-ENV ARK_MODEL=doubao-1-5-thinking-pro-250415
+# 注意：敏感信息应通过环境变量传入，不要硬编码在 Dockerfile 中
+# 请在运行容器时通过 -e 参数或 docker-compose.yml 传入以下环境变量：
+# - OLLAMA_API_URL
+# - OLLAMA_MODEL
+# - MONGODB_URI
+# - REDIS_PASSWORD
+# - TAVILY_API_KEY
+# - ARK_API_KEY
+# - ARK_API_URL
+# - ARK_MODEL
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \

@@ -21,7 +21,7 @@ if (!toolSystemInitialized) {
   initializeToolSystem();
   toolSystemInitialized = true;
 }
-import { errorResponse } from './_utils/response.js';
+import { errorResponse, errorResponseWithStatus } from './_utils/response.js';
 import { getCorsHeaders, handleOptionsRequest } from './_utils/cors.js';
 import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.js';
 import { getContainer } from '../_clean/di-container.js';
@@ -37,6 +37,8 @@ import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import type { ChatRequestData, RequestOption } from '../types/chat.js';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
+import { requireCsrf } from './_utils/csrf.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -95,6 +97,12 @@ export async function post({
     if (!data) {
       return errorResponse('请求数据不能为空', requestOrigin);
     }
+
+    // ✅ CSRF + Origin/Referer 校验（保护所有写请求）
+    const csrf = await requireCsrf(headers);
+    if (csrf.ok === false) {
+      return errorResponseWithStatus(csrf.message, csrf.status, requestOrigin);
+    }
     
     let {
       message,
@@ -110,6 +118,15 @@ export async function post({
       isCompressed,
       resumeFrom, // 续流参数：{ messageId, position }
     } = data;
+
+    // 如果已登录，后端统一以会话里的 sub 作为 userId，避免前端残留 userId 导致串数据
+    const session = await getBffSessionFromHeaders(headers);
+    if (session?.user?.sub) {
+      if (userId && userId !== session.user.sub) {
+        console.warn('⚠️ 检测到 userId 与登录会话不一致，已自动切换到会话用户');
+      }
+      userId = session.user.sub;
+    }
 
     // ✅ Clean Architecture: 处理上传会话（压缩或分片上传）
     if (uploadSessionId) {
@@ -329,6 +346,19 @@ export async function post({
       
       // ==================== 多Agent模式 ====================
       if (mode === 'multi_agent') {
+        // ✅ 登录控制：未登录禁止使用多 Agent
+        // 🧪 测试环境例外：允许通过 X-Test-Auth=1 绕过（仅用于 Jest E2E，不影响生产/开发）
+        const testBypass =
+          process.env.NODE_ENV === 'test'
+          && (headers?.['x-test-auth'] === '1' || headers?.['X-Test-Auth'] === '1');
+
+        if (!testBypass) {
+          const session = await getBffSessionFromHeaders(headers);
+          if (!session) {
+            return errorResponseWithStatus('请先登录后再使用多 Agent 模式（演示版限制）', 403, requestOrigin);
+          }
+        }
+
         console.log('🤖 [MultiAgent] 启动多Agent协作模式...');
         handoffToStream = true;
         return handleMultiAgentMode(
