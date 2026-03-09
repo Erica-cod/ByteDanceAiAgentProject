@@ -19,6 +19,10 @@ export interface ExtractOptions {
   logPrefix?: string;
   /** 允许的标签名（如 'tool_call', 'json', 'plan'） */
   tagName?: string;
+  /** 是否启用指标日志（默认 true） */
+  enableMetrics?: boolean;
+  /** 调用来源标识（用于聚合统计） */
+  source?: string;
 }
 
 /**
@@ -29,6 +33,36 @@ export interface ExtractResult<T = any> {
   data: T;
   /** 去除提取部分后的剩余文本 */
   remainingText: string;
+}
+
+type RepairStage = 'raw' | 'jsonrepair' | 'custom' | 'none';
+
+interface JSONExtractorMetricsEvent {
+  event: 'json_extraction';
+  source: string;
+  success: boolean;
+  autoFix: boolean;
+  durationMs: number;
+  strategy?: string;
+  stage: RepairStage;
+  rawParseAttempts: number;
+  rawParseSuccess: number;
+  jsonrepairAttempts: number;
+  jsonrepairSuccess: number;
+  customFixAttempts: number;
+  customFixSuccess: number;
+  finalError?: string;
+}
+
+function emitJSONExtractorMetrics(
+  options: ExtractOptions,
+  payload: JSONExtractorMetricsEvent
+): void {
+  if (options.enableMetrics === false) {
+    return;
+  }
+
+  console.info(`[JSONExtractorMetrics] ${JSON.stringify(payload)}`);
 }
 
 /**
@@ -49,6 +83,42 @@ export function extractJSON<T = any>(
   options: ExtractOptions = {}
 ): T | null {
   const { autoFix = true, logPrefix = '🔍 [JSONExtractor]' } = options;
+  const startTime = Date.now();
+  const source = options.source ?? 'unknown';
+  const metrics = {
+    rawParseAttempts: 0,
+    rawParseSuccess: 0,
+    jsonrepairAttempts: 0,
+    jsonrepairSuccess: 0,
+    customFixAttempts: 0,
+    customFixSuccess: 0,
+  };
+
+  const emitSuccessMetrics = (strategy: string, stage: RepairStage) => {
+    emitJSONExtractorMetrics(options, {
+      event: 'json_extraction',
+      source,
+      success: true,
+      autoFix,
+      durationMs: Date.now() - startTime,
+      strategy,
+      stage,
+      ...metrics,
+    });
+  };
+
+  const emitFailureMetrics = (finalError?: string) => {
+    emitJSONExtractorMetrics(options, {
+      event: 'json_extraction',
+      source,
+      success: false,
+      autoFix,
+      durationMs: Date.now() - startTime,
+      stage: 'none',
+      ...metrics,
+      finalError,
+    });
+  };
   
   console.log(`${logPrefix} 开始提取 JSON...`);
   console.log(`${logPrefix} 文本长度: ${text.length} 字符`);
@@ -186,8 +256,11 @@ export function extractJSON<T = any>(
       
       // 尝试直接解析
       try {
+        metrics.rawParseAttempts += 1;
         const result = JSON.parse(jsonStr);
+        metrics.rawParseSuccess += 1;
         console.log(`${logPrefix} ✅ JSON 解析成功（策略: ${strategy.name}）`);
+        emitSuccessMetrics(strategy.name, 'raw');
         return result;
       } catch (parseError: any) {
         // 如果失败且启用自动修复，尝试修复后再解析
@@ -197,15 +270,19 @@ export function extractJSON<T = any>(
           
           // 🔧 修复策略 1: 使用 jsonrepair 包（成熟的第三方库）
           try {
+            metrics.jsonrepairAttempts += 1;
             const repairedJsonStr = jsonrepair(jsonStr);
             const result = JSON.parse(repairedJsonStr);
+            metrics.jsonrepairSuccess += 1;
             console.log(`${logPrefix} ✅ JSON 修复成功（使用 jsonrepair 包，策略: ${strategy.name}）`);
+            emitSuccessMetrics(strategy.name, 'jsonrepair');
             return result;
           } catch (repairError: any) {
             console.warn(`${logPrefix} ⚠️  jsonrepair 包修复失败: ${repairError.message}`);
             
             // 🔧 修复策略 2: 使用自定义修复逻辑（备用方案）
             try {
+              metrics.customFixAttempts += 1;
               const fixedJsonStr = fixCommonJSONErrors(jsonStr);
               
               if (fixedJsonStr !== jsonStr) {
@@ -213,7 +290,9 @@ export function extractJSON<T = any>(
               }
               
               const result = JSON.parse(fixedJsonStr);
+              metrics.customFixSuccess += 1;
               console.log(`${logPrefix} ✅ JSON 修复成功（使用自定义逻辑，策略: ${strategy.name}）`);
+              emitSuccessMetrics(strategy.name, 'custom');
               return result;
             } catch (fixError: any) {
               console.warn(`${logPrefix} ❌ 自定义修复也失败: ${fixError.message}`);
@@ -228,6 +307,7 @@ export function extractJSON<T = any>(
   }
   
   console.error(`${logPrefix} ❌ 所有策略均失败，无法提取 JSON`);
+  emitFailureMetrics('all_strategies_failed');
   return null;
 }
 
@@ -246,6 +326,31 @@ export function extractJSONWithRemainder<T = any>(
   options: ExtractOptions = {}
 ): ExtractResult<T> | null {
   const { tagName = 'tool_call' } = options;
+  const startTime = Date.now();
+  const source = options.source ?? 'unknown';
+  const autoFix = options.autoFix !== false;
+  const metrics = {
+    rawParseAttempts: 0,
+    rawParseSuccess: 0,
+    jsonrepairAttempts: 0,
+    jsonrepairSuccess: 0,
+    customFixAttempts: 0,
+    customFixSuccess: 0,
+  };
+
+  const emitMetrics = (success: boolean, stage: RepairStage, strategy?: string, finalError?: string) => {
+    emitJSONExtractorMetrics(options, {
+      event: 'json_extraction',
+      source,
+      success,
+      autoFix,
+      durationMs: Date.now() - startTime,
+      strategy,
+      stage,
+      ...metrics,
+      finalError,
+    });
+  };
   
   // 优先匹配完整的闭合标签
   const closedTagRegex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i');
@@ -254,28 +359,37 @@ export function extractJSONWithRemainder<T = any>(
   if (closedMatch) {
     try {
       const jsonStr = closedMatch[1].trim();
+      metrics.rawParseAttempts += 1;
       const data = JSON.parse(jsonStr);
+      metrics.rawParseSuccess += 1;
       const remainingText = text.replace(closedTagRegex, '').trim();
       
       console.log(`🔍 [extractJSONWithRemainder] 找到完整的 <${tagName}> 标签`);
+      emitMetrics(true, 'raw', 'closed_tag');
       return { data, remainingText };
     } catch (error: any) {
       // 尝试修复
       if (options.autoFix !== false) {
         // 先尝试 jsonrepair 包
         try {
+          metrics.jsonrepairAttempts += 1;
           const repairedJsonStr = jsonrepair(closedMatch[1].trim());
           const data = JSON.parse(repairedJsonStr);
+          metrics.jsonrepairSuccess += 1;
           const remainingText = text.replace(closedTagRegex, '').trim();
           console.log(`🔍 [extractJSONWithRemainder] JSON 修复成功（jsonrepair）`);
+          emitMetrics(true, 'jsonrepair', 'closed_tag');
           return { data, remainingText };
         } catch {
           // 备用：自定义修复
           try {
+            metrics.customFixAttempts += 1;
             const fixedJsonStr = fixCommonJSONErrors(closedMatch[1].trim());
             const data = JSON.parse(fixedJsonStr);
+            metrics.customFixSuccess += 1;
             const remainingText = text.replace(closedTagRegex, '').trim();
             console.log(`🔍 [extractJSONWithRemainder] JSON 修复成功（自定义）`);
+            emitMetrics(true, 'custom', 'closed_tag');
             return { data, remainingText };
           } catch {}
         }
@@ -290,10 +404,13 @@ export function extractJSONWithRemainder<T = any>(
   if (openMatch && !text.includes(`</${tagName}>`)) {
     try {
       const jsonStr = openMatch[1].trim();
+      metrics.rawParseAttempts += 1;
       const data = JSON.parse(jsonStr);
+      metrics.rawParseSuccess += 1;
       const remainingText = text.substring(0, openMatch.index).trim();
       
       console.log(`🔍 [extractJSONWithRemainder] 找到未闭合的 <${tagName}> 标签（可能还在流式输出）`);
+      emitMetrics(true, 'raw', 'open_tag');
       return { data, remainingText };
     } catch (error: any) {
       console.warn(`⚠️  [extractJSONWithRemainder] 未闭合标签 JSON 解析失败: ${error.message}`);
@@ -371,6 +488,26 @@ export function fixCommonJSONErrors(jsonStr: string): string {
   // 这里只处理明显的键值对场景
   fixed = fixed.replace(/'([^']*)'(\s*:\s*)/g, '"$1"$2');
   fixed = fixed.replace(/:\s*'([^']*)'/g, ': "$1"');
+
+  // 4.1 修复缺失 key 结束引号的场景
+  // 例：{"suggested_diff_hunk: null, "approve_pr": false}
+  // 仅在对象 key 位置修复（前面必须是 { 或 ,）
+  fixed = fixed.replace(/([,{]\s*)"([^"\r\n:]+):\s*/g, '$1"$2": ');
+
+  // 4.2 修复双引号成对转义的字符串化 JSON（常见于 C#/批处理风格）
+  // 例："{""name"":""Alice""}" -> {"name":"Alice"}
+  const trimmed = fixed.trim();
+  if (
+    trimmed.startsWith('"{') &&
+    trimmed.endsWith('}"') &&
+    trimmed.includes('""')
+  ) {
+    fixed = trimmed.slice(1, -1).replace(/""/g, '"');
+  }
+
+  // 4.3 修复多个顶层 JSON 粘连
+  // 例：{"a":1} {"b":2} 或 {"a":1}{"b":2} -> [{"a":1},{"b":2}]
+  fixed = normalizeConcatenatedTopLevelJSON(fixed);
   
   // 5. 修复不平衡的括号/花括号（尝试补全）
   const openBraces = (fixed.match(/{/g) || []).length;
@@ -399,6 +536,79 @@ export function fixCommonJSONErrors(jsonStr: string): string {
   }
   
   return fixed;
+}
+
+/**
+ * 将多个顶层 JSON 片段拼接为合法数组
+ * - 只在检测到“多个完整顶层片段”时生效
+ * - 保留原有文本，不做语义重写
+ */
+function normalizeConcatenatedTopLevelJSON(input: string): string {
+  const text = input.trim();
+  if (!text) return input;
+
+  const topStart = text[0];
+  if (topStart !== '{' && topStart !== '[') {
+    return input;
+  }
+
+  const segments: string[] = [];
+  let inString = false;
+  let escapeNext = false;
+  let objDepth = 0;
+  let arrDepth = 0;
+  let segmentStart = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') objDepth++;
+    if (char === '}') objDepth--;
+    if (char === '[') arrDepth++;
+    if (char === ']') arrDepth--;
+
+    if (objDepth === 0 && arrDepth === 0) {
+      const piece = text.slice(segmentStart, i + 1).trim();
+      if (piece) {
+        segments.push(piece);
+      }
+
+      let j = i + 1;
+      while (j < text.length && /\s/.test(text[j])) {
+        j++;
+      }
+
+      if (j < text.length && (text[j] === '{' || text[j] === '[')) {
+        segmentStart = j;
+        i = j - 1;
+      }
+    }
+  }
+
+  if (segments.length >= 2) {
+    return `[${segments.join(',')}]`;
+  }
+
+  return input;
 }
 
 /**

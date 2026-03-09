@@ -111,6 +111,60 @@
 
 ---
 
+## 🆕 JSON 容错近期更新（2026-03）
+
+> 这部分用于和面试官说明：我们不仅“有兜底”，还“能量化效果”。
+
+### 1) 增加可观测指标（已落地）
+
+- 代码位置：`api/_clean/shared/utils/json-extractor.ts`
+- 新增结构化指标日志：`[JSONExtractorMetrics]`
+- 可观测维度：
+  - `rawParseAttempts/rawParseSuccess`
+  - `jsonrepairAttempts/jsonrepairSuccess`
+  - `customFixAttempts/customFixSuccess`
+  - `stage`（`raw` / `jsonrepair` / `custom` / `none`）
+  - `durationMs`、`source`、`success`
+
+#### 埋点何时触发
+
+- `extractJSON()` 返回成功时触发一次（`success=true`，`stage` 为 `raw/jsonrepair/custom`）
+- `extractJSON()` 全部策略失败时触发一次（`success=false`，`stage=none`）
+- `extractJSONWithRemainder()` 在闭合标签路径、未闭合标签路径成功时触发一次
+- 注意：`extractJSONWithRemainder()` 回退到 `extractJSON()` 时，指标由 `extractJSON()` 统一上报，避免重复统计
+
+#### 怎么收集监控报告
+
+- **采集方式**：日志系统匹配前缀 `[JSONExtractorMetrics]`，提取后面的 JSON 字段
+- **聚合维度**：按 `source`、时间窗口（5 分钟/1 小时/1 天）聚合
+- **核心报表口径**：
+  - `final_success_rate = success=true 的事件数 / 总事件数`
+  - `l1_success_rate = stage=jsonrepair 的事件数 / jsonrepairAttempts>0 的事件数`
+  - `l2_rescue_rate = stage=custom 的事件数 / jsonrepairSuccess=0 且 customFixAttempts>0 的事件数`
+- **推荐告警**：
+  - `final_success_rate < 99%` 告警
+  - `stage=custom` 比例周环比突增告警（通常说明上游模型输出质量下降）
+  - `durationMs` P95 异常升高告警（通常说明输入异常或规则退化）
+
+### 2) 兜底规则增强（针对 jsonrepair issue 反馈）
+
+在 `fixCommonJSONErrors()` 新增了 3 类补位修复：
+
+1. **缺失 key 结束引号**
+   - 例：`"suggested_diff_hunk: null` -> `"suggested_diff_hunk": null`
+2. **双引号成对转义的字符串化 JSON**
+   - 例：`"{""name"":""Alice""}"` -> `{"name":"Alice"}`
+3. **多个顶层 JSON 粘连**
+   - 例：`{"a":1}{"b":2}` -> `[{"a":1},{"b":2}]`
+
+### 3) 零模型成本回归测试（已落地）
+
+- 新增测试：`test/jest/json-extractor-fallback.test.ts`
+- 覆盖上述 3 类新增兜底规则
+- 优点：不需要再发模型请求，不消耗 token，CI 可直接回归
+
+---
+
 ## ✅ 记忆要点
 
 1. **四层容错**：严重错误检测 → 修复 → react-markdown → 备用
@@ -119,6 +173,7 @@
 4. **性能影响小**：+5-10ms
 5. **不误伤**：检测流式特征才修复
 6. **react-markdown 容错**：基于 AST 宽松解析，增量更新，回退到纯文本
+7. **JSON 容错可量化**：不仅有双层修复，还有分层成功率指标
 
 ---
 
