@@ -11,6 +11,14 @@ type CrossTabEvent =
       version: number;
       sourceTabId: string;
       at: number;
+    }
+  | {
+      type: 'conversation_send_released';
+      userId: string;
+      conversationId: string;
+      version: number;
+      sourceTabId: string;
+      at: number;
     };
 
 const STORAGE_EVENT_KEY = 'ai_agent_cross_tab_event';
@@ -82,6 +90,31 @@ export function publishConversationListUpdated(): void {
     localStorage.setItem(STORAGE_EVENT_KEY, JSON.stringify(event));
   } catch (error) {
     console.warn('跨 tab 会话列表通知发送失败（storage fallback）:', error);
+  }
+}
+
+export function publishConversationSendReleased(userId: string, conversationId: string): void {
+  if (typeof window === 'undefined' || !userId || !conversationId) return;
+
+  const event: CrossTabEvent = {
+    type: 'conversation_send_released',
+    userId,
+    conversationId,
+    version: Date.now(),
+    sourceTabId: crossTabTabId,
+    at: Date.now(),
+  };
+
+  const bc = getChannel();
+  if (bc) {
+    bc.postMessage(event);
+    return;
+  }
+
+  try {
+    localStorage.setItem(STORAGE_EVENT_KEY, JSON.stringify(event));
+  } catch (error) {
+    console.warn('跨 tab 发送释放通知失败（storage fallback）:', error);
   }
 }
 

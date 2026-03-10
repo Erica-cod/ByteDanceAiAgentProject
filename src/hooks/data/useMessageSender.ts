@@ -1,7 +1,15 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useChatStore, useUIStore } from '../../stores';
 import { useSSEStream } from './useSSEStream';
 import type { MessageListRefactoredHandle as MessageListHandle } from '../../components/business/Message/MessageListRefactored';
+import { crossTabTabId, publishConversationSendReleased } from '../../utils/events/crossTabChannel';
+import {
+  CONVERSATION_SEND_LOCK_ERROR_CODE,
+  type ConversationSendLock,
+  tryAcquireConversationSendLock,
+  refreshConversationSendLock,
+  releaseConversationSendLock,
+} from '../../utils/events/conversationSendLock';
 
 interface UseMessageSenderOptions {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
@@ -19,9 +27,48 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
   const { sendMessage: sendSSEMessage, createAbortController, abort } = useSSEStream({
     onConversationCreated: options.onConversationCreated,
   });
+  const activeLockRef = useRef<ConversationSendLock | null>(null);
+  const lockHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const releaseActiveLock = useCallback(() => {
+    if (lockHeartbeatRef.current) {
+      clearInterval(lockHeartbeatRef.current);
+      lockHeartbeatRef.current = null;
+    }
+    if (activeLockRef.current) {
+      publishConversationSendReleased(
+        activeLockRef.current.userId,
+        activeLockRef.current.conversationId
+      );
+      releaseConversationSendLock(activeLockRef.current);
+      activeLockRef.current = null;
+    }
+  }, []);
 
   // 核心发送逻辑
   const sendMessageInternal = useCallback(async (messageText: string, existingUserMessageId?: string) => {
+    const { userId, conversationId } = useChatStore.getState();
+    const acquiredLock = tryAcquireConversationSendLock(
+      userId,
+      conversationId,
+      crossTabTabId
+    );
+
+    if (!acquiredLock) {
+      const lockError = new Error('当前对话正在其他标签页生成，请稍后再试');
+      (lockError as Error & { code?: string; lockUserId?: string; lockConversationId?: string }).code = CONVERSATION_SEND_LOCK_ERROR_CODE;
+      (lockError as Error & { code?: string; lockUserId?: string; lockConversationId?: string }).lockUserId = userId;
+      (lockError as Error & { code?: string; lockUserId?: string; lockConversationId?: string }).lockConversationId = conversationId || '__new__';
+      throw lockError;
+    }
+
+    activeLockRef.current = acquiredLock;
+    lockHeartbeatRef.current = setInterval(() => {
+      if (activeLockRef.current) {
+        refreshConversationSendLock(activeLockRef.current);
+      }
+    }, 10_000);
+
     let userMessage;
 
     if (existingUserMessageId) {
@@ -73,12 +120,14 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
       );
     } finally {
       setLoading(false);
+      releaseActiveLock();
     }
   }, [
     addMessage,
     createAbortController,
     options.messageCountRefs,
     removeMessage,
+    releaseActiveLock,
     saveToCache,
     sendSSEMessage,
     setLoading,
@@ -108,7 +157,10 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
   return {
     sendMessageInternal,
     retryMessage,
-    abort: useCallback(() => abort(), [abort]),
+    abort: useCallback(() => {
+      releaseActiveLock();
+      abort();
+    }, [abort, releaseActiveLock]),
   };
 }
 

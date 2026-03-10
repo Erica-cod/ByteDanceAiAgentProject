@@ -101,7 +101,7 @@
  * @see test/PERFORMANCE-OPTIMIZATION-SUMMARY.md - 详细性能分析报告
  */
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useChatStore, useQueueStore, useUIStore } from '../../../stores';
 import { getConversationDetails, type Conversation } from '../../../utils/conversation/conversationAPI';
 import { isLongText } from '../../../utils/text/textUtils';
@@ -126,13 +126,20 @@ import { publishConversationUpdated } from '../../../utils/events/crossTabChanne
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamBufferRef = useRef<Map<string, {
+    assistantMessageId: string;
+    content: string;
+    thinking: string;
+    sources?: Array<{ title: string; url: string }>;
+    done: boolean;
+    timestamp: number;
+  }>>(new Map());
 
   const userId = useChatStore((s) => s.userId);
   const deviceId = useChatStore((s) => s.deviceId);
   const conversationId = useChatStore((s) => s.conversationId);
   const setConversationId = useChatStore((s) => s.setConversationId);
   const updateMessage = useChatStore((s) => s.updateMessage);
-  const appendToLastMessage = useChatStore((s) => s.appendToLastMessage);
   const markMessageFailed = useChatStore((s) => s.markMessageFailed);
   const markMessageSuccess = useChatStore((s) => s.markMessageSuccess);
   const saveToCache = useChatStore((s) => s.saveToCache);
@@ -144,7 +151,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const chatMode = useUIStore((s) => s.chatMode);
 
   //  RAF 批处理优化
-  const { scheduleMessageUpdate, flushMessageUpdate } = useRAFBatching(appendToLastMessage);
+  const { scheduleMessageUpdate, flushMessageUpdate } = useRAFBatching();
 
   const notifyConversationUpdated = useCallback((targetConversationId?: string | null) => {
     const convId = targetConversationId || useChatStore.getState().conversationId;
@@ -152,12 +159,41 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     publishConversationUpdated(convId);
   }, []);
 
+  useEffect(() => {
+    if (!conversationId) return;
+    const pending = streamBufferRef.current.get(conversationId);
+    if (!pending) return;
+
+    const chatState = useChatStore.getState();
+    const exists = chatState.messages.some((m) => m.id === pending.assistantMessageId);
+    if (!exists) {
+      chatState.addMessage({
+        id: pending.assistantMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: pending.timestamp,
+        pendingSync: true,
+      });
+    }
+
+    chatState.updateMessage(pending.assistantMessageId, {
+      content: pending.content,
+      thinking: pending.thinking || undefined,
+      sources: pending.sources,
+    });
+
+    if (pending.done) {
+      streamBufferRef.current.delete(conversationId);
+    }
+  }, [conversationId]);
+
   const sendMessage = useCallback(async (
     messageText: string,
     userMessageId: string,
     assistantMessageId: string,
     messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>
   ) => {
+    const streamConversationIdRef = { current: conversationId };
     // SSE 重连配置
     const MAX_RECONNECT_ATTEMPTS = 3;
     const BASE_RETRY_DELAY_MS = 500;
@@ -312,6 +348,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
                 // init：同步 conversationId
                 if (parsed.type === 'init' && parsed.conversationId) {
+                  streamConversationIdRef.current = parsed.conversationId;
                   if (!conversationId) {
                     setConversationId(parsed.conversationId);
                     options.onConversationCreated?.(parsed.conversationId);
@@ -407,8 +444,58 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 const currentSources = parsed.sources;
 
                 if (chatMode === 'single') {
+                  const applyAssistantUpdate = (
+                    content?: string,
+                    thinking?: string,
+                    sources?: Array<{ title: string; url: string }>
+                  ) => {
+                    const targetConversationId = streamConversationIdRef.current;
+                    if (!targetConversationId) return;
+
+                    const activeConversationId = useChatStore.getState().conversationId;
+                    const currentContent = content ?? '';
+                    const currentThinking = thinking ?? '';
+
+                    // 始终缓存流式快照：切走后不渲染，切回后可一次性补齐并继续实时
+                    streamBufferRef.current.set(targetConversationId, {
+                      assistantMessageId,
+                      content: currentContent,
+                      thinking: currentThinking,
+                      sources,
+                      done: false,
+                      timestamp: Date.now(),
+                    });
+
+                    if (activeConversationId !== targetConversationId) {
+                      return;
+                    }
+
+                    const chatState = useChatStore.getState();
+                    const exists = chatState.messages.some((m) => m.id === assistantMessageId);
+                    if (!exists) {
+                      chatState.addMessage({
+                        id: assistantMessageId,
+                        role: 'assistant',
+                        content: '',
+                        timestamp: Date.now(),
+                        pendingSync: true,
+                      });
+                    }
+
+                    updateMessage(assistantMessageId, {
+                      ...(content !== undefined ? { content } : {}),
+                      ...(thinking !== undefined ? { thinking } : {}),
+                      ...(sources !== undefined ? { sources } : {}),
+                    });
+                  };
+
                   //  使用 RAF 批处理更新（减少 10-25% 的渲染次数）
-                  scheduleMessageUpdate(state.currentContent, state.currentThinking, currentSources);
+                  scheduleMessageUpdate(
+                    state.currentContent,
+                    state.currentThinking,
+                    currentSources,
+                    applyAssistantUpdate
+                  );
                   
                   /* 
                    *  原始方案（已废弃）：
@@ -469,7 +556,14 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
       //  流式处理成功完成
       flushMessageUpdate();
-      notifyConversationUpdated(conversationId);
+      if (streamConversationIdRef.current) {
+        const pending = streamBufferRef.current.get(streamConversationIdRef.current);
+        if (pending) {
+          pending.done = true;
+          streamBufferRef.current.set(streamConversationIdRef.current, pending);
+        }
+      }
+      notifyConversationUpdated(streamConversationIdRef.current || conversationId);
       
       if (queueToken) {
         console.log(`清除队列 token: ${queueToken}`);
@@ -499,7 +593,14 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     } catch (error: any) {
       //  错误时也要立即执行待处理的更新
       flushMessageUpdate();
-      notifyConversationUpdated(conversationId);
+      if (streamConversationIdRef.current) {
+        const pending = streamBufferRef.current.get(streamConversationIdRef.current);
+        if (pending) {
+          pending.done = true;
+          streamBufferRef.current.set(streamConversationIdRef.current, pending);
+        }
+      }
+      notifyConversationUpdated(streamConversationIdRef.current || conversationId);
       
       if (error.name === 'AbortError') {
         console.log('请求已取消');

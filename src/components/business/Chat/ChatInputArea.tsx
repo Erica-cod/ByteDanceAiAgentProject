@@ -28,6 +28,8 @@ export interface ChatInputAreaProps {
   isLoading: boolean;
   /** 队列长度 */
   queueLength?: number;
+  /** 队列消息内容（用于输入框上方展示） */
+  queuedMessages?: Array<{ id: string; content: string }>;
   /** 最大长度 */
   maxLength?: number;
   /** 是否显示统计 */
@@ -43,6 +45,7 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   onStop,
   isLoading,
   queueLength = 0,
+  queuedMessages = [],
   maxLength,
   showStats = true,
   onStatsWarningClick,
@@ -62,6 +65,27 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
 
   return (
     <div className="chat-input-area">
+      {queuedMessages.length > 0 && (
+        <div className="chat-input-area__queue">
+          <div className="chat-input-area__queue-title">
+            队列中 {queuedMessages.length} 条，当前消息发送完成后将依次发送
+          </div>
+          <div className="chat-input-area__queue-list">
+            {queuedMessages.slice(0, 3).map((item, index) => (
+              <div key={item.id} className="chat-input-area__queue-item">
+                <span className="chat-input-area__queue-index">{index + 1}.</span>
+                <span className="chat-input-area__queue-text">{item.content}</span>
+              </div>
+            ))}
+            {queuedMessages.length > 3 && (
+              <div className="chat-input-area__queue-more">
+                还有 {queuedMessages.length - 3} 条未展示
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="chat-input-area__wrapper">
         <textarea
           ref={textareaRef}

@@ -40,8 +40,6 @@ export function useConversationManager(userId: string, onAbort: () => void) {
 
   // 新建对话
   const handleNewConversation = async () => {
-    onAbort();
-
     const newConv = await createConversation(userId, `对话 ${conversations.length + 1}`);
     if (newConv) {
       setConversations([newConv, ...conversations]);
@@ -66,7 +64,12 @@ export function useConversationManager(userId: string, onAbort: () => void) {
       return;
     }
 
-    onAbort();
+    // 先清空展示，避免“上一会话的流式内容”在切换瞬间串到当前会话页面
+    useChatStore.setState({
+      messages: [],
+      firstItemIndex: 0,
+      hasMoreMessages: false,
+    });
 
     setConversationId(convId);
     clearConversationUnread(convId);
