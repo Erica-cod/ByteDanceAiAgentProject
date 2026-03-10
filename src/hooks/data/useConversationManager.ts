@@ -6,6 +6,7 @@ import {
   type Conversation,
 } from '../../utils/conversation/conversationAPI';
 import { useChatStore } from '../../stores';
+import { publishConversationListUpdated } from '../../utils/events/crossTabChannel';
 
 export function useConversationManager(userId: string, onAbort: () => void) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -14,6 +15,7 @@ export function useConversationManager(userId: string, onAbort: () => void) {
 
   const setConversationId = useChatStore((s) => s.setConversationId);
   const loadConversation = useChatStore((s) => s.loadConversation);
+  const clearConversationUnread = useChatStore((s) => s.clearConversationUnread);
 
   // 加载对话列表
   const loadConversations = async () => {
@@ -26,6 +28,7 @@ export function useConversationManager(userId: string, onAbort: () => void) {
       if (convs.length > 0 && !conversationId) {
         const latest = convs[0];
         setConversationId(latest.conversationId);
+        clearConversationUnread(latest.conversationId);
         await loadConversation(latest.conversationId);
       }
     } catch (error) {
@@ -49,6 +52,7 @@ export function useConversationManager(userId: string, onAbort: () => void) {
         hasMoreMessages: false,
         totalMessages: 0,
       });
+      publishConversationListUpdated();
     }
   };
 
@@ -65,6 +69,7 @@ export function useConversationManager(userId: string, onAbort: () => void) {
     onAbort();
 
     setConversationId(convId);
+    clearConversationUnread(convId);
     await loadConversation(convId);
     shouldScrollToBottomRef.current = true;
   };
@@ -75,6 +80,7 @@ export function useConversationManager(userId: string, onAbort: () => void) {
     if (success) {
       const updatedConvs = conversations.filter((c) => c.conversationId !== convId);
       setConversations(updatedConvs);
+      publishConversationListUpdated();
 
       const currentConvId = useChatStore.getState().conversationId;
       if (convId === currentConvId) {

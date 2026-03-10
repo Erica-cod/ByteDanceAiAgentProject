@@ -20,9 +20,10 @@ import { HeaderControls } from './HeaderControls';
 import { ChatInputArea } from './ChatInputArea';
 import { getUserId, initializeUser } from '../../../utils/auth/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/device/privacyFirstFingerprint';
-import { useChatStore, useUIStore, useQueueStore } from '../../../stores';
+import { useChatStore, useUIStore } from '../../../stores';
 import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
 import { useAuthStore } from '../../../stores/authStore';
+import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import './ChatInterfaceRefactored.css';
 
 const ChatInterfaceRefactored: React.FC = () => {
@@ -38,6 +39,10 @@ const ChatInterfaceRefactored: React.FC = () => {
   const hasMoreMessages = useChatStore((s) => s.hasMoreMessages);
   const isLoadingMore = useChatStore((s) => s.isLoadingMore);
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
+  const loadConversation = useChatStore((s) => s.loadConversation);
+  const unreadConversationIds = useChatStore((s) => s.unreadConversationIds);
+  const markConversationUnread = useChatStore((s) => s.markConversationUnread);
+  const clearConversationUnread = useChatStore((s) => s.clearConversationUnread);
 
   const isLoading = useUIStore((s) => s.isLoading);
   const modelType = useUIStore((s) => s.modelType);
@@ -147,6 +152,46 @@ const ChatInterfaceRefactored: React.FC = () => {
     }
   }, [isLoading, messageQueue.queue.length]); // 依赖队列长度和加载状态
 
+  const throttledLoadConversations = useThrottle(() => {
+    conversationManager.loadConversations().catch((error) => {
+      console.error('跨 tab 刷新对话列表失败:', error);
+    });
+  }, 1000);
+
+  const throttledReloadConversation = useThrottle((convId: string) => {
+    if (isLoading) return;
+    loadConversation(convId)
+      .then(() => clearConversationUnread(convId))
+      .catch((error) => console.error('跨 tab 刷新会话失败:', error));
+  }, 1500);
+
+  // 跨 tab 消息更新通知：当前会话轻量刷新，非当前会话标记红点
+  useEffect(() => {
+    const unsubscribe = subscribeCrossTabEvents((event) => {
+      if (event.type === 'conversation_list_updated') {
+        throttledLoadConversations();
+        return;
+      }
+
+      if (event.type !== 'conversation_updated') return;
+
+      if (event.conversationId !== conversationId) {
+        markConversationUnread(event.conversationId);
+        return;
+      }
+
+      throttledReloadConversation(event.conversationId);
+    });
+
+    return () => unsubscribe();
+  }, [
+    clearConversationUnread,
+    conversationId,
+    markConversationUnread,
+    throttledLoadConversations,
+    throttledReloadConversation,
+  ]);
+
   // ===== 业务逻辑 =====
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
@@ -240,6 +285,7 @@ const ChatInterfaceRefactored: React.FC = () => {
       <ConversationList
         conversations={conversationManager.conversations}
         currentConversationId={conversationId}
+        unreadConversationIds={unreadConversationIds}
         onSelectConversation={conversationManager.handleSelectConversation}
         onNewConversation={conversationManager.handleNewConversation}
         onDeleteConversation={conversationManager.handleDeleteConversation}

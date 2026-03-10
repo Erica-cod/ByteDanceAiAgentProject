@@ -122,6 +122,7 @@ import {
 } from './chunking-handlers';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
 import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
+import { publishConversationUpdated } from '../../../utils/events/crossTabChannel';
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -144,6 +145,12 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
   //  RAF 批处理优化
   const { scheduleMessageUpdate, flushMessageUpdate } = useRAFBatching(appendToLastMessage);
+
+  const notifyConversationUpdated = useCallback((targetConversationId?: string | null) => {
+    const convId = targetConversationId || useChatStore.getState().conversationId;
+    if (!convId) return;
+    publishConversationUpdated(convId);
+  }, []);
 
   const sendMessage = useCallback(async (
     messageText: string,
@@ -309,6 +316,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                     setConversationId(parsed.conversationId);
                     options.onConversationCreated?.(parsed.conversationId);
                   }
+                  notifyConversationUpdated(parsed.conversationId);
                   if (parsed.mode === 'multi_agent') {
                     state.multiAgentStatus = 'in_progress';
                   }
@@ -461,6 +469,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
       //  流式处理成功完成
       flushMessageUpdate();
+      notifyConversationUpdated(conversationId);
       
       if (queueToken) {
         console.log(`清除队列 token: ${queueToken}`);
@@ -490,6 +499,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     } catch (error: any) {
       //  错误时也要立即执行待处理的更新
       flushMessageUpdate();
+      notifyConversationUpdated(conversationId);
       
       if (error.name === 'AbortError') {
         console.log('请求已取消');
@@ -510,6 +520,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     markMessageFailed,
     markMessageSuccess,
     modelType,
+    notifyConversationUpdated,
     options.onConversationCreated,
     queueToken,
     saveToCache,

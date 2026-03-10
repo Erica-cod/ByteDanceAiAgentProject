@@ -8,6 +8,7 @@ import './ConversationList.css';
 interface ConversationListProps {
   conversations: Conversation[];
   currentConversationId: string | null;
+  unreadConversationIds?: string[];
   onSelectConversation: (conversationId: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (conversationId: string) => void;
@@ -24,6 +25,7 @@ const ConversationTime: React.FC<{ updatedAt: string }> = ({ updatedAt }) => {
 const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
   currentConversationId,
+  unreadConversationIds = [],
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
@@ -69,6 +71,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
           <ConversationTime updatedAt={conversation.updatedAt} />
         </div>
       </div>
+      {unreadConversationIds.includes(conversation.conversationId) && (
+        <span className="conversation-unread-dot" title="有新消息" />
+      )}
       <button
         className="delete-conversation-btn"
         onClick={(e) => {
