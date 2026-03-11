@@ -9,7 +9,7 @@
  * - 职责更清晰，代码更简洁
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import ConversationList from '../../old-structure/ConversationList';
 import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
@@ -20,9 +20,11 @@ import { HeaderControls } from './HeaderControls';
 import { ChatInputArea } from './ChatInputArea';
 import { getUserId, initializeUser } from '../../../utils/auth/userManager';
 import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/device/privacyFirstFingerprint';
-import { useChatStore, useUIStore, useQueueStore } from '../../../stores';
+import { useChatStore, useUIStore } from '../../../stores';
 import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
 import { useAuthStore } from '../../../stores/authStore';
+import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
+import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
 import './ChatInterfaceRefactored.css';
 
 const ChatInterfaceRefactored: React.FC = () => {
@@ -38,6 +40,10 @@ const ChatInterfaceRefactored: React.FC = () => {
   const hasMoreMessages = useChatStore((s) => s.hasMoreMessages);
   const isLoadingMore = useChatStore((s) => s.isLoadingMore);
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
+  const loadConversation = useChatStore((s) => s.loadConversation);
+  const unreadConversationIds = useChatStore((s) => s.unreadConversationIds);
+  const markConversationUnread = useChatStore((s) => s.markConversationUnread);
+  const clearConversationUnread = useChatStore((s) => s.clearConversationUnread);
 
   const isLoading = useUIStore((s) => s.isLoading);
   const modelType = useUIStore((s) => s.modelType);
@@ -59,6 +65,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   const listRef = useRef<MessageListRefactoredHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const pendingConversationListSyncRef = useRef(false);
 
   // ===== 自定义 Hooks =====
   const { sendMessageInternal, retryMessage, abort } = useMessageSender({
@@ -75,8 +82,6 @@ const ChatInterfaceRefactored: React.FC = () => {
     abort();
     setLoading(false);
   });
-
-  const processQueueRef = useRef<(() => Promise<void>) | null>(null);
 
   const messageQueue = useMessageQueue({
     onProcessQueue: async () => {}, // 空实现，队列处理由 useEffect 监听 isLoading 自动触发
@@ -130,22 +135,75 @@ const ChatInterfaceRefactored: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]); // 只在 userId 变化时重新加载
 
-  // ✅ 监听 isLoading 状态，自动处理队列
+  const processQueueOnce = useCallback(async () => {
+    if (isLoading || messageQueue.isProcessing || messageQueue.queue.length === 0) return;
+    await messageQueue.processMessageQueue(sendMessageInternal);
+  }, [isLoading, messageQueue.isProcessing, messageQueue.processMessageQueue, messageQueue.queue.length, sendMessageInternal]);
+
+  // ✅ 队列自动处理：空闲且未被锁阻塞时，尝试处理一次
   useEffect(() => {
-    if (!isLoading && messageQueue.queue.length > 0) {
-      console.log('📤 检测到队列有消息，开始处理...');
-      const processQueue = async () => {
-        await messageQueue.processMessageQueue(sendMessageInternal);
-      };
-      
-      // 延迟500ms，确保 UI 状态稳定
-      const timer = setTimeout(() => {
-        processQueue();
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, messageQueue.queue.length]); // 依赖队列长度和加载状态
+    if (messageQueue.waitingLock) return;
+    processQueueOnce();
+  }, [messageQueue.waitingLock, processQueueOnce]);
+
+  const throttledLoadConversations = useThrottle(() => {
+    conversationManager.loadConversations().catch((error) => {
+      console.error('跨 tab 刷新对话列表失败:', error);
+    });
+  }, 1000);
+
+  // 跨 tab 消息更新通知：当前会话轻量刷新，非当前会话标记红点
+  useEffect(() => {
+    const unsubscribe = subscribeCrossTabEvents((event) => {
+      if (event.type === 'conversation_list_updated') {
+        // 参考 ChatGPT 一类产品的常见交互：流式生成期间不打断侧栏交互，延后列表同步
+        pendingConversationListSyncRef.current = true;
+        if (!isLoading) {
+          throttledLoadConversations();
+          pendingConversationListSyncRef.current = false;
+        }
+        return;
+      }
+
+      if (event.type === 'conversation_send_released') {
+        const waitingLock = messageQueue.waitingLock;
+        if (!waitingLock) return;
+        if (
+          waitingLock.userId === event.userId
+          && waitingLock.conversationId === event.conversationId
+        ) {
+          messageQueue.setWaitingLock(null);
+          processQueueOnce();
+        }
+        return;
+      }
+
+      if (event.type !== 'conversation_updated') return;
+
+      if (event.conversationId !== conversationId) {
+        markConversationUnread(event.conversationId);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [
+    clearConversationUnread,
+    conversationId,
+    markConversationUnread,
+    messageQueue.waitingLock,
+    messageQueue.setWaitingLock,
+    processQueueOnce,
+    isLoading,
+    throttledLoadConversations,
+  ]);
+
+  // 流式结束后补一次会话列表同步，避免生成过程中频繁刷新侧栏
+  useEffect(() => {
+    if (isLoading) return;
+    if (!pendingConversationListSyncRef.current) return;
+    throttledLoadConversations();
+    pendingConversationListSyncRef.current = false;
+  }, [isLoading, throttledLoadConversations]);
 
   // ===== 业务逻辑 =====
   const handleSendMessage = () => {
@@ -161,7 +219,18 @@ const ChatInterfaceRefactored: React.FC = () => {
     // 否则，立即发送
     const messageText = inputValue;
     setInputValue('');
-    sendMessageInternal(messageText);
+    sendMessageInternal(messageText).catch((error: any) => {
+      if (error?.code === CONVERSATION_SEND_LOCK_ERROR_CODE) {
+        messageQueue.addToQueue(messageText);
+        messageQueue.setWaitingLock({
+          userId: error?.lockUserId || userId,
+          conversationId: error?.lockConversationId || conversationId || '__new__',
+        });
+        console.log('📥 当前会话被其他标签页占用，已自动加入队列');
+        return;
+      }
+      console.error('发送消息失败:', error);
+    });
   };
 
   const handleStopGeneration = () => {
@@ -221,17 +290,26 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // 底部内容
   const footerContent = (
+    (() => {
+      const displayQueue = messageQueue.queue.filter((item) => item.id !== messageQueue.activeQueueItemId);
+      return (
     <ChatInputArea
       value={inputValue}
       onChange={setInputValue}
       onSend={throttledSendMessage}
       onStop={handleStopGeneration}
       isLoading={isLoading}
-      queueLength={messageQueue.queue.length}
+      queueLength={displayQueue.length}
+      queuedMessages={displayQueue.map((item) => ({
+        id: item.id,
+        content: item.content,
+      }))}
       onStatsWarningClick={() => {
         console.log('超长文本警告点击');
       }}
     />
+      );
+    })()
   );
 
   return (
@@ -240,6 +318,7 @@ const ChatInterfaceRefactored: React.FC = () => {
       <ConversationList
         conversations={conversationManager.conversations}
         currentConversationId={conversationId}
+        unreadConversationIds={unreadConversationIds}
         onSelectConversation={conversationManager.handleSelectConversation}
         onNewConversation={conversationManager.handleNewConversation}
         onDeleteConversation={conversationManager.handleDeleteConversation}

@@ -252,6 +252,23 @@ req.on('close', () => {
 });
 ```
 
+#### 10. CROSS_TAB_STREAMING_QUEUE_LOCK_DESIGN.md
+**跨 tab 流式输出与发送队列设计说明**
+
+**覆盖问题：**
+- 多 tab 同会话并发发送冲突
+- 队列重复消费与重复发送
+- 切换会话后流式内容串流
+- 流式期间侧栏频繁刷新导致无法切换
+- 多 tab 下 CSRF token 覆盖引发 403
+
+**核心方案：**
+1. 事件通知与数据拉取分离（BroadcastChannel/storage）
+2. 会话级发送锁（userId + conversationId）
+3. 队列按 tab 隔离（避免跨 tab 重复消费）
+4. 后台接收不渲染，切回补齐并恢复实时
+5. 流式期间延后侧栏列表同步
+
 ## 🎯 关键技术点
 
 ### SSE 工作原理

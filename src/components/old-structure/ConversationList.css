@@ -218,6 +218,20 @@
   color: inherit;
 }
 
+.conversation-unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+  flex-shrink: 0;
+}
+
+.conversation-item.active .conversation-unread-dot {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
 .delete-conversation-btn {
   background: #fef2f2;
   border: 2px solid #fecaca;

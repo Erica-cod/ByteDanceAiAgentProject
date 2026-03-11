@@ -143,9 +143,24 @@ export function verifyOriginOrReferer(headers?: Record<string, any>): CsrfCheckR
 export async function issueCsrfToken(headers?: Record<string, any>) {
   const existingSid = getCsrfSidFromHeaders(headers);
   const csrfSid = existingSid || base64url(randomBytes(18));
+  const key = csrfKey(csrfSid);
+
+  // 多 tab 场景下，若同一个 csrfSid 已存在 token，则直接复用。
+  // 这样可以避免某个 tab 获取新 token 后，导致其他 tab 缓存 token 失效并出现“不匹配”。
+  if (existingSid) {
+    const existingToken = await redis().get(key);
+    if (existingToken) {
+      await redis().expire(key, CSRF_TTL_SEC);
+      return {
+        csrfSid,
+        csrfToken: existingToken,
+        setCookie: undefined,
+      };
+    }
+  }
 
   const csrfToken = base64url(randomBytes(32));
-  await redis().set(csrfKey(csrfSid), csrfToken, 'EX', CSRF_TTL_SEC);
+  await redis().set(key, csrfToken, 'EX', CSRF_TTL_SEC);
 
   return {
     csrfSid,

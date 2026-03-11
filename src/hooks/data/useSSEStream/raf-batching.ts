@@ -34,9 +34,10 @@ interface PendingUpdate {
   content?: string;
   thinking?: string;
   sources?: any;
+  applyUpdate?: (content?: string, thinking?: string, sources?: any) => void;
 }
 
-export function useRAFBatching(appendToLastMessage: (content?: string, thinking?: string, sources?: any) => void) {
+export function useRAFBatching() {
   const rafIdRef = useRef<number | null>(null);
   const pendingUpdateRef = useRef<PendingUpdate | null>(null);
 
@@ -44,7 +45,12 @@ export function useRAFBatching(appendToLastMessage: (content?: string, thinking?
    * 使用 RAF 批处理更新消息
    * 在同一帧（~16ms）内的多次调用会被合并为 1 次渲染
    */
-  const scheduleMessageUpdate = (content?: string, thinking?: string, sources?: any) => {
+  const scheduleMessageUpdate = (
+    content?: string,
+    thinking?: string,
+    sources?: any,
+    applyUpdate?: (content?: string, thinking?: string, sources?: any) => void
+  ) => {
     // 累积待更新的内容（始终使用最新值）
     if (!pendingUpdateRef.current) {
       pendingUpdateRef.current = {};
@@ -59,6 +65,9 @@ export function useRAFBatching(appendToLastMessage: (content?: string, thinking?
     if (sources !== undefined) {
       pendingUpdateRef.current.sources = sources;
     }
+    if (applyUpdate) {
+      pendingUpdateRef.current.applyUpdate = applyUpdate;
+    }
 
     // 如果已经安排了 RAF，跳过（关键！这确保了批处理效果）
     if (rafIdRef.current !== null) {
@@ -68,10 +77,10 @@ export function useRAFBatching(appendToLastMessage: (content?: string, thinking?
     // 安排在下一帧执行更新
     rafIdRef.current = requestAnimationFrame(() => {
       if (pendingUpdateRef.current) {
-        const { content, thinking, sources } = pendingUpdateRef.current;
+        const { content, thinking, sources, applyUpdate: updater } = pendingUpdateRef.current;
         
         // 执行实际的状态更新（只触发 1 次重渲染）
-        appendToLastMessage(content, thinking, sources);
+        updater?.(content, thinking, sources);
         
         // 清理
         pendingUpdateRef.current = null;
@@ -91,8 +100,8 @@ export function useRAFBatching(appendToLastMessage: (content?: string, thinking?
     }
     
     if (pendingUpdateRef.current) {
-      const { content, thinking, sources } = pendingUpdateRef.current;
-      appendToLastMessage(content, thinking, sources);
+      const { content, thinking, sources, applyUpdate: updater } = pendingUpdateRef.current;
+      updater?.(content, thinking, sources);
       pendingUpdateRef.current = null;
     }
   };

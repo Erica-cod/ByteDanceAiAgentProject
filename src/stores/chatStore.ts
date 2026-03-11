@@ -42,6 +42,7 @@ interface ChatState {
   hasMoreMessages: boolean;
   totalMessages: number;
   isLoadingMore: boolean;
+  unreadConversationIds: string[];
 
   // 同步 Actions
   setMessages: (messages: Message[]) => void;
@@ -56,6 +57,8 @@ interface ChatState {
   setHasMoreMessages: (has: boolean) => void;
   setTotalMessages: (total: number) => void;
   setIsLoadingMore: (loading: boolean) => void;
+  markConversationUnread: (conversationId: string) => void;
+  clearConversationUnread: (conversationId: string) => void;
 
   // 流式更新优化（关键性能优化）
   appendToLastMessage: (contentDelta?: string, thinkingDelta?: string, sources?: Array<{ title: string; url: string }>) => void;
@@ -83,6 +86,7 @@ export const useChatStore = create<ChatState>()(
     hasMoreMessages: false,
     totalMessages: 0,
     isLoadingMore: false,
+    unreadConversationIds: [],
 
     // 同步 Actions
     setMessages: (messages) => {
@@ -118,7 +122,13 @@ export const useChatStore = create<ChatState>()(
         state.messages = state.messages.filter((m) => m.id !== id);
       }),
 
-    setConversationId: (id) => set({ conversationId: id }),
+    setConversationId: (id) =>
+      set((state) => {
+        state.conversationId = id;
+        if (id) {
+          state.unreadConversationIds = state.unreadConversationIds.filter((convId) => convId !== id);
+        }
+      }),
     setUserId: (userId) => set({ userId }),
     setDeviceId: (deviceId) => set({ deviceId }), //  新增
     setConversations: (conversations) => set({ conversations }),
@@ -126,6 +136,17 @@ export const useChatStore = create<ChatState>()(
     setHasMoreMessages: (has) => set({ hasMoreMessages: has }),
     setTotalMessages: (total) => set({ totalMessages: total }),
     setIsLoadingMore: (loading) => set({ isLoadingMore: loading }),
+    markConversationUnread: (conversationId) =>
+      set((state) => {
+        if (!conversationId) return;
+        if (!state.unreadConversationIds.includes(conversationId)) {
+          state.unreadConversationIds.push(conversationId);
+        }
+      }),
+    clearConversationUnread: (conversationId) =>
+      set((state) => {
+        state.unreadConversationIds = state.unreadConversationIds.filter((id) => id !== conversationId);
+      }),
 
     // 流式更新优化（性能关键）
     appendToLastMessage: (contentDelta, thinkingDelta, sources) =>
