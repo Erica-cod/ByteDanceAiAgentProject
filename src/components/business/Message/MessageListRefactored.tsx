@@ -73,32 +73,62 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
   const [isTransitioning, setIsTransitioning] = React.useState(true);
   const [transitionOpacity, setTransitionOpacity] = React.useState(1);
   const hasInitialDataRef = useRef(false);
+  const hasStartedFadeOutRef = useRef(false);
+  const removeFallbackTimerRef = useRef<number | null>(null);
+  const emptyConversationFallbackTimerRef = useRef<number | null>(null);
+
+  const clearMaskTimers = useCallback(() => {
+    if (removeFallbackTimerRef.current !== null) {
+      window.clearTimeout(removeFallbackTimerRef.current);
+      removeFallbackTimerRef.current = null;
+    }
+    if (emptyConversationFallbackTimerRef.current !== null) {
+      window.clearTimeout(emptyConversationFallbackTimerRef.current);
+      emptyConversationFallbackTimerRef.current = null;
+    }
+  }, []);
+
+  const startMaskFadeOut = useCallback(() => {
+    if (hasStartedFadeOutRef.current) return;
+    hasStartedFadeOutRef.current = true;
+    setTransitionOpacity(0);
+
+    // 兜底：极端情况下 transitionend 可能不触发，超时后强制移除遮罩
+    removeFallbackTimerRef.current = window.setTimeout(() => {
+      setIsTransitioning(false);
+    }, 500);
+  }, []);
   
   React.useEffect(() => {
+    clearMaskTimers();
     setIsTransitioning(true);
     setTransitionOpacity(1);
     hasInitialDataRef.current = false;
-  }, []);
+    hasStartedFadeOutRef.current = false;
+
+    // 空会话兜底：没有消息也不应长期停留在遮罩态
+    emptyConversationFallbackTimerRef.current = window.setTimeout(() => {
+      startMaskFadeOut();
+    }, 800);
+
+    return clearMaskTimers;
+  }, [clearMaskTimers, startMaskFadeOut]);
   
   // 监听数据加载状态
   React.useEffect(() => {
     if (messages.length > 0 && !hasInitialDataRef.current) {
       hasInitialDataRef.current = true;
-      
-      const fadeOutTimer = setTimeout(() => {
-        setTransitionOpacity(0);
-      }, 100);
-      
-      const removeTimer = setTimeout(() => {
-        setIsTransitioning(false);
-      }, 400);
-      
+
+      // 等待至少一帧，确保遮罩先以 opacity=1 渲染，再触发淡出
+      const rafId = window.requestAnimationFrame(() => {
+        startMaskFadeOut();
+      });
+
       return () => {
-        clearTimeout(fadeOutTimer);
-        clearTimeout(removeTimer);
+        window.cancelAnimationFrame(rafId);
       };
     }
-  }, [messages.length]);
+  }, [messages.length, startMaskFadeOut]);
 
   // 注意：不要在流式输出的每个 chunk 里主动 scrollToIndex。
   // 这会导致 Virtuoso 频繁布局 + 滚动联动，产生“闪烁/抖动”。
@@ -164,6 +194,12 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
         <div
           className="message-list-refactored__mask"
           style={{ opacity: transitionOpacity }}
+          onTransitionEnd={(event) => {
+            if (event.propertyName !== 'opacity') return;
+            if (!hasStartedFadeOutRef.current) return;
+            clearMaskTimers();
+            setIsTransitioning(false);
+          }}
         />
       )}
 
