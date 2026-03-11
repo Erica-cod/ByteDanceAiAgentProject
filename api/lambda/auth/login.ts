@@ -11,6 +11,7 @@ import type { RequestOption } from '../../types/chat.js';
 import { handleOptionsRequest } from '../_utils/cors.js';
 import { createLoginState, saveLoginState, buildAuthorizationUrl } from '../_utils/bffOidcAuth.js';
 import { issueCsrfToken } from '../_utils/csrf.js';
+import { enforceAuthRateLimit, buildAuthStoreUnavailableResponse } from '../_utils/authRateLimit.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
@@ -18,35 +19,49 @@ export async function options({ headers }: RequestOption<any, any>) {
 }
 
 export async function get({ query, headers }: RequestOption<{ returnTo?: string; deviceIdHash?: string }, any>) {
-  // ✅ 绑定浏览器：确保存在 HttpOnly csrfSid cookie（没有就发一个）
-  const issued = await issueCsrfToken(headers);
-
-  const { record, code_challenge } = createLoginState({
-    returnTo: query?.returnTo,
+  const requestOrigin = headers?.origin;
+  const limitResp = await enforceAuthRateLimit({
+    endpoint: 'auth_login',
+    headers,
+    requestOrigin,
     deviceIdHash: query?.deviceIdHash,
-    csrfSid: issued.csrfSid,
   });
+  if (limitResp) return limitResp;
 
-  await saveLoginState(record);
+  try {
+    // ✅ 绑定浏览器：确保存在 HttpOnly csrfSid cookie（没有就发一个）
+    const issued = await issueCsrfToken(headers);
 
-  const location = buildAuthorizationUrl({
-    state: record.state,
-    nonce: record.nonce,
-    code_challenge,
-    deviceIdHash: record.deviceIdHash,
-  });
+    const { record, code_challenge } = createLoginState({
+      returnTo: query?.returnTo,
+      deviceIdHash: query?.deviceIdHash,
+      csrfSid: issued.csrfSid,
+    });
 
-  const outHeaders: Record<string, string> = {
-    Location: location,
-  };
-  if (issued.setCookie) outHeaders['Set-Cookie'] = issued.setCookie;
+    await saveLoginState(record);
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      ...outHeaders,
-    },
-  });
+    const location = buildAuthorizationUrl({
+      state: record.state,
+      nonce: record.nonce,
+      code_challenge,
+      deviceIdHash: record.deviceIdHash,
+    });
+
+    const outHeaders: Record<string, string> = {
+      Location: location,
+    };
+    if (issued.setCookie) outHeaders['Set-Cookie'] = issued.setCookie;
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...outHeaders,
+      },
+    });
+  } catch (error) {
+    console.error('[auth/login] 认证存储异常:', error);
+    return buildAuthStoreUnavailableResponse(requestOrigin);
+  }
 }
 
 

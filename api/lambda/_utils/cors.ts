@@ -46,7 +46,7 @@ export function getCorsHeaders(requestOrigin?: string): Record<string, string> {
     headers['Access-Control-Max-Age'] = '86400'; // 24小时
     
     // 暴露自定义响应头（让前端能读取）
-    headers['Access-Control-Expose-Headers'] = 'X-Queue-Token, X-Queue-Position, X-Queue-Estimated-Wait, Retry-After';
+    headers['Access-Control-Expose-Headers'] = 'X-Queue-Token, X-Queue-Position, X-Queue-Estimated-Wait, Retry-After, X-RateLimit-Reason, X-RateLimit-Mode';
   }
   
   return headers;

@@ -10,6 +10,7 @@
 import type { RequestOption } from '../../types/chat.js';
 import { getCorsHeaders, handleOptionsRequest } from '../_utils/cors.js';
 import { issueCsrfToken } from '../_utils/csrf.js';
+import { enforceAuthRateLimit, buildAuthStoreUnavailableResponse } from '../_utils/authRateLimit.js';
 
 export async function options({ headers }: RequestOption<any, any>) {
   const origin = headers?.origin;
@@ -18,23 +19,34 @@ export async function options({ headers }: RequestOption<any, any>) {
 
 export async function get({ headers }: RequestOption<any, any>) {
   const requestOrigin = headers?.origin;
+  const limitResp = await enforceAuthRateLimit({
+    endpoint: 'auth_csrf',
+    headers,
+    requestOrigin,
+  });
+  if (limitResp) return limitResp;
+
   const corsHeaders = getCorsHeaders(requestOrigin);
+  try {
+    const { csrfToken, setCookie } = await issueCsrfToken(headers);
 
-  const { csrfToken, setCookie } = await issueCsrfToken(headers);
+    const outHeaders: Record<string, string> = {
+      'Content-Type': 'application/json; charset=utf-8',
+      ...corsHeaders,
+    };
+    if (setCookie) outHeaders['Set-Cookie'] = setCookie;
 
-  const outHeaders: Record<string, string> = {
-    'Content-Type': 'application/json; charset=utf-8',
-    ...corsHeaders,
-  };
-  if (setCookie) outHeaders['Set-Cookie'] = setCookie;
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      data: { csrfToken },
-    }),
-    { status: 200, headers: outHeaders }
-  );
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: { csrfToken },
+      }),
+      { status: 200, headers: outHeaders }
+    );
+  } catch (error) {
+    console.error('[auth/csrf] CSRF token 下发失败:', error);
+    return buildAuthStoreUnavailableResponse(requestOrigin);
+  }
 }
 
 

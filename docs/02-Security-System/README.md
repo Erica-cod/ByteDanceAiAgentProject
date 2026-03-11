@@ -107,6 +107,15 @@
 - ✅ OIDC Discovery：`/.well-known/openid-configuration`
 - ✅ Redis 存储与最小交互页
 
+### 7. AUTH_RATE_LIMIT_RESILIENCE_DESIGN.md（新增）⭐⭐
+**认证限流与 Redis 降级设计（NAT 友好版）**
+
+覆盖“认证链路会不会打穿 Redis/IdP、NAT 误伤怎么处理、Redis down 怎么降级”的工程方案，重点包括：
+- ✅ 分层限流（global / IP / device）与命中短路规则
+- ✅ Redis 主限流 + 本地保险限流（local counter）
+- ✅ 无锁熔断状态机（closed/open/half_open）
+- ✅ tradeoff 说明（计数割裂、是否回灌、为什么不加全局锁）
+
 ## 🎯 关键技术点
 
 ### 设备指纹技术
@@ -288,9 +297,16 @@ const encrypted = await crypto.subtle.encrypt(
 1. `SECURITY_NO_LOGIN_SYSTEM.md` - 理解完整的安全方案
 2. `CORS_CONFIGURATION.md` - 学习 CORS 配置
 3. `CORS_UPDATE_SUMMARY.md` - 了解配置演进
+4. `SSO_OAUTH2_BFF_DESIGN.md` - 理解 OIDC + BFF 的登录架构
+5. `IDP_OIDC_PROVIDER_QUICKSTART.md` - 跑通 IdP 与 Redis 交互
+6. `AUTH_RATE_LIMIT_RESILIENCE_DESIGN.md` - 理解认证链路限流与降级设计
 
 **相关代码文件：**
 - `src/utils/deviceCrypto.ts` - 加密工具
 - `src/utils/secureConversationCache.ts` - 安全缓存
 - `src/utils/privacyFirstFingerprint.ts` - 设备指纹
+- `api/lambda/_utils/authRateLimit.ts` - 认证限流与降级状态机
+- `api/lambda/auth/login.ts` - 登录入口限流接入
+- `api/lambda/auth/callback.ts` - 回调限流与异常降级接入
+- `api/lambda/auth/csrf.ts` - CSRF 下发限流接入
 
