@@ -115,6 +115,58 @@
 | `SharedWorker` | 可集中连接管理 | 兼容性/调试成本高 | 暂不采用 |
 | Service Worker 中转 | 能力强、可扩展离线 | 复杂度高，非当前痛点 | 暂不采用 |
 
+## BroadcastChannel 原理确认（源码与规范）
+
+### 核心结论
+
+- `BroadcastChannel` 是浏览器内核提供的同源消息总线，语义是发布-订阅（pub/sub）。
+- 消息在浏览器内部分发，不通过业务服务端中转。
+- 发送者不会收到自己发送的消息；新加入上下文不会回放历史消息。
+
+### 证据摘要
+
+1. WHATWG HTML 规范定义了“broadcasting to other browsing contexts”机制。  
+2. MDN 明确其作用域为“同源 + 同频道名”，并说明发送对象不包含发送者自身。  
+3. Chromium `broadcast_channel.cc` 中可以看到：
+   - 单线程共享 provider 并借助 associated interfaces 保证消息顺序。
+   - `postMessage` 对消息做序列化（`SerializedScriptValue`）。
+   - 收到消息后通过 `EnqueueEvent(..., DOMManipulation)` 异步投递。
+4. Gecko `BroadcastChannelService` 实现中可见注册 actor、`PostMessage` 与按键组织管理。
+
+## HTTP/1.1 连接上限与流式场景影响
+
+### 容易混淆的点
+
+- **不受连接上限影响**：`BroadcastChannel`（浏览器内部通信）  
+- **受连接上限影响**：每个 tab 到服务端的 SSE/fetch 连接（网络连接）
+
+### 风险说明
+
+在 HTTP/1.1 下，同源并发连接数有浏览器实现上的上限（常见约 6）。  
+当多 tab 同时建立 SSE/长连接时，可能出现：
+
+- 新连接排队或阻塞
+- 请求建立慢、超时或失败
+- 页面体感卡顿
+
+> 该上限是“常见实现行为”，不同浏览器/版本可能存在差异。
+
+### 治理策略（优先级）
+
+1. **优先启用 HTTP/2 或 HTTP/3**：利用多路复用减少 H1 连接瓶颈。  
+2. **前端连接治理**：会话级锁 + 事件驱动队列，避免同会话并发打流。  
+3. **后台 tab 降载**：后台仅收通知，不主动新建流连接。  
+4. **服务端限流排队**：保留 `429 + queueToken`，避免重试风暴。  
+5. **可选升级**：leader tab 单连接转发（复杂度更高，按需实施）。
+
+### Nginx / 网关 H2 检查清单
+
+- 确认监听开启 `http2`（TLS 入口通常为 `listen 443 ssl http2;`）。
+- 证书链有效，浏览器侧协商协议为 h2（可在 DevTools Network 中查看 Protocol）。
+- 反向代理链路中不要把 h2 降级回 h1（重点检查 CDN/WAF/Ingress 配置）。
+- SSE 路由确认无错误缓存与缓冲策略（避免流式被代理层“攒包”）。
+- 压测验证多 tab 流式并发下连接建立时间与错误率。
+
 ### 2) 发送并发控制方案
 
 | 方案 | 优点 | 缺点 | 本项目结论 |
