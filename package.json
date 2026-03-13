@@ -111,5 +111,19 @@
     "is-generator-function": "1.0.10",
     "has-symbols": "1.1.0",
     "koa": "2.15.3"
+  },
+  "browserslist": {
+    "production": [
+      "chrome >= 110",
+      "edge >= 110",
+      "firefox >= 110",
+      "safari >= 16.4",
+      "ios_saf >= 16.4"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
