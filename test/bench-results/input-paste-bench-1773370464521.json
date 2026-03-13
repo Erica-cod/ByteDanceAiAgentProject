@@ -1,0 +1,184 @@
+{
+  "meta": {
+    "appUrl": "http://localhost:8080",
+    "repeat": 2,
+    "headless": true,
+    "cpuProfiles": [
+      "cpu_1x"
+    ],
+    "generatedAt": "2026-03-13T02:54:22.802Z"
+  },
+  "profiles": {
+    "cpu_1x": {
+      "cpuRate": 1,
+      "cases": {
+        "100_chars": {
+          "sizeChars": 100,
+          "summary": {
+            "runs": 2,
+            "budgets": {
+              "inputP95BudgetMs": 100,
+              "nextPaintP95BudgetMs": 100,
+              "maxLongTaskP95BudgetMs": 50
+            },
+            "evaluation": {
+              "inputP95Pass": true,
+              "nextPaintP95Pass": true,
+              "maxLongTaskP95Pass": false,
+              "overallPass": false
+            },
+            "inputDispatchMs": {
+              "p50": 48.59999999962747,
+              "p95": 48.59999999962747,
+              "max": 48.59999999962747
+            },
+            "dispatchSyncMs": {
+              "p50": 0.19999999925494194,
+              "p95": 0.19999999925494194,
+              "max": 0.19999999925494194
+            },
+            "nextPaintMs": {
+              "p50": 16.59999999962747,
+              "p95": 16.59999999962747,
+              "max": 16.59999999962747
+            },
+            "settleMs": {
+              "p50": 214.09999999962747,
+              "p95": 214.09999999962747,
+              "max": 214.09999999962747
+            },
+            "longTaskTotalMs": {
+              "p50": 128,
+              "p95": 128,
+              "max": 128
+            },
+            "maxLongTaskMs": {
+              "p50": 70,
+              "p95": 70,
+              "max": 70
+            }
+          },
+          "raw": [
+            {
+              "inputDispatchCostMs": 37.5,
+              "dispatchSyncCostMs": 0.09999999962747097,
+              "nextPaintMs": 3.5,
+              "settleCostMs": 214.09999999962747,
+              "cleanCostMs": 21.40000000037253,
+              "longTaskCount": 2,
+              "longTaskTotalMs": 128,
+              "maxLongTaskMs": 70
+            },
+            {
+              "inputDispatchCostMs": 48.59999999962747,
+              "dispatchSyncCostMs": 0.19999999925494194,
+              "nextPaintMs": 16.59999999962747,
+              "settleCostMs": 213.30000000074506,
+              "cleanCostMs": 17.699999999254942,
+              "longTaskCount": 2,
+              "longTaskTotalMs": 128,
+              "maxLongTaskMs": 70
+            }
+          ]
+        },
+        "5000_chars": {
+          "sizeChars": 5000,
+          "summary": {
+            "runs": 2,
+            "budgets": {
+              "inputP95BudgetMs": 100,
+              "nextPaintP95BudgetMs": 100,
+              "maxLongTaskP95BudgetMs": 50
+            },
+            "evaluation": {
+              "inputP95Pass": true,
+              "nextPaintP95Pass": true,
+              "maxLongTaskP95Pass": false,
+              "overallPass": false
+            },
+            "inputDispatchMs": {
+              "p50": 50.70000000111759,
+              "p95": 50.70000000111759,
+              "max": 50.70000000111759
+            },
+            "dispatchSyncMs": {
+              "p50": 0.19999999925494194,
+              "p95": 0.19999999925494194,
+              "max": 0.19999999925494194
+            },
+            "nextPaintMs": {
+              "p50": 18.199999999254942,
+              "p95": 18.199999999254942,
+              "max": 18.199999999254942
+            },
+            "settleMs": {
+              "p50": 209.59999999962747,
+              "p95": 209.59999999962747,
+              "max": 209.59999999962747
+            },
+            "longTaskTotalMs": {
+              "p50": 128,
+              "p95": 128,
+              "max": 128
+            },
+            "maxLongTaskMs": {
+              "p50": 70,
+              "p95": 70,
+              "max": 70
+            }
+          },
+          "raw": [
+            {
+              "inputDispatchCostMs": 50.70000000111759,
+              "dispatchSyncCostMs": 0.10000000149011612,
+              "nextPaintMs": 17.40000000037253,
+              "settleCostMs": 209.59999999962747,
+              "cleanCostMs": 0.8999999985098839,
+              "longTaskCount": 2,
+              "longTaskTotalMs": 128,
+              "maxLongTaskMs": 70
+            },
+            {
+              "inputDispatchCostMs": 49.29999999888241,
+              "dispatchSyncCostMs": 0.19999999925494194,
+              "nextPaintMs": 18.199999999254942,
+              "settleCostMs": 205.2000000011176,
+              "cleanCostMs": 17.40000000037253,
+              "longTaskCount": 2,
+              "longTaskTotalMs": 128,
+              "maxLongTaskMs": 70
+            }
+          ]
+        }
+      },
+      "comparison": {
+        "baselineLabel": "100_chars",
+        "baselineSizeChars": 100,
+        "cases": {
+          "100_chars": {
+            "sizeChars": 100,
+            "deltaVsBaseline": {
+              "inputP95Ms": 0,
+              "inputP95Pct": 0,
+              "nextPaintP95Ms": 0,
+              "nextPaintP95Pct": 0,
+              "maxLongTaskP95Ms": 0,
+              "maxLongTaskP95Pct": 0
+            }
+          },
+          "5000_chars": {
+            "sizeChars": 5000,
+            "deltaVsBaseline": {
+              "inputP95Ms": 2.1,
+              "inputP95Pct": 4.32,
+              "nextPaintP95Ms": 1.6,
+              "nextPaintP95Pct": 9.64,
+              "maxLongTaskP95Ms": 0,
+              "maxLongTaskP95Pct": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
