@@ -1,8 +1,5 @@
 /**
  * VirtualList 通用虚拟列表组件（已迁移到 react-virtuoso）
- *
- * 旧版本基于 react-virtualized（已停止维护），为了避免依赖风险与维护成本，
- * 这里改为 Virtuoso 实现，保留原有 props/handle 形态，尽量兼容旧代码。
  */
 import React, { useImperativeHandle, useRef, useCallback } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
@@ -13,19 +10,19 @@ interface VirtualListProps<T> {
   items: T[];
   /** 渲染单个项目的函数 */
   renderItem: (item: T, index: number) => React.ReactNode;
-  /** 估算的单项高度（Virtuoso 内部会自动测量，这里保留参数以兼容旧调用） */
+  /** 估算的单项高度（保留参数兼容旧调用） */
   estimatedItemHeight?: number;
-  /** 最小项目高度（保留参数以兼容旧调用） */
+  /** 最小项目高度（保留参数兼容旧调用） */
   minItemHeight?: number;
-  /** 预渲染的额外行数（旧版是行数，这里近似为像素 overscan） */
+  /** 预渲染的额外行数 */
   overscanRowCount?: number;
   /** 空状态渲染器 */
   noItemsRenderer?: () => React.ReactNode;
-  /** 额外的容器样式 */
+  /** 额外容器样式 */
   className?: string;
   /** 滚动事件回调 */
   onScroll?: (params: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
-  /** 项目唯一键提取函数，默认使用 index */
+  /** 项目唯一键提取函数，默认 index */
   getItemKey?: (item: T, index: number) => string | number;
 }
 
@@ -60,7 +57,7 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
       }
     },
     recomputeRowHeights: () => {
-      // Virtuoso 自动测量动态高度，无需手动 recompute；保留接口兼容旧调用
+      // Virtuoso 自动测量动态高度，保留接口兼容旧调用
     },
     clearCache: () => {
       // Virtuoso 无显式高度缓存，保留接口兼容旧调用
@@ -68,11 +65,8 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
   }));
 
   const itemContent = useCallback(
-    (index: number, item: T) => {
-      // 让 renderItem 能拿到 index（与旧版一致）
-      return renderItem(item, index);
-    },
-    [renderItem]
+    (index: number, item: T) => renderItem(item, index),
+    [renderItem],
   );
 
   const Empty = useCallback(() => {
@@ -109,10 +103,9 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
                     className={['virtual-list-scroller', cn].filter(Boolean).join(' ')}
                   />
                 );
-              }
+              },
             ),
           }}
-          // 近似复刻旧版 onScroll 参数
           onScroll={() => {
             if (!onScroll || !scrollerRef.current) return;
             const el = scrollerRef.current;
@@ -128,11 +121,9 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
   );
 }
 
-// ✅ 使用泛型 forwardRef
 export const VirtualList = React.forwardRef(VirtualListInner) as <T>(
-  props: VirtualListProps<T> & { ref?: React.Ref<VirtualListHandle> }
+  props: VirtualListProps<T> & { ref?: React.Ref<VirtualListHandle> },
 ) => React.ReactElement;
 
 export default VirtualList;
-
 

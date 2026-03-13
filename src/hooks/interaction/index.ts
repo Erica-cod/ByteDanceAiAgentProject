@@ -6,3 +6,4 @@
 
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useThrottle } from './useThrottle';
+export { useLongTextDetection } from './useLongTextDetection';

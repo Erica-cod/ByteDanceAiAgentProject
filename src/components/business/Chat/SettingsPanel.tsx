@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useThemeStore } from '../../stores/themeStore';
-import { useUIStore } from '../../stores';
+import { useThemeStore } from '../../../stores/themeStore';
+import { useUIStore } from '../../../stores';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -13,15 +13,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useThemeStore();
   const { modelType, setModelType, chatMode, setChatMode } = useUIStore();
-  
-  // 更改语言
+
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
     localStorage.setItem('language', lng);
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <>
       <div className="settings-overlay" onClick={onClose} />
@@ -32,9 +31,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             ✕
           </button>
         </div>
-        
+
         <div className="settings-content">
-          {/* 语言设置 */}
           <div className="settings-section">
             <h3>{t('settings.language')}</h3>
             <div className="settings-options">
@@ -54,8 +52,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
           </div>
-          
-          {/* 主题设置 */}
+
           <div className="settings-section">
             <h3>{t('settings.theme')}</h3>
             <div className="settings-options">
@@ -82,8 +79,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
           </div>
-          
-          {/* 模型选择 */}
+
           <div className="settings-section">
             <h3>{t('settings.model')}</h3>
             <div className="settings-options">
@@ -103,8 +99,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
           </div>
-          
-          {/* 对话模式 */}
+
           <div className="settings-section">
             <h3>{t('settings.chatMode')}</h3>
             <div className="settings-options">

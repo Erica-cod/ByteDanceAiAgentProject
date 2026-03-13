@@ -2,7 +2,7 @@
  * useSSEStream 相关类型定义
  */
 
-import type { RoundData } from '../../../components/old-structure/MultiAgentDisplay';
+import type { RoundData } from '../../../components/business/Message/MultiAgentDisplay';
 
 export interface UseSSEStreamOptions {
   onConversationCreated?: (convId: string) => void;

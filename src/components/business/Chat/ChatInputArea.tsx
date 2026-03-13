@@ -12,7 +12,7 @@
 import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAutoResizeTextarea } from '../../../hooks';
-import TextStatsIndicator from '../../old-structure/TextStatsIndicator';
+import TextStatsIndicator from './TextStatsIndicator';
 import './ChatInputArea.css';
 
 export interface ChatInputAreaProps {

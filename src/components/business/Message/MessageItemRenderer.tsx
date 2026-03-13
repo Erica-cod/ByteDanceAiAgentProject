@@ -8,12 +8,15 @@
  * - 处理不同消息类型的路由
  */
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
-import StreamingMarkdown from './StreamingMarkdown';
-import MultiAgentDisplay from '../../old-structure/MultiAgentDisplay';
-import { ProgressiveMessageRefactored } from './ProgressiveMessageRefactored';
 import type { Message } from '../../../stores/chatStore';
+
+const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgentDisplay'));
+const StreamingMarkdownLazy = React.lazy(() => import('./StreamingMarkdown'));
+const ProgressiveMessageRefactoredLazy = React.lazy(() =>
+  import('./ProgressiveMessageRefactored').then(module => ({ default: module.ProgressiveMessageRefactored }))
+);
 
 export interface MessageItemRendererProps {
   /** 消息数据 */
@@ -54,13 +57,15 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
     if (message.multiAgentData) {
       return (
         <MessageItem role="assistant">
-          <MultiAgentDisplay
-            rounds={message.multiAgentData.rounds}
-            status={message.multiAgentData.status}
-            consensusTrend={message.multiAgentData.consensusTrend}
-            streamingAgentContent={message.streamingAgentContent}
-            onHeightChange={onHeightChange}
-          />
+          <Suspense fallback={<div>加载多 Agent 视图中...</div>}>
+            <MultiAgentDisplayLazy
+              rounds={message.multiAgentData.rounds}
+              status={message.multiAgentData.status}
+              consensusTrend={message.multiAgentData.consensusTrend}
+              streamingAgentContent={message.streamingAgentContent}
+              onHeightChange={onHeightChange}
+            />
+          </Suspense>
         </MessageItem>
       );
     }
@@ -80,15 +85,19 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
 
     // 内容渲染：渐进式加载 vs 普通渲染
     const contentNode = message.contentLength && message.contentLength > 1000 ? (
-      <ProgressiveMessageRefactored
-        messageId={message.id}
-        userId={userId}
-        initialContent={message.content}
-        totalLength={message.contentLength}
-        chunkSize={1000}
-      />
+      <Suspense fallback={<div>加载大消息渲染器中...</div>}>
+        <ProgressiveMessageRefactoredLazy
+          messageId={message.id}
+          userId={userId}
+          initialContent={message.content}
+          totalLength={message.contentLength}
+          chunkSize={1000}
+        />
+      </Suspense>
     ) : message.content ? (
-      <StreamingMarkdown content={message.content} />
+      <Suspense fallback={<div>渲染消息中...</div>}>
+        <StreamingMarkdownLazy content={message.content} />
+      </Suspense>
     ) : (
       <div>正在思考...</div>
     );

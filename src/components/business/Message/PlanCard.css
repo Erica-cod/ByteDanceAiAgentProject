@@ -540,7 +540,7 @@
 .plan-list-items {
   display: flex;
   flex-direction: column;
-  gap: 0; /* 使用 PlanCard compact 模式，它自己有 margin-bottom */
+  gap: 0;
 }
 
 /* 空列表提示 */
@@ -586,7 +586,6 @@
     font-size: 18px;
   }
 
-  /* 精简模式在移动端的适配 */
   .plan-card-compact {
     padding: 16px;
     flex-direction: column;
@@ -608,3 +607,4 @@
     gap: 8px;
   }
 }
+

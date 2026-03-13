@@ -14,6 +14,24 @@
   min-width: 0; /* 防止flex子元素溢出 */
 }
 
+/* 关键兜底：在 ConversationList.css 异步加载前，先固定侧栏宽度，避免 chat-layout 横向位移导致 CLS 飙升 */
+.chat-interface-refactored > .conversation-sidebar {
+  width: 300px;
+  min-width: 300px;
+  flex-shrink: 0;
+}
+
+.chat-interface-refactored > .conversation-sidebar.collapsed {
+  width: 60px;
+  min-width: 60px;
+}
+
+/* Lazy 侧栏加载中的占位容器，确保 chat-layout 在首屏阶段不发生横向重排。 */
+.chat-interface-refactored > .conversation-sidebar--placeholder {
+  border-right: 2px solid rgba(240, 240, 240, 0.8);
+  background: rgba(255, 255, 255, 0.85);
+}
+
 /* 暗色模式 */
 @media (prefers-color-scheme: dark) {
   .chat-interface-refactored {

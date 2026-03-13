@@ -9,11 +9,9 @@
  * - 职责更清晰，代码更简洁
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import ConversationList from '../../old-structure/ConversationList';
 import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
-import SettingsPanel from '../../old-structure/SettingsPanel';
 import { ChatLayout } from '../../base/Layout';
 import { ChatHeader } from '../../base/Layout';
 import { HeaderControls } from './HeaderControls';
@@ -25,7 +23,18 @@ import { useConversationManager, useMessageQueue, useMessageSender, useThrottle 
 import { useAuthStore } from '../../../stores/authStore';
 import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
+import { runWhenIdle, cancelIdleTask } from '../../../utils/perf/scheduling';
 import './ChatInterfaceRefactored.css';
+
+const ConversationListLazy = React.lazy(() => import('./ConversationList'));
+const SettingsPanelLazy = React.lazy(() => import('./SettingsPanel'));
+
+const ConversationSidebarPlaceholder: React.FC = () => (
+  <div
+    className="conversation-sidebar conversation-sidebar--placeholder expanded"
+    aria-hidden="true"
+  />
+);
 
 const ChatInterfaceRefactored: React.FC = () => {
   const { t } = useTranslation();
@@ -89,12 +98,18 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // ===== 初始化 =====
   useEffect(() => {
-    (async () => {
-      const id = await getPrivacyFirstDeviceId();
-      setDeviceId(id);
-      showPrivacyNotice();
-      console.log('🔐 设备 ID（Hash）已生成:', id);
-    })();
+    const idleId = runWhenIdle(() => {
+      (async () => {
+        const id = await getPrivacyFirstDeviceId();
+        setDeviceId(id);
+        showPrivacyNotice();
+        console.log('🔐 设备 ID（Hash）已生成:', id);
+      })();
+    }, { timeout: 1200 });
+
+    return () => {
+      cancelIdleTask(idleId);
+    };
   }, [setDeviceId]);
 
   useEffect(() => {
@@ -103,7 +118,13 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // 初始化读取登录态（演示版）
   useEffect(() => {
-    refreshMe().catch(() => {});
+    const idleId = runWhenIdle(() => {
+      refreshMe().catch(() => {});
+    }, { timeout: 1500 });
+
+    return () => {
+      cancelIdleTask(idleId);
+    };
   }, [refreshMe]);
 
   // 登录用户切换时，同步业务 userId，确保会按账号隔离加载数据
@@ -315,16 +336,18 @@ const ChatInterfaceRefactored: React.FC = () => {
   return (
     <div className="chat-interface-refactored">
       {/* 对话列表 */}
-      <ConversationList
-        conversations={conversationManager.conversations}
-        currentConversationId={conversationId}
-        unreadConversationIds={unreadConversationIds}
-        onSelectConversation={conversationManager.handleSelectConversation}
-        onNewConversation={conversationManager.handleNewConversation}
-        onDeleteConversation={conversationManager.handleDeleteConversation}
-        isLoading={conversationManager.isLoadingConversations}
-        messageCountRefs={messageCountRefs}
-      />
+      <Suspense fallback={<ConversationSidebarPlaceholder />}>
+        <ConversationListLazy
+          conversations={conversationManager.conversations}
+          currentConversationId={conversationId}
+          unreadConversationIds={unreadConversationIds}
+          onSelectConversation={conversationManager.handleSelectConversation}
+          onNewConversation={conversationManager.handleNewConversation}
+          onDeleteConversation={conversationManager.handleDeleteConversation}
+          isLoading={conversationManager.isLoadingConversations}
+          messageCountRefs={messageCountRefs}
+        />
+      </Suspense>
 
       {/* 聊天区域 - 使用重构后的布局 */}
       <ChatLayout
@@ -334,10 +357,14 @@ const ChatInterfaceRefactored: React.FC = () => {
       />
 
       {/* 设置面板 */}
-      <SettingsPanel 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-      />
+      {isSettingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsPanelLazy
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };
