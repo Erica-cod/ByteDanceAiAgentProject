@@ -68,6 +68,66 @@
 - `username + ip`（device 缺失时）
 - IdP `/token` 侧的账号维度阈值
 
+### 4.4 当前每条规则的设计意图（why / protect / fail）
+
+下面按当前代码中的规则逐条说明。
+
+#### A) `auth_login_ip`
+
+- **为什么存在**：对匿名入口做第一层“粗洪峰保护”，避免单个出口 IP 瞬时打爆认证链路。
+- **保护对象**：BFF 进程、Redis、后续 IdP `/auth`。
+- **何时会失效/效果变差**：
+  - 攻击者分布式多 IP 发流量（单 IP 阈值被绕过）。
+  - NAT 场景必须把阈值放宽，导致攻击阻断能力下降。
+
+#### B) `auth_login_global`
+
+- **为什么存在**：不依赖身份键，给 `/api/auth/login` 增加总闸门，防全局容量被打满。
+- **保护对象**：系统总体容量（CPU、连接池、Redis QPS）。
+- **何时会失效/效果变差**：
+  - 只能限制“总量”，不能识别恶意来源。
+  - 阈值过低会在业务高峰误伤正常流量。
+
+#### C) `auth_login_device`
+
+- **为什么存在**：在 NAT 下替代“单纯 IP 限流”，降低“同网关多人被连坐”。
+- **保护对象**：真实终端级别公平性、登录入口可用性。
+- **何时会失效/效果变差**：
+  - 请求不带 `deviceIdHash`（规则不会生效）。
+  - 攻击者频繁伪造/轮换设备标识，规则价值下降。
+
+#### D) `auth_callback_ip`
+
+- **为什么存在**：callback 是高价值入口（换 token/建 session 前），先做入口流量削峰。
+- **保护对象**：`loadLoginState`、`acquireLoginStateLock`、`token exchange` 这条关键路径。
+- **何时会失效/效果变差**：
+  - 分布式多 IP 回调轰炸可绕过单 IP。
+  - 仅靠该规则不能替代 state 单次消费与 csrfSid 绑定校验。
+
+#### E) `auth_callback_global`
+
+- **为什么存在**：防 callback 端点总量过高时拖垮 Redis 与 IdP token 交换。
+- **保护对象**：Redis 会话中间态读写、IdP `/token`。
+- **何时会失效/效果变差**：
+  - 与 `auth_login_global` 一样，无法区分“恶意/正常来源”。
+  - 如果与上游流量峰值不匹配，会造成整体 429 抖动。
+
+#### F) `auth_csrf_ip`
+
+- **为什么存在**：`/api/auth/csrf` 常被前端频繁调用，防止被滥用导致 Redis 热点写入。
+- **保护对象**：`bff:csrf:*` 键空间、Redis 写负载。
+- **何时会失效/效果变差**：
+  - 多 IP 分散请求可规避该规则。
+  - 若前端误实现导致重复请求，可能触发误限流（需要客户端缓存 token）。
+
+#### G) `auth_csrf_global`
+
+- **为什么存在**：给 CSRF 下发链路增加总量保护，避免系统被“低成本请求”拖垮。
+- **保护对象**：BFF + Redis 的整体可用性。
+- **何时会失效/效果变差**：
+  - 对来源没有识别能力，只能“全局限闸”。
+  - 高峰期阈值配置不当时会牺牲可用性。
+
 ---
 
 ## 5. 分层协调规则（谁先判、命中后怎么办）
@@ -79,6 +139,76 @@
 3. **任一层命中即返回 429，短路结束。**
 
 也就是：命中内层后，不需要再回头看外层。
+
+---
+
+## 5.1 规则执行时序图（短路 + 降级）
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Client as Client
+  participant BFF as Auth API
+  participant RL as AuthRateLimit
+  participant Redis as Redis Counter
+  participant Local as Local Counter
+  participant Biz as Login/Callback/CSRF Logic
+
+  Client->>BFF: 请求 /api/auth/login|callback|csrf
+  BFF->>RL: enforceAuthRateLimit(endpoint, keys)
+
+  alt 熔断 open（当前不探针）
+    RL->>Local: consume(rule1..ruleN)
+    alt 命中任一规则
+      Local-->>RL: blocked + retryAfter
+      RL-->>BFF: 429 (short-circuit)
+      BFF-->>Client: 429 + Retry-After + reason/mode
+    else 全部通过
+      Local-->>RL: allow
+      RL-->>BFF: pass
+      BFF->>Biz: 执行业务逻辑
+      Biz-->>Client: 2xx/3xx
+    end
+
+  else 熔断 closed/half-open 探针
+    RL->>Redis: consume(rule1..ruleN)
+    alt Redis 正常
+      alt 命中任一规则
+        Redis-->>RL: blocked + retryAfter
+        RL-->>BFF: 429 (short-circuit)
+        BFF-->>Client: 429 + Retry-After + reason/mode
+      else 全部通过
+        Redis-->>RL: allow
+        RL-->>BFF: pass
+        BFF->>Biz: 执行业务逻辑
+        Biz-->>Client: 2xx/3xx
+      end
+    else Redis 异常
+      Redis-->>RL: error
+      RL->>Local: fallback consume(rule1..ruleN)
+      alt 本地命中
+        Local-->>RL: blocked
+        RL-->>BFF: 429
+        BFF-->>Client: 429 + mode=local
+      else 本地通过
+        Local-->>RL: allow
+        RL-->>BFF: pass
+        BFF->>Biz: 执行业务逻辑
+        alt 业务依赖 Redis 失败
+          Biz-->>Client: 503 (auth_store_unavailable)
+        else 业务成功
+          Biz-->>Client: 2xx/3xx
+        end
+      end
+    end
+  end
+```
+
+说明：
+
+- 规则执行是“有序 + 短路”的：任一规则命中直接返回，不会继续后续规则。
+- 限流层降级（Redis -> Local）与业务层失败（返回 503）是两件事，分别处理。
+- `mode=local` 表示计数来自本地保险限流，不代表业务一定会成功。
 
 ---
 
@@ -105,6 +235,78 @@
 
 - `api/lambda/_utils/authRateLimit.ts`
 - `api/lambda/_utils/cors.ts`
+
+---
+
+## 6.1 Callback 安全专项时序图（state + 绑定校验 + 单次消费）
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Browser as Browser
+  participant BFF as /api/auth/callback
+  participant RL as AuthRateLimit
+  participant Redis as Redis
+  participant IdP as IdP /token
+
+  Browser->>BFF: GET /api/auth/callback?code=...&state=...
+
+  BFF->>RL: enforceAuthRateLimit(auth_callback)
+  alt callback 限流命中
+    RL-->>BFF: blocked(429)
+    BFF-->>Browser: 429 + Retry-After
+  else callback 限流通过
+    RL-->>BFF: pass
+
+    BFF->>Redis: load bff:oidc:login:{state}
+    alt state 缺失/过期
+      Redis-->>BFF: null
+      BFF-->>Browser: 400 (state invalid/expired)
+    else 找到 login state
+      Redis-->>BFF: record(state, nonce, code_verifier, csrfSid,...)
+
+      BFF->>BFF: 读取请求 cookie 中 csrfSid
+      alt csrfSid 不匹配
+        BFF-->>Browser: 403 (context mismatch)
+      else csrfSid 匹配
+        BFF->>Redis: SET NX EX bff:oidc:login_lock:{state}
+        alt 未抢到锁
+          Redis-->>BFF: lock failed
+          BFF-->>Browser: 409 (state already processing/used)
+        else 抢锁成功
+          Redis-->>BFF: lock ok
+          BFF->>Redis: DEL bff:oidc:login:{state}
+
+          BFF->>IdP: POST /token(code + code_verifier)
+          alt token 交换失败
+            IdP-->>BFF: error
+            BFF-->>Browser: 400/500
+          else token 交换成功
+            IdP-->>BFF: id_token/access_token/refresh_token
+            BFF->>BFF: 校验 nonce + jwt 签名声明
+            alt 校验失败
+              BFF-->>Browser: 400
+            else 校验通过
+              BFF->>Redis: SET bff:session:{sid}
+              alt 会话写入失败
+                BFF-->>Browser: 503 (auth_store_unavailable)
+              else 会话写入成功
+                BFF-->>Browser: 302 + Set-Cookie(bff_sid)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+```
+
+设计要点：
+
+- **先限流再读状态**：先削峰，避免 callback 直接压垮 Redis。
+- **先校验 `csrfSid` 再抢锁**：避免攻击者拿泄露链接提前抢锁造成 DoS。
+- **抢锁成功后立刻删 `login state`**：确保同一 `state` 单次消费，缩短重放窗口。
+- **会话写入失败返回 503**：认证关键状态不可降级为 fail-open。
 
 ---
 
