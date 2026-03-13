@@ -56,6 +56,9 @@
     "load:k6:chat:smoke": "k6 run test/k6/chat_sse_smoke.js",
     "bench:k6:chat:large-markdown": "k6 run test/k6/chat_sse_large_markdown.js",
     "bench:input:paste": "node scripts/bench-input-paste-playwright.js",
+    "bench:lighthouse:prod": "cross-env LH_MODE=static ALLOW_STATIC_FALLBACK=false node scripts/run-lighthouse-prod-fixed.js",
+    "bench:lighthouse:prod:serve": "cross-env LH_MODE=serve ALLOW_STATIC_FALLBACK=true node scripts/run-lighthouse-prod-fixed.js",
+    "analyze:bundle:top20": "node scripts/analyze-bundle-top20.js",
     "test:all": "npm run test:volcengine && node test-planning-tools.js"
   },
   "dependencies": {

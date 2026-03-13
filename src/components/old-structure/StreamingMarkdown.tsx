@@ -1,7 +1,5 @@
 import React, { useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import { BaseMarkdownRenderer } from '../base';
 import PlanCard, { extractPlanData } from './PlanCard';
 import PlanListCard, { extractPlanListData } from './PlanListCard';
 import './StreamingMarkdown.css';
@@ -184,9 +182,10 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, classNam
       {planData && <PlanCard planData={planData} />}
       
       {/* 渲染处理后的 Markdown 内容（已移除 JSON 部分） */}
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+      <BaseMarkdownRenderer
+        content={displayContent}
+        className="streaming-markdown-core"
+        enableHighlight
         components={{
           // 自定义代码块渲染
           code(props: any) {
@@ -232,20 +231,18 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({ content, classNam
           p(props: any) {
             const { node, children, ...rest } = props;
             // 检查父元素是否是列表项
-            const isInListItem = node?.position && 
+            const isInListItem = node?.position &&
               node.parent?.type === 'listItem';
-            
+
             if (isInListItem) {
               // 列表项中的段落使用 span 替代，避免换行
               return <span className="list-item-text">{children}</span>;
             }
-            
+
             return <p {...rest}>{children}</p>;
           },
         }}
-      >
-        {displayContent}
-      </ReactMarkdown>
+      />
     </div>
   );
 };

@@ -1,0 +1,256 @@
+{
+  "generatedAt": "2026-03-13T04:12:21.895Z",
+  "meta": {
+    "analyzedMapCount": 30,
+    "initialModuleCount": 53,
+    "asyncModuleCount": 160,
+    "initialSourceFileCount": 532,
+    "asyncSourceFileCount": 319,
+    "initialTotalBytes": 1167985,
+    "asyncTotalBytes": 1610856
+  },
+  "initialTop20": [
+    {
+      "rank": 1,
+      "source": "node_modules/core-js",
+      "bytes": 432410,
+      "size": "422.3 KB"
+    },
+    {
+      "rank": 2,
+      "source": "other/../../../../router.ts",
+      "bytes": 182776,
+      "size": "178.5 KB"
+    },
+    {
+      "rank": 3,
+      "source": "node_modules/react-dom",
+      "bytes": 133667,
+      "size": "130.5 KB"
+    },
+    {
+      "rank": 4,
+      "source": "node_modules/i18next",
+      "bytes": 80278,
+      "size": "78.4 KB"
+    },
+    {
+      "rank": 5,
+      "source": "other/../../../../index.tsx",
+      "bytes": 60207,
+      "size": "58.8 KB"
+    },
+    {
+      "rank": 6,
+      "source": "other/../../../../utils.ts",
+      "bytes": 48589,
+      "size": "47.5 KB"
+    },
+    {
+      "rank": 7,
+      "source": "other/../../../../lib/hooks.tsx",
+      "bytes": 36503,
+      "size": "35.6 KB"
+    },
+    {
+      "rank": 8,
+      "source": "node_modules/react-i18next",
+      "bytes": 22416,
+      "size": "21.9 KB"
+    },
+    {
+      "rank": 9,
+      "source": "other/../../../../history.ts",
+      "bytes": 21635,
+      "size": "21.1 KB"
+    },
+    {
+      "rank": 10,
+      "source": "other/../../../../lib/components.tsx",
+      "bytes": 21192,
+      "size": "20.7 KB"
+    },
+    {
+      "rank": 11,
+      "source": "other/webpack/runtime/jsonp chunk loading",
+      "bytes": 18010,
+      "size": "17.6 KB"
+    },
+    {
+      "rank": 12,
+      "source": "node_modules/zustand",
+      "bytes": 17533,
+      "size": "17.1 KB"
+    },
+    {
+      "rank": 13,
+      "source": "other/../../../src/utils/storage/localStorageLRU.ts",
+      "bytes": 10658,
+      "size": "10.4 KB"
+    },
+    {
+      "rank": 14,
+      "source": "other/../../../../dom.ts",
+      "bytes": 9968,
+      "size": "9.7 KB"
+    },
+    {
+      "rank": 15,
+      "source": "other/webpack/runtime/hot module replacement",
+      "bytes": 9562,
+      "size": "9.3 KB"
+    },
+    {
+      "rank": 16,
+      "source": "node_modules/react",
+      "bytes": 8193,
+      "size": "8.0 KB"
+    },
+    {
+      "rank": 17,
+      "source": "node_modules/@rsbuild/core",
+      "bytes": 6229,
+      "size": "6.1 KB"
+    },
+    {
+      "rank": 18,
+      "source": "other/../../../src/utils/events/eventManager.ts",
+      "bytes": 5433,
+      "size": "5.3 KB"
+    },
+    {
+      "rank": 19,
+      "source": "other/../../../../lib/context.ts",
+      "bytes": 5229,
+      "size": "5.1 KB"
+    },
+    {
+      "rank": 20,
+      "source": "node_modules/scheduler",
+      "bytes": 4433,
+      "size": "4.3 KB"
+    }
+  ],
+  "asyncTop20": [
+    {
+      "rank": 1,
+      "source": "node_modules/highlight.js",
+      "bytes": 385650,
+      "size": "376.6 KB"
+    },
+    {
+      "rank": 2,
+      "source": "node_modules/micromark-core-commonmark",
+      "bytes": 113622,
+      "size": "111.0 KB"
+    },
+    {
+      "rank": 3,
+      "source": "node_modules/react-virtuoso",
+      "bytes": 94505,
+      "size": "92.3 KB"
+    },
+    {
+      "rank": 4,
+      "source": "node_modules/mdast-util-to-hast",
+      "bytes": 52631,
+      "size": "51.4 KB"
+    },
+    {
+      "rank": 5,
+      "source": "node_modules/immer",
+      "bytes": 49527,
+      "size": "48.4 KB"
+    },
+    {
+      "rank": 6,
+      "source": "node_modules/unified",
+      "bytes": 41686,
+      "size": "40.7 KB"
+    },
+    {
+      "rank": 7,
+      "source": "node_modules/micromark",
+      "bytes": 41605,
+      "size": "40.6 KB"
+    },
+    {
+      "rank": 8,
+      "source": "node_modules/mdast-util-to-markdown",
+      "bytes": 39590,
+      "size": "38.7 KB"
+    },
+    {
+      "rank": 9,
+      "source": "node_modules/property-information",
+      "bytes": 35533,
+      "size": "34.7 KB"
+    },
+    {
+      "rank": 10,
+      "source": "node_modules/vfile",
+      "bytes": 31547,
+      "size": "30.8 KB"
+    },
+    {
+      "rank": 11,
+      "source": "node_modules/mdast-util-from-markdown",
+      "bytes": 29010,
+      "size": "28.3 KB"
+    },
+    {
+      "rank": 12,
+      "source": "node_modules/micromark-extension-gfm-table",
+      "bytes": 27525,
+      "size": "26.9 KB"
+    },
+    {
+      "rank": 13,
+      "source": "other/../../../../src/hooks/data/useSSEStream/index.ts",
+      "bytes": 26363,
+      "size": "25.7 KB"
+    },
+    {
+      "rank": 14,
+      "source": "node_modules/micromark-extension-gfm-autolink-literal",
+      "bytes": 20276,
+      "size": "19.8 KB"
+    },
+    {
+      "rank": 15,
+      "source": "node_modules/hast-util-to-jsx-runtime",
+      "bytes": 19757,
+      "size": "19.3 KB"
+    },
+    {
+      "rank": 16,
+      "source": "node_modules/hast-util-to-text",
+      "bytes": 19593,
+      "size": "19.1 KB"
+    },
+    {
+      "rank": 17,
+      "source": "other/../../../../src/components/old-structure/MultiAgentDisplay.tsx",
+      "bytes": 17244,
+      "size": "16.8 KB"
+    },
+    {
+      "rank": 18,
+      "source": "node_modules/lowlight",
+      "bytes": 14953,
+      "size": "14.6 KB"
+    },
+    {
+      "rank": 19,
+      "source": "other/webpack/runtime/importScripts chunk loading",
+      "bytes": 14921,
+      "size": "14.6 KB"
+    },
+    {
+      "rank": 20,
+      "source": "node_modules/micromark-util-subtokenize",
+      "bytes": 14468,
+      "size": "14.1 KB"
+    }
+  ]
+}

@@ -15,13 +15,11 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
 import { fixIncompleteMarkdown, safeFixMarkdown } from '../../../utils/markdown/markdownFixer';
 import { renderMarkdownFallback } from '../../../utils/markdown/fallbackMarkdownRenderer';
 import PlanCard, { extractPlanData } from '../../old-structure/PlanCard';
 import PlanListCard, { extractPlanListData } from '../../old-structure/PlanListCard';
+import { BaseMarkdownRenderer } from '../../base';
 import './StreamingMarkdown.css';
 
 interface StreamingMarkdownProps {
@@ -272,82 +270,73 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({
       });
     }
 
-    // 正常使用 react-markdown
-    try {
-      return (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-          components={{
-            // 自定义代码块渲染
-            code(props: any) {
-              const { node, inline, className, children, ...rest } = props;
-              return inline ? (
-                <code className="inline-code" {...rest}>
-                  {children}
-                </code>
-              ) : (
-                <code className={className} {...rest}>
-                  {children}
-                </code>
-              );
-            },
-            // 自定义链接渲染（在新标签页打开）
-            a(props: any) {
-              const { node, children, href, ...rest } = props;
-              return (
-                <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
-                  {children}
-                </a>
-              );
-            },
-            // 自定义表格样式
-            table(props: any) {
-              const { node, children, ...rest } = props;
-              return (
-                <div className="table-wrapper">
-                  <table {...rest}>{children}</table>
-                </div>
-              );
-            },
-            // 自定义列表项渲染 - 解决流式渲染时的对齐问题
-            li(props: any) {
-              const { node, children, ...rest } = props;
-              return (
-                <li {...rest}>
-                  {children}
-                </li>
-              );
-            },
-            // 自定义段落渲染 - 在列表项中的段落特殊处理
-            p(props: any) {
-              const { node, children, ...rest } = props;
-              // 检查父元素是否是列表项
-              const isInListItem = node?.position && 
-                node.parent?.type === 'listItem';
-              
-              if (isInListItem) {
-                // 列表项中的段落使用 span 替代，避免换行
-                return <span className="list-item-text">{children}</span>;
-              }
-              
-              return <p {...rest}>{children}</p>;
-            },
-          }}
-        >
-          {fixedContent}
-        </ReactMarkdown>
-      );
-    } catch (error) {
-      // 捕获 react-markdown 的渲染错误
-      console.error('[StreamingMarkdown] react-markdown 渲染失败:', error);
-      setRenderError(error as Error);
-      // 立即使用备用渲染器
-      return renderMarkdownFallback(fixedContent, { 
-        className: 'fallback-mode error-fallback',
-        gfm: true,
-      });
-    }
+    return (
+      <BaseMarkdownRenderer
+        content={fixedContent}
+        className="streaming-markdown-core"
+        enableHighlight
+        onLoadError={(error) => {
+          console.error('[StreamingMarkdown] Markdown 模块加载失败:', error);
+          setRenderError(error);
+        }}
+        components={{
+          // 自定义代码块渲染
+          code(props: any) {
+            const { node, inline, className, children, ...rest } = props;
+            return inline ? (
+              <code className="inline-code" {...rest}>
+                {children}
+              </code>
+            ) : (
+              <code className={className} {...rest}>
+                {children}
+              </code>
+            );
+          },
+          // 自定义链接渲染（在新标签页打开）
+          a(props: any) {
+            const { node, children, href, ...rest } = props;
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+                {children}
+              </a>
+            );
+          },
+          // 自定义表格样式
+          table(props: any) {
+            const { node, children, ...rest } = props;
+            return (
+              <div className="table-wrapper">
+                <table {...rest}>{children}</table>
+              </div>
+            );
+          },
+          // 自定义列表项渲染 - 解决流式渲染时的对齐问题
+          li(props: any) {
+            const { node, children, ...rest } = props;
+            return (
+              <li {...rest}>
+                {children}
+              </li>
+            );
+          },
+          // 自定义段落渲染 - 在列表项中的段落特殊处理
+          p(props: any) {
+            const { node, children, ...rest } = props;
+            // 检查父元素是否是列表项
+            const isInListItem = node?.position &&
+              node.parent?.type === 'listItem';
+
+            if (isInListItem) {
+              // 列表项中的段落使用 span 替代，避免换行
+              return <span className="list-item-text">{children}</span>;
+            }
+
+            return <p {...rest}>{children}</p>;
+          },
+        }}
+      />
+    );
   };
 
   return (

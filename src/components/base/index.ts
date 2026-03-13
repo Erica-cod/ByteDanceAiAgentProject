@@ -16,3 +16,6 @@ export * from './Message';
 // 渐进式加载组件
 export * from './ProgressiveLoad';
 
+// Markdown 基础渲染组件
+export * from './Markdown';
+

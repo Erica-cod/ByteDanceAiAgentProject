@@ -9,11 +9,10 @@
  * - 职责更清晰，代码更简洁
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import ConversationList from '../../old-structure/ConversationList';
 import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
-import SettingsPanel from '../../old-structure/SettingsPanel';
 import { ChatLayout } from '../../base/Layout';
 import { ChatHeader } from '../../base/Layout';
 import { HeaderControls } from './HeaderControls';
@@ -26,6 +25,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
 import './ChatInterfaceRefactored.css';
+
+const SettingsPanelLazy = React.lazy(() => import('../../old-structure/SettingsPanel'));
 
 const ChatInterfaceRefactored: React.FC = () => {
   const { t } = useTranslation();
@@ -334,10 +335,14 @@ const ChatInterfaceRefactored: React.FC = () => {
       />
 
       {/* 设置面板 */}
-      <SettingsPanel 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-      />
+      {isSettingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsPanelLazy
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

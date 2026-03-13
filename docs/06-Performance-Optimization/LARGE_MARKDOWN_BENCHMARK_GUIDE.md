@@ -1,5 +1,7 @@
 # 大 Markdown 性能基准指南
 
+> 相关阶段文档已归档到：`docs/06-Performance-Optimization/Large-Markdown-Optimization/`
+
 ## 目标
 
 统一评估“大量 Markdown 输入”场景下的性能变化，对比优化前后数据。
@@ -81,3 +83,44 @@ BASE_URL=http://localhost:3000 ORIGIN=http://localhost:8080 VUS=2 ITERATIONS=6 C
 - 输入链路 `longTaskTotalMs` 下降 >= 40%
 - 发送链路 `chat_total_ms` 下降 >= 20%
 - 失败率 `http_req_failed < 5%`
+
+## 4) Lighthouse 固定口径脚本（生产）
+
+脚本：`scripts/run-lighthouse-prod-fixed.js`
+
+默认流程：
+
+- `npm run build`
+- 启动静态 `dist` 服务（`PORT=8082`，入口 `/`）
+- Playwright 做可渲染校验（避免 `NO_FCP` 假阴性）
+- 执行 Lighthouse，输出到 `test/bench-results/`
+
+运行方式：
+
+```bash
+npm run bench:lighthouse:prod
+```
+
+诊断 `modern serve`（仅排查框架问题时使用）：
+
+```bash
+npm run bench:lighthouse:prod:serve
+```
+
+常用参数：
+
+```bash
+PORT=8082 LH_MODE=serve ALLOW_STATIC_FALLBACK=true LH_OUTPUT_PATH=test/bench-results/lighthouse-prod-fixed.json npm run bench:lighthouse:prod
+```
+
+参数说明：
+
+- `LH_MODE=serve|static`：优先使用哪种服务模式（默认 `static`）
+- `ALLOW_STATIC_FALLBACK=true|false`：`serve` 校验失败时是否自动回退静态 `dist`
+- `SKIP_BUILD=true`：跳过 build（仅用于你确认产物未变更的场景）
+- `LH_OUTPUT_PATH=...`：自定义报告输出路径
+
+建议：
+
+- 默认使用 `npm run bench:lighthouse:prod`（已强制 static，不受环境变量影响）。
+- 只有在排查框架问题时才使用 `npm run bench:lighthouse:prod:serve`。
