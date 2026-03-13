@@ -26,6 +26,12 @@
   min-width: 60px;
 }
 
+/* Lazy 侧栏加载中的占位容器，确保 chat-layout 在首屏阶段不发生横向重排。 */
+.chat-interface-refactored > .conversation-sidebar--placeholder {
+  border-right: 2px solid rgba(240, 240, 240, 0.8);
+  background: rgba(255, 255, 255, 0.85);
+}
+
 /* 暗色模式 */
 @media (prefers-color-scheme: dark) {
   .chat-interface-refactored {

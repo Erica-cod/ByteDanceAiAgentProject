@@ -29,6 +29,13 @@ import './ChatInterfaceRefactored.css';
 const ConversationListLazy = React.lazy(() => import('./ConversationList'));
 const SettingsPanelLazy = React.lazy(() => import('./SettingsPanel'));
 
+const ConversationSidebarPlaceholder: React.FC = () => (
+  <div
+    className="conversation-sidebar conversation-sidebar--placeholder expanded"
+    aria-hidden="true"
+  />
+);
+
 const ChatInterfaceRefactored: React.FC = () => {
   const { t } = useTranslation();
   
@@ -329,7 +336,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   return (
     <div className="chat-interface-refactored">
       {/* 对话列表 */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<ConversationSidebarPlaceholder />}>
         <ConversationListLazy
           conversations={conversationManager.conversations}
           currentConversationId={conversationId}
