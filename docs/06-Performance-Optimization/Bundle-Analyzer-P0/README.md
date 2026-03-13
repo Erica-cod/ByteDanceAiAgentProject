@@ -14,6 +14,7 @@
 - `TOP20_MODULES_REPORT.md`：Top 20 清单报告
 - `P0_ANALYSIS_AND_NEXT_ACTIONS.md`：P0 结论与后续改进任务
 - `P1_DYNAMIC_MARKDOWN_RESULT.md`：P1 落地结果（组件差分 + 动态加载）
+- `P1_CRP_STATIC_COMPRESSION_RESULT.md`：P1.5 落地结果（首屏关键链路 + static 压缩校准）
 
 ## 执行命令
 

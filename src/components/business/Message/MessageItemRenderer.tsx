@@ -10,10 +10,10 @@
 
 import React, { Suspense } from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
-import StreamingMarkdown from './StreamingMarkdown';
 import type { Message } from '../../../stores/chatStore';
 
 const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgentDisplay'));
+const StreamingMarkdownLazy = React.lazy(() => import('./StreamingMarkdown'));
 const ProgressiveMessageRefactoredLazy = React.lazy(() =>
   import('./ProgressiveMessageRefactored').then(module => ({ default: module.ProgressiveMessageRefactored }))
 );
@@ -95,7 +95,9 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
         />
       </Suspense>
     ) : message.content ? (
-      <StreamingMarkdown content={message.content} />
+      <Suspense fallback={<div>渲染消息中...</div>}>
+        <StreamingMarkdownLazy content={message.content} />
+      </Suspense>
     ) : (
       <div>正在思考...</div>
     );

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:zlib';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const DEFAULT_PORT = Number(process.env.PORT || 8082);
@@ -140,6 +141,51 @@ function prepareStaticEntry() {
   copyFileSync(sourceHtmlPath, staticEntryPath);
 }
 
+function collectCompressTargets(dir, result = []) {
+  if (!existsSync(dir)) return result;
+  const entries = readdirSync(dir);
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      collectCompressTargets(fullPath, result);
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    if (fullPath.endsWith('.gz') || fullPath.endsWith('.br')) continue;
+    if (!/\.(js|css|html|svg|json|txt|map)$/.test(fullPath)) continue;
+    result.push(fullPath);
+  }
+  return result;
+}
+
+function createPrecompressedAssets() {
+  const targets = [
+    ...collectCompressTargets(join('dist', 'static')),
+    ...collectCompressTargets('dist'),
+  ];
+
+  const dedup = Array.from(new Set(targets))
+    .filter(filePath => !filePath.endsWith('.gz') && !filePath.endsWith('.br'));
+
+  for (const filePath of dedup) {
+    const raw = readFileSync(filePath);
+    // 只为中大型文本资源生成预压缩文件，避免无意义小文件膨胀。
+    if (raw.length < 1024) continue;
+
+    const gz = gzipSync(raw, { level: 9 });
+    const br = brotliCompressSync(raw, {
+      params: {
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+        [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+      },
+    });
+
+    writeFileSync(`${filePath}.gz`, gz);
+    writeFileSync(`${filePath}.br`, br);
+  }
+}
+
 async function main() {
   const shouldBuild = process.env.SKIP_BUILD !== 'true';
   if (shouldBuild) {
@@ -164,7 +210,8 @@ async function main() {
         });
       } else {
         prepareStaticEntry();
-        proc = startProcess('npx', ['http-server', 'dist', '-p', String(port), '-c-1']);
+        createPrecompressedAssets();
+        proc = startProcess('npx', ['http-server', 'dist', '-p', String(port), '-c-1', '-g', '-b']);
       }
 
       const ready = await waitForServer(appUrl, 90000);

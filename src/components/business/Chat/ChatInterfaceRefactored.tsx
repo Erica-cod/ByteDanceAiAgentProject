@@ -23,6 +23,7 @@ import { useConversationManager, useMessageQueue, useMessageSender, useThrottle 
 import { useAuthStore } from '../../../stores/authStore';
 import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
+import { runWhenIdle, cancelIdleTask } from '../../../utils/perf/scheduling';
 import './ChatInterfaceRefactored.css';
 
 const ConversationListLazy = React.lazy(() => import('./ConversationList'));
@@ -90,12 +91,18 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // ===== 初始化 =====
   useEffect(() => {
-    (async () => {
-      const id = await getPrivacyFirstDeviceId();
-      setDeviceId(id);
-      showPrivacyNotice();
-      console.log('🔐 设备 ID（Hash）已生成:', id);
-    })();
+    const idleId = runWhenIdle(() => {
+      (async () => {
+        const id = await getPrivacyFirstDeviceId();
+        setDeviceId(id);
+        showPrivacyNotice();
+        console.log('🔐 设备 ID（Hash）已生成:', id);
+      })();
+    }, { timeout: 1200 });
+
+    return () => {
+      cancelIdleTask(idleId);
+    };
   }, [setDeviceId]);
 
   useEffect(() => {
@@ -104,7 +111,13 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // 初始化读取登录态（演示版）
   useEffect(() => {
-    refreshMe().catch(() => {});
+    const idleId = runWhenIdle(() => {
+      refreshMe().catch(() => {});
+    }, { timeout: 1500 });
+
+    return () => {
+      cancelIdleTask(idleId);
+    };
   }, [refreshMe]);
 
   // 登录用户切换时，同步业务 userId，确保会按账号隔离加载数据
