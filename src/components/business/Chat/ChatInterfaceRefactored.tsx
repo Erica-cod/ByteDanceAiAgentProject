@@ -11,7 +11,6 @@
 
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import ConversationList from '../../old-structure/ConversationList';
 import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
 import { ChatLayout } from '../../base/Layout';
 import { ChatHeader } from '../../base/Layout';
@@ -26,7 +25,8 @@ import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
 import './ChatInterfaceRefactored.css';
 
-const SettingsPanelLazy = React.lazy(() => import('../../old-structure/SettingsPanel'));
+const ConversationListLazy = React.lazy(() => import('./ConversationList'));
+const SettingsPanelLazy = React.lazy(() => import('./SettingsPanel'));
 
 const ChatInterfaceRefactored: React.FC = () => {
   const { t } = useTranslation();
@@ -316,16 +316,18 @@ const ChatInterfaceRefactored: React.FC = () => {
   return (
     <div className="chat-interface-refactored">
       {/* 对话列表 */}
-      <ConversationList
-        conversations={conversationManager.conversations}
-        currentConversationId={conversationId}
-        unreadConversationIds={unreadConversationIds}
-        onSelectConversation={conversationManager.handleSelectConversation}
-        onNewConversation={conversationManager.handleNewConversation}
-        onDeleteConversation={conversationManager.handleDeleteConversation}
-        isLoading={conversationManager.isLoadingConversations}
-        messageCountRefs={messageCountRefs}
-      />
+      <Suspense fallback={null}>
+        <ConversationListLazy
+          conversations={conversationManager.conversations}
+          currentConversationId={conversationId}
+          unreadConversationIds={unreadConversationIds}
+          onSelectConversation={conversationManager.handleSelectConversation}
+          onNewConversation={conversationManager.handleNewConversation}
+          onDeleteConversation={conversationManager.handleDeleteConversation}
+          isLoading={conversationManager.isLoadingConversations}
+          messageCountRefs={messageCountRefs}
+        />
+      </Suspense>
 
       {/* 聊天区域 - 使用重构后的布局 */}
       <ChatLayout

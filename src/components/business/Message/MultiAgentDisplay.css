@@ -183,8 +183,8 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  min-height: 100px; /* ⚡ 性能优化：减少CLS */
-  contain: layout; /* ⚡ 隔离布局计算 */
+  min-height: 100px;
+  contain: layout;
 }
 
 .round-item.last-round {
@@ -229,7 +229,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  white-space: nowrap; /* ✅ 防止换行 */
+  white-space: nowrap;
 }
 
 .round-number {
@@ -248,7 +248,7 @@
 .round-agents {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap; /* 允许换行 */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
 }
@@ -273,8 +273,8 @@
   font-size: 12px;
   transition: transform 0.3s;
   color: #666;
-  justify-self: end; /* ✅ 在grid中右对齐 */
-  align-self: center; /* ✅ 垂直居中 */
+  justify-self: end;
+  align-self: center;
 }
 
 .expand-icon.expanded {
@@ -292,9 +292,9 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 500px; /* ⚡ 调整为合理高度（之前 1200px 太大） */
-  contain: layout style; /* ✅ 隔离布局计算 */
-  content-visibility: auto; /* ⚡ 优化不可见内容渲染 */
+  min-height: 500px;
+  contain: layout style;
+  content-visibility: auto;
 }
 
 /* Agent输出 - 毛玻璃效果 + 性能优化 */
@@ -306,10 +306,10 @@
   -webkit-backdrop-filter: blur(8px);
   border-radius: 0 12px 12px 0;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  min-height: 280px; /* ⚡ 调整为合理高度（之前 650px 太大） */
-  will-change: transform; /* ✅ 提示浏览器优化动画 */
-  contain: layout style paint; /* ✅ CSS Containment，隔离布局影响 */
-  content-visibility: auto; /* ⚡ 浏览器自动优化不可见内容渲染 */
+  min-height: 280px;
+  will-change: transform;
+  contain: layout style paint;
+  content-visibility: auto;
 }
 
 .agent-output.agent-planner {
@@ -366,7 +366,6 @@
   font-weight: 600;
 }
 
-/* ✅ 新增：流式生成指示器 */
 .streaming-indicator {
   margin-left: auto;
   font-size: 11px;
@@ -388,13 +387,11 @@
   font-size: 14px;
   line-height: 1.6;
   color: #333;
-  min-height: 250px; /* ⚡ 调整为合理高度（之前 600px 太大，现在更平衡） */
-  contain: layout style; /* ✅ 性能优化 */
-  content-visibility: auto; /* ⚡ 优化渲染 */
-  /* transition: min-height 0.3s ease; */ /* ⚡ 移除过渡，避免动画触发重排 */
+  min-height: 250px;
+  contain: layout style;
+  content-visibility: auto;
 }
 
-/* ⚡ 流式生成占位符（隐藏 JSON 阶段的友好提示） */
 .streaming-placeholder {
   display: flex;
   flex-direction: column;
@@ -402,7 +399,7 @@
   justify-content: center;
   gap: 12px;
   padding: 40px 20px;
-  height: 200px; /* ⚡ 调整为合理高度（之前 600px 太大） */
+  height: 200px;
   min-height: 200px;
 }
 
@@ -479,8 +476,8 @@
   }
 
   .round-header {
-    grid-template-columns: 1fr auto; /* ✅ 移动端：内容区 | 展开图标 */
-    grid-template-rows: auto auto; /* ✅ 两行 */
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
   }
 
   .round-title {
@@ -495,7 +492,7 @@
 
   .expand-icon {
     grid-column: 2;
-    grid-row: 1 / 3; /* ✅ 跨越两行 */
+    grid-row: 1 / 3;
   }
 
   .round-agents {

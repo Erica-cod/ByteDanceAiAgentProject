@@ -120,7 +120,6 @@
   font-size: 18px;
 }
 
-/* 动画 */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -141,7 +140,6 @@
   }
 }
 
-/* 深色主题 */
 [data-theme="dark"] .settings-panel {
   --bg-primary: #1f2937;
   --bg-secondary: #111827;
@@ -173,21 +171,20 @@
   color: white;
 }
 
-/* 响应式 */
 @media (max-width: 640px) {
   .settings-panel {
     width: 95%;
     max-height: 90vh;
   }
-  
+
   .settings-header {
     padding: 16px 20px;
   }
-  
+
   .settings-content {
     padding: 20px;
   }
-  
+
   .settings-options {
     grid-template-columns: 1fr;
   }

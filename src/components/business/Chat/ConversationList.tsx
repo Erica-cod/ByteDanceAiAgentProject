@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Conversation } from '../../utils/conversation/conversationAPI';
-import { useDateFormat, useThrottle } from '../../hooks';
+import { Conversation } from '../../../utils/conversation/conversationAPI';
+import { useDateFormat, useThrottle } from '../../../hooks';
 import VirtualList, { VirtualListHandle } from './VirtualList';
 import './ConversationList.css';
 
@@ -16,7 +16,6 @@ interface ConversationListProps {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
 }
 
-// 时间显示组件（使用 useDateFormat hook）
 const ConversationTime: React.FC<{ updatedAt: string }> = ({ updatedAt }) => {
   const formattedDate = useDateFormat(updatedAt);
   return <span className="conversation-time">{formattedDate}</span>;
@@ -36,17 +35,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const virtualListRef = useRef<VirtualListHandle>(null);
 
-  // 🔧 节流：防止用户快速切换对话导致频繁加载数据
   const throttledSelectConversation = useThrottle(onSelectConversation, 500);
-
-  // 🔧 节流：防止用户误触创建多个空对话
   const throttledNewConversation = useThrottle(onNewConversation, 1000);
-
-  // 🔧 节流：防止重复删除请求
   const throttledDeleteConversation = useThrottle(onDeleteConversation, 1000);
 
-  // ✅ 渲染单个对话项
-  const renderConversationItem = (conversation: Conversation, index: number) => (
+  const renderConversationItem = (conversation: Conversation) => (
     <div
       className={`conversation-item ${
         conversation.conversationId === currentConversationId ? 'active' : ''
@@ -57,7 +50,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
         <div className="conversation-title">{conversation.title}</div>
         <div className="conversation-meta">
           <span className="message-count">
-            <span 
+            <span
               ref={(el) => {
                 if (el && messageCountRefs) {
                   messageCountRefs.current.set(conversation.conversationId, el);
@@ -89,7 +82,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
     </div>
   );
 
-  // ✅ 空状态渲染器
   const renderEmptyState = () => (
     <div className="empty-conversations">
       <p>{t('conversation.noConversations')}</p>
@@ -131,8 +123,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
             estimatedItemHeight={90}
             minItemHeight={80}
             overscanRowCount={2}
-            // ✅ 性能优化：限制最多渲染约15个DOM节点
-            // 可视区域约8-10个 + 预渲染上下各2个 = 总计约12-14个
             noItemsRenderer={renderEmptyState}
             getItemKey={(conversation) => conversation.conversationId}
           />

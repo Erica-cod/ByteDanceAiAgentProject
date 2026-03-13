@@ -2,7 +2,7 @@
  * 多 Agent 模式事件处理器
  */
 
-import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../../components/old-structure/MultiAgentDisplay';
+import type { RoundData, AgentOutput as MAAgentOutput, HostDecision as MAHostDecision } from '../../../components/business/Message/MultiAgentDisplay';
 import type { StreamState } from './types';
 
 /**

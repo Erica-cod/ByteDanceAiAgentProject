@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLongTextDetection } from '../../hooks/interaction/useLongTextDetection';
+import { useLongTextDetection } from '../../../hooks/interaction/useLongTextDetection';
 import './TextStatsIndicator.css';
 
 interface TextStatsIndicatorProps {
@@ -15,7 +15,6 @@ const TextStatsIndicator: React.FC<TextStatsIndicatorProps> = ({ text, onWarning
   const { detection } = useLongTextDetection(text);
   const { stats, level, reason } = detection;
 
-  // 空文本不显示
   if (stats.chars === 0) {
     return null;
   }
@@ -27,7 +26,7 @@ const TextStatsIndicator: React.FC<TextStatsIndicatorProps> = ({ text, onWarning
         <span className="stat-separator">·</span>
         <span className="stat-item">{stats.lines} 行</span>
       </div>
-      
+
       {level !== 'none' && (
         <div className="stats-warning" onClick={onWarningClick}>
           <span className="warning-icon">⚠️</span>

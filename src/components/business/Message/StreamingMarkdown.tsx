@@ -17,8 +17,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { fixIncompleteMarkdown, safeFixMarkdown } from '../../../utils/markdown/markdownFixer';
 import { renderMarkdownFallback } from '../../../utils/markdown/fallbackMarkdownRenderer';
-import PlanCard, { extractPlanData } from '../../old-structure/PlanCard';
-import PlanListCard, { extractPlanListData } from '../../old-structure/PlanListCard';
+import PlanCard, { extractPlanData } from './PlanCard';
+import PlanListCard, { extractPlanListData } from './PlanListCard';
 import { BaseMarkdownRenderer } from '../../base';
 import './StreamingMarkdown.css';
 

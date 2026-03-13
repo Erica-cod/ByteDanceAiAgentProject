@@ -22,7 +22,6 @@
   min-width: 60px;
 }
 
-/* 侧边栏头部 - 毛玻璃效果 */
 .sidebar-header {
   padding: 20px 16px;
   background: rgba(255, 255, 255, 0.95);
@@ -94,7 +93,6 @@
   cursor: not-allowed;
 }
 
-/* 对话列表 */
 .conversations-list {
   flex: 1;
   overflow: hidden;
@@ -118,7 +116,6 @@
   background: #999;
 }
 
-/* 空状态 */
 .empty-conversations {
   text-align: center;
   padding: 60px 20px;
@@ -143,7 +140,6 @@
   font-weight: 400;
 }
 
-/* 对话项 - 毛玻璃效果 */
 .conversation-item {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(10px);
@@ -271,7 +267,6 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   .conversation-sidebar.expanded {
     position: absolute;

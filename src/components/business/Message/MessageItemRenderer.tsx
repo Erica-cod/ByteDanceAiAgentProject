@@ -13,7 +13,7 @@ import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLink
 import StreamingMarkdown from './StreamingMarkdown';
 import type { Message } from '../../../stores/chatStore';
 
-const MultiAgentDisplayLazy = React.lazy(() => import('../../old-structure/MultiAgentDisplay'));
+const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgentDisplay'));
 const ProgressiveMessageRefactoredLazy = React.lazy(() =>
   import('./ProgressiveMessageRefactored').then(module => ({ default: module.ProgressiveMessageRefactored }))
 );
