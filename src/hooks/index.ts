@@ -20,6 +20,7 @@ export {
   useDebounce,
   useDebouncedCallback,
   useThrottle,
+  useLongTextDetection,
 } from './interaction';
 
 // 工具类

@@ -1,5 +1,5 @@
 import React from 'react';
-import { isLongText, type TextStats } from '../../utils/text/textUtils';
+import { useLongTextDetection } from '../../hooks/interaction/useLongTextDetection';
 import './TextStatsIndicator.css';
 
 interface TextStatsIndicatorProps {
@@ -12,7 +12,7 @@ interface TextStatsIndicatorProps {
  * 显示字符数、行数，并在文本过长时显示警告
  */
 const TextStatsIndicator: React.FC<TextStatsIndicatorProps> = ({ text, onWarningClick }) => {
-  const detection = isLongText(text);
+  const { detection } = useLongTextDetection(text);
   const { stats, level, reason } = detection;
 
   // 空文本不显示
