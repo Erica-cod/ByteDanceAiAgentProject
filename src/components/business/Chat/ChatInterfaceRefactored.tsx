@@ -24,6 +24,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
 import { runWhenIdle, cancelIdleTask } from '../../../utils/perf/scheduling';
+import { buildMultiAgentPerfMock } from '../../../dev/fixtures/multiAgentPerfFixture';
 import './ChatInterfaceRefactored.css';
 
 const ConversationListLazy = React.lazy(() => import('./ConversationList'));
@@ -75,6 +76,12 @@ const ChatInterfaceRefactored: React.FC = () => {
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
   const pendingConversationListSyncRef = useRef(false);
+  const perfMockInitializedRef = useRef(false);
+
+  const perfMockEnabled =
+    typeof window !== 'undefined'
+    && process.env.NODE_ENV === 'development'
+    && new URLSearchParams(window.location.search).get('perfMock') === '1';
 
   // ===== 自定义 Hooks =====
   const { sendMessageInternal, retryMessage, abort } = useMessageSender({
@@ -152,9 +159,32 @@ const ChatInterfaceRefactored: React.FC = () => {
   }, [canUseMultiAgent, chatMode, setChatMode]);
 
   useEffect(() => {
+    if (perfMockEnabled) return;
     conversationManager.loadConversations().catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // 只在 userId 变化时重新加载
+  }, [userId, perfMockEnabled]); // 只在 userId 变化时重新加载
+
+  useEffect(() => {
+    if (!perfMockEnabled) return;
+    if (perfMockInitializedRef.current) return;
+    perfMockInitializedRef.current = true;
+
+    const { conversationId: mockConversationId, messages: mockMessages } = buildMultiAgentPerfMock();
+
+    useChatStore.setState({
+      conversationId: mockConversationId,
+      messages: mockMessages,
+      firstItemIndex: 0,
+      hasMoreMessages: false,
+      totalMessages: mockMessages.length,
+      isLoadingMore: false,
+    });
+
+    setLoading(false);
+    console.log(
+      `[PerfMock] 已注入多 Agent 假数据，消息数=${mockMessages.length}。可移除 ?perfMock=1 退出。`
+    );
+  }, [perfMockEnabled, setLoading]);
 
   const processQueueOnce = useCallback(async () => {
     if (isLoading || messageQueue.isProcessing || messageQueue.queue.length === 0) return;

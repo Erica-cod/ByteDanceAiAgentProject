@@ -255,7 +255,8 @@ async function hashString(str: string): Promise<string> {
  */
 async function trackDevice(deviceIdHash: string): Promise<void> {
   try {
-    await fetchWithCsrf('/api/device/track', {
+    // BFF 文件路由为 /api/device（api/lambda/device.ts），避免请求不存在的 /track 子路径。
+    await fetchWithCsrf('/api/device', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceIdHash }),
