@@ -29,7 +29,7 @@
 
 > P1 已落地结果见：`P1_DYNAMIC_MARKDOWN_RESULT.md`
 >
-> P1.5（首屏关键链路 + static 压缩校准）结果见：`P1_CRP_STATIC_COMPRESSION_RESULT.md`
+> P1.5 / P1.6（首屏关键链路 + static 压缩校准 + CLS 收敛）结果见：`P1_CRP_STATIC_COMPRESSION_RESULT.md`
 
 ## P2（治理）
 

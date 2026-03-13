@@ -66,3 +66,44 @@
 本轮属于“高性价比”优化，已经把首屏从“偏慢”拉到“可接受偏好”区间，且不需要大规模重构。  
 下一步建议继续围绕 `main.css` 与剩余关键请求做精简，目标将 `render-blocking` 压到 `200ms` 左右。
 
+---
+
+## P1.6 结果补充（main.css 内联 + CLS 收敛）
+
+### 增量改动
+
+1) `scripts/run-lighthouse-prod-fixed.js`
+- 在 static 基准流程中，将 `dist/index.html` 的 `main.*.css` 自动内联为 `<style>`
+- 保留 `.gz/.br` 预压缩逻辑，确保静态基准与真实生产压缩策略一致
+
+2) 侧栏首屏稳定性修正（CLS）
+- `ChatInterfaceRefactored` 增加 `ConversationListLazy` 的同宽占位 fallback
+- `ConversationList` 将骨架放入已挂载容器内部，避免切换时外层布局抖动
+- `ChatInterfaceRefactored.css` 增加侧栏宽度兜底样式，防止异步样式到达前宽度漂移
+
+### Lighthouse 对比（同口径）
+
+- 上一基线：`test/bench-results/lighthouse-prod-1773382806895.json`
+- 新结果：`test/bench-results/lighthouse-prod-1773383031744.json`
+
+| 指标 | 旧 | 新 | 变化 |
+|---|---:|---:|---:|
+| Performance | 86 | 88 | +2 |
+| FCP | 2.6s | 2.2s | -0.4s |
+| LCP | 3.7s | 3.6s | -0.1s |
+| TBT | 30ms | 60ms | +30ms（仍低） |
+| TTI | 3.7s | 3.6s | -0.1s |
+| CLS | 0.001 | 0.001 | 持平稳定 |
+
+### 机会项变化
+
+- `render-blocking-resources`：约 `470ms` -> `0ms`（`score: 1`）
+- `unused-css-rules`：收敛为 `score: 1`
+- `uses-text-compression`：持续 `score: 1`
+- 当前剩余较主要机会：`unused-javascript` 约 `23KiB`（影响已较小）
+
+### 小结
+
+P1.6 已把当前最主要的首屏阻塞项基本清空，分数与稳定性都达到一轮较优平衡。  
+下一阶段更适合转向“真实业务口径”优化（例如减少 benchmark 404 噪声、收敛剩余非关键 JS）。
+

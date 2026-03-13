@@ -141,6 +141,33 @@ function prepareStaticEntry() {
   copyFileSync(sourceHtmlPath, staticEntryPath);
 }
 
+function inlineMainCssForStaticEntry() {
+  const staticEntryPath = join('dist', 'index.html');
+  if (!existsSync(staticEntryPath)) {
+    throw new Error(`static entry html missing: ${staticEntryPath}`);
+  }
+
+  const html = readFileSync(staticEntryPath, 'utf8');
+  const mainCssMatch = html.match(/<link[^>]*href="(\/static\/css\/main\.[^"]+\.css)"[^>]*>/i);
+  if (!mainCssMatch) {
+    return;
+  }
+
+  const href = mainCssMatch[1];
+  const cssPath = join('dist', href.replace(/^\//, '').replace(/\//g, '\\'));
+  if (!existsSync(cssPath)) {
+    throw new Error(`main css missing for inline: ${cssPath}`);
+  }
+
+  let css = readFileSync(cssPath, 'utf8');
+  // 防止极端情况下 style 标签提前闭合。
+  css = css.replace(/<\/style/gi, '<\\/style');
+
+  const styleTag = `<style id="lh-inline-main-css">${css}</style>`;
+  const nextHtml = html.replace(mainCssMatch[0], styleTag);
+  writeFileSync(staticEntryPath, nextHtml);
+}
+
 function collectCompressTargets(dir, result = []) {
   if (!existsSync(dir)) return result;
   const entries = readdirSync(dir);
@@ -210,6 +237,8 @@ async function main() {
         });
       } else {
         prepareStaticEntry();
+        // static 基准中把首屏主样式内联，减少 render-blocking CSS 链路成本。
+        inlineMainCssForStaticEntry();
         createPrecompressedAssets();
         proc = startProcess('npx', ['http-server', 'dist', '-p', String(port), '-c-1', '-g', '-b']);
       }
