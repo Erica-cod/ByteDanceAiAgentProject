@@ -99,6 +99,29 @@
   padding: 12px 10px;
 }
 
+.conversation-list-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversation-list-loading-skeleton__item {
+  height: 62px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef1f6 25%, #f4f6fa 37%, #eef1f6 63%);
+  background-size: 400% 100%;
+  animation: conversation-list-skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes conversation-list-skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
 .conversations-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -281,6 +304,13 @@
     width: 0;
     min-width: 0;
     border-right: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .conversation-list-loading-skeleton__item {
+    background: linear-gradient(90deg, #313131 25%, #3a3a3a 37%, #313131 63%);
+    background-size: 400% 100%;
   }
 }
 

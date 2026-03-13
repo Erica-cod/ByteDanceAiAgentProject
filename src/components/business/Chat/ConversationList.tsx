@@ -89,6 +89,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
     </div>
   );
 
+  const renderLoadingSkeleton = () => (
+    <div className="conversation-list-loading-skeleton" aria-hidden="true">
+      <div className="conversation-list-loading-skeleton__item" />
+      <div className="conversation-list-loading-skeleton__item" />
+      <div className="conversation-list-loading-skeleton__item" />
+      <div className="conversation-list-loading-skeleton__item" />
+      <div className="conversation-list-loading-skeleton__item" />
+      <div className="conversation-list-loading-skeleton__item" />
+    </div>
+  );
+
   return (
     <div className={`conversation-sidebar ${isExpanded ? 'expanded' : 'collapsed'}`}>
       <div className="sidebar-header">
@@ -116,16 +127,20 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
       {isExpanded && (
         <div className="conversations-list">
-          <VirtualList
-            ref={virtualListRef}
-            items={conversations}
-            renderItem={renderConversationItem}
-            estimatedItemHeight={90}
-            minItemHeight={80}
-            overscanRowCount={2}
-            noItemsRenderer={renderEmptyState}
-            getItemKey={(conversation) => conversation.conversationId}
-          />
+          {isLoading ? (
+            renderLoadingSkeleton()
+          ) : (
+            <VirtualList
+              ref={virtualListRef}
+              items={conversations}
+              renderItem={renderConversationItem}
+              estimatedItemHeight={90}
+              minItemHeight={80}
+              overscanRowCount={2}
+              noItemsRenderer={renderEmptyState}
+              getItemKey={(conversation) => conversation.conversationId}
+            />
+          )}
         </div>
       )}
     </div>
