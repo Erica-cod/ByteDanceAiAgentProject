@@ -9,6 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const DEFAULT_PORT = Number(process.env.PORT || 8082);
 const ALLOW_STATIC_FALLBACK = (process.env.ALLOW_STATIC_FALLBACK || 'true') !== 'false';
 const MODE = process.env.LH_MODE || 'static'; // static | serve
+const LH_INLINE_MAIN_CSS = process.env.LH_INLINE_MAIN_CSS === 'true';
 const OUTPUT_PATH = process.env.LH_OUTPUT_PATH || `test/bench-results/lighthouse-prod-${Date.now()}.json`;
 
 function runCommand(command, args, options = {}) {
@@ -237,8 +238,10 @@ async function main() {
         });
       } else {
         prepareStaticEntry();
-        // static 基准中把首屏主样式内联，减少 render-blocking CSS 链路成本。
-        inlineMainCssForStaticEntry();
+        // 仅在需要做实验校准时开启，避免和真实构建链路混淆。
+        if (LH_INLINE_MAIN_CSS) {
+          inlineMainCssForStaticEntry();
+        }
         createPrecompressedAssets();
         proc = startProcess('npx', ['http-server', 'dist', '-p', String(port), '-c-1', '-g', '-b']);
       }

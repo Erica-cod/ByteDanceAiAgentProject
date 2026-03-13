@@ -12,7 +12,7 @@
     "dev:app": "cross-env NODE_ENV=development modern dev",
     "dev:idp": "cross-env NODE_ENV=development tsx idp/server.ts",
     "start:idp": "cross-env NODE_ENV=production tsx idp/server.ts",
-    "build": "cross-env NODE_ENV=production modern build",
+    "build": "cross-env NODE_ENV=production modern build && node scripts/postbuild-optimize-assets.js",
     "start": "cross-env NODE_ENV=production modern start",
     "serve": "cross-env NODE_ENV=production modern serve",
     "dev:local": "cross-env NODE_ENV=development modern dev",
