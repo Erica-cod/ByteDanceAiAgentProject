@@ -59,6 +59,8 @@
     "bench:lighthouse:prod": "cross-env LH_MODE=static ALLOW_STATIC_FALLBACK=false node scripts/run-lighthouse-prod-fixed.js",
     "bench:lighthouse:prod:serve": "cross-env LH_MODE=serve ALLOW_STATIC_FALLBACK=true node scripts/run-lighthouse-prod-fixed.js",
     "bench:lighthouse:flow:multi-agent": "node scripts/run-lighthouse-user-flow-multi-agent.js",
+    "bench:lighthouse:flow:multi-agent:prod": "cross-env FLOW_MODE=static FLOW_PORT=8082 node scripts/run-lighthouse-user-flow-multi-agent.js",
+    "bench:lighthouse:flow:multi-agent:prod:headed": "cross-env FLOW_MODE=static FLOW_PORT=8082 HEADLESS=false node scripts/run-lighthouse-user-flow-multi-agent.js",
     "gen:fixture:multi-agent": "node scripts/generate-multi-agent-fixture.js",
     "analyze:bundle:top20": "node scripts/analyze-bundle-top20.js",
     "test:all": "npm run test:volcengine && node test-planning-tools.js"

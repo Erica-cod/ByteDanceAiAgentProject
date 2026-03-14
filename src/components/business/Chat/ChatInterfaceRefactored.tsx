@@ -9,7 +9,7 @@
  * - 职责更清晰，代码更简洁
  */
 
-import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense, startTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
 import { ChatLayout } from '../../base/Layout';
@@ -77,11 +77,16 @@ const ChatInterfaceRefactored: React.FC = () => {
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
   const pendingConversationListSyncRef = useRef(false);
   const perfMockInitializedRef = useRef(false);
+  const perfMockHydrationTimerRef = useRef<number | null>(null);
 
   const perfMockEnabled =
     typeof window !== 'undefined'
-    && process.env.NODE_ENV === 'development'
-    && new URLSearchParams(window.location.search).get('perfMock') === '1';
+    && new URLSearchParams(window.location.search).get('perfMock') === '1'
+    && (
+      process.env.NODE_ENV === 'development'
+      || window.location.hostname === 'localhost'
+      || window.location.hostname === '127.0.0.1'
+    );
 
   // ===== 自定义 Hooks =====
   const { sendMessageInternal, retryMessage, abort } = useMessageSender({
@@ -170,20 +175,48 @@ const ChatInterfaceRefactored: React.FC = () => {
     perfMockInitializedRef.current = true;
 
     const { conversationId: mockConversationId, messages: mockMessages } = buildMultiAgentPerfMock();
+    const latestMultiAgentMessage = [...mockMessages].reverse().find((item) => Boolean(item.multiAgentData));
+    const eagerMessages = latestMultiAgentMessage
+      ? [...mockMessages.slice(0, 5), latestMultiAgentMessage]
+      : mockMessages.slice(0, 6);
 
+    // 先注入轻量首屏数据，降低首屏 LCP 的渲染压力。
     useChatStore.setState({
       conversationId: mockConversationId,
-      messages: mockMessages,
+      messages: eagerMessages,
       firstItemIndex: 0,
       hasMoreMessages: false,
       totalMessages: mockMessages.length,
       isLoadingMore: false,
     });
 
+    const idleId = runWhenIdle(() => {
+      perfMockHydrationTimerRef.current = window.setTimeout(() => {
+        startTransition(() => {
+          useChatStore.setState({
+            conversationId: mockConversationId,
+            messages: mockMessages,
+            firstItemIndex: 0,
+            hasMoreMessages: false,
+            totalMessages: mockMessages.length,
+            isLoadingMore: false,
+          });
+        });
+      }, 400);
+    }, { timeout: 2500 });
+
     setLoading(false);
     console.log(
-      `[PerfMock] 已注入多 Agent 假数据，消息数=${mockMessages.length}。可移除 ?perfMock=1 退出。`
+      `[PerfMock] 首屏先注入 ${eagerMessages.length} 条轻量消息，空闲时补齐到 ${mockMessages.length} 条。`
     );
+
+    return () => {
+      cancelIdleTask(idleId);
+      if (perfMockHydrationTimerRef.current !== null) {
+        window.clearTimeout(perfMockHydrationTimerRef.current);
+        perfMockHydrationTimerRef.current = null;
+      }
+    };
   }, [perfMockEnabled, setLoading]);
 
   const processQueueOnce = useCallback(async () => {

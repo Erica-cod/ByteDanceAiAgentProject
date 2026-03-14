@@ -8,7 +8,7 @@
  * - 处理不同消息类型的路由
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
 import type { Message } from '../../../stores/chatStore';
 
@@ -30,6 +30,83 @@ export interface MessageItemRendererProps {
   /** 高度变化回调 */
   onHeightChange?: () => void;
 }
+
+interface MultiAgentAssistantContentProps {
+  message: Message;
+  onHeightChange?: () => void;
+}
+
+const MultiAgentAssistantContent: React.FC<MultiAgentAssistantContentProps> = ({ message, onHeightChange }) => {
+  const hasStreaming = Boolean(message.streamingAgentContent && Object.keys(message.streamingAgentContent).length > 0);
+  const shouldExpandByDefault = hasStreaming || message.multiAgentData?.status === 'in_progress';
+  const [expanded, setExpanded] = useState<boolean>(shouldExpandByDefault);
+
+  const summary = useMemo(() => {
+    const rounds = message.multiAgentData?.rounds?.length ?? 0;
+    const trend = message.multiAgentData?.consensusTrend ?? [];
+    const latestConsensus = trend.length > 0 ? trend[trend.length - 1] : null;
+    return {
+      rounds,
+      latestConsensus,
+      status: message.multiAgentData?.status ?? 'converged',
+    };
+  }, [message.multiAgentData]);
+
+  if (expanded) {
+    return (
+      <Suspense fallback={<div>加载多 Agent 视图中...</div>}>
+        <MultiAgentDisplayLazy
+          rounds={message.multiAgentData!.rounds}
+          status={message.multiAgentData!.status}
+          consensusTrend={message.multiAgentData!.consensusTrend}
+          streamingAgentContent={message.streamingAgentContent}
+          onHeightChange={onHeightChange}
+        />
+      </Suspense>
+    );
+  }
+
+  return (
+    <div
+      className="multi-agent-summary-card"
+      style={{
+        border: '1px solid #d1d5db',
+        borderRadius: '10px',
+        padding: '12px 14px',
+        background: '#f9fafb',
+        color: '#1f2937',
+      }}
+    >
+      <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
+        多 Agent 历史摘要
+      </div>
+      <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+        共 {summary.rounds} 轮讨论，
+        状态：{summary.status === 'converged' ? '已收敛' : summary.status === 'in_progress' ? '进行中' : '已终止'}
+        {summary.latestConsensus !== null ? `，最终共识 ${(summary.latestConsensus * 100).toFixed(1)}%` : ''}
+      </div>
+      <button
+        style={{
+          marginTop: '10px',
+          padding: '6px 10px',
+          borderRadius: '8px',
+          border: '1px solid #94a3b8',
+          background: '#ffffff',
+          color: '#1e3a8a',
+          cursor: 'pointer',
+          fontSize: '13px',
+          fontWeight: 600,
+        }}
+        onClick={() => {
+          setExpanded(true);
+          onHeightChange?.();
+        }}
+      >
+        查看完整讨论过程
+      </button>
+    </div>
+  );
+};
 
 export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
   message,
@@ -57,15 +134,7 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
     if (message.multiAgentData) {
       return (
         <MessageItem role="assistant">
-          <Suspense fallback={<div>加载多 Agent 视图中...</div>}>
-            <MultiAgentDisplayLazy
-              rounds={message.multiAgentData.rounds}
-              status={message.multiAgentData.status}
-              consensusTrend={message.multiAgentData.consensusTrend}
-              streamingAgentContent={message.streamingAgentContent}
-              onHeightChange={onHeightChange}
-            />
-          </Suspense>
+          <MultiAgentAssistantContent message={message} onHeightChange={onHeightChange} />
         </MessageItem>
       );
     }
