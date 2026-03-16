@@ -8,6 +8,7 @@ const INLINE_MAIN_CSS = (process.env.INLINE_MAIN_CSS || 'true') !== 'false';
 const PRECOMPRESS_ASSETS = (process.env.PRECOMPRESS_ASSETS || 'true') !== 'false';
 const CLEAN_TEMPLATE_MARKERS = (process.env.CLEAN_TEMPLATE_MARKERS || 'true') !== 'false';
 const INJECT_PRELOAD_HINTS = (process.env.INJECT_PRELOAD_HINTS || 'true') !== 'false';
+const INJECT_APP_SHELL = (process.env.INJECT_APP_SHELL || 'true') !== 'false';
 
 function inlineMainCss(htmlPath) {
   if (!existsSync(htmlPath)) return false;
@@ -97,6 +98,66 @@ function cleanServerTemplateMarkers(htmlPath) {
   return count;
 }
 
+function injectAppShell(htmlPath) {
+  if (!existsSync(htmlPath)) return false;
+  let html = readFileSync(htmlPath, 'utf8');
+
+  if (!html.includes('<div id="root"></div>')) return false;
+
+  // 在 <head> 中注入主题检测脚本，在浏览器首次绘制前应用 dark-theme
+  const themeScript = [
+    '<script>',
+    '(function(){try{',
+    "var s=localStorage.getItem('theme-storage');",
+    'if(s){var d=JSON.parse(s);var t=d&&d.state&&d.state.theme;',
+    "if(t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches)){",
+    "document.documentElement.setAttribute('data-theme','dark');",
+    "document.documentElement.classList.add('dark-theme')}}",
+    '}catch(e){}})()',
+    '</script>',
+  ].join('');
+
+  // App Shell HTML — 结构与 React 组件树一致，浏览器解析即绘制
+  const shellHtml = [
+    '<div id="root">',
+    '<div class="app">',
+    '<div class="chat-interface-refactored">',
+    '<div class="chat-layout">',
+    '<div class="chat-layout__header">',
+    '<div class="chat-header">',
+    '<div class="chat-header__title">',
+    '<h1>AI 智能助手</h1>',
+    '</div>',
+    '<div class="chat-header__controls">',
+    '<div style="display:flex;gap:12px;min-height:40px"></div>',
+    '</div>',
+    '</div>',
+    '</div>',
+    '<div class="chat-layout__content">',
+    '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af;font-size:16px">',
+    '加载中...',
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+  ].join('');
+
+  // i18n 脚本 — 放在 shell 后、</body> 前，同步执行在首次绘制前切换英文标题
+  const i18nScript =
+    "<script>try{if(localStorage.getItem('language')==='en'){" +
+    "var h=document.querySelector('#root h1');" +
+    "if(h)h.textContent='AI Assistant'}}catch(e){}</script>";
+
+  html = html.replace('</head>', themeScript + '</head>');
+  html = html.replace('<div id="root"></div>', shellHtml);
+  html = html.replace('</body>', i18nScript + '</body>');
+
+  writeFileSync(htmlPath, html);
+  return true;
+}
+
 function injectPreloadHints(htmlPath) {
   if (!existsSync(htmlPath)) return 0;
   const html = readFileSync(htmlPath, 'utf8');
@@ -105,7 +166,7 @@ function injectPreloadHints(htmlPath) {
   if (scriptMatches.length === 0) return 0;
 
   const preloadTags = scriptMatches
-    .map((m) => `<link rel="preload" href="${m[1]}" as="script" crossorigin>`)
+    .map((m) => `<link rel="preload" href="${m[1]}" as="script" crossorigin fetchpriority="high">`)
     .join('');
 
   const injected = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">${preloadTags}`);
@@ -133,6 +194,16 @@ function main() {
     console.log(`[postbuild] clean template markers done: ${total} markers removed`);
   } else {
     console.log('[postbuild] skip clean template markers');
+  }
+
+  if (INJECT_APP_SHELL) {
+    let injected = 0;
+    htmlEntries.forEach((htmlPath) => {
+      if (injectAppShell(htmlPath)) injected += 1;
+    });
+    console.log(`[postbuild] app shell injected: ${injected} html files`);
+  } else {
+    console.log('[postbuild] skip app shell');
   }
 
   if (INJECT_PRELOAD_HINTS) {
