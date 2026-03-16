@@ -117,11 +117,14 @@ function injectAppShell(htmlPath) {
     '</script>',
   ].join('');
 
-  // App Shell HTML — 结构与 React 组件树一致，浏览器解析即绘制
+  // App Shell HTML — 结构必须和 React 组件树完全匹配，hydrateRoot 才能复用 DOM 节点
+  // 渲染链: App(.app) > ChatInterfaceRefactored(.chat-interface-refactored)
+  //   > Suspense fallback(.conversation-sidebar--placeholder) + ChatLayout(.chat-layout)
   const shellHtml = [
     '<div id="root">',
     '<div class="app">',
     '<div class="chat-interface-refactored">',
+    '<div class="conversation-sidebar conversation-sidebar--placeholder expanded" aria-hidden="true"></div>',
     '<div class="chat-layout">',
     '<div class="chat-layout__header">',
     '<div class="chat-header">',

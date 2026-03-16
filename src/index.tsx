@@ -84,15 +84,20 @@ if ('requestIdleCallback' in window) {
   }, 1);
 }
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
-
-root.render(
+const rootEl = document.getElementById('root') as HTMLElement;
+const appTree = (
   <React.StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// postbuild 注入了 App Shell 时用 hydrateRoot 复用已有 DOM（保留 LCP h1 节点，避免重绘）
+// Shell 不存在时回退到 createRoot（开发环境 / INJECT_APP_SHELL=false）
+if (rootEl.children.length > 0) {
+  ReactDOM.hydrateRoot(rootEl, appTree);
+} else {
+  ReactDOM.createRoot(rootEl).render(appTree);
+}
 
