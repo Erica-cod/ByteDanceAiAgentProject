@@ -7,18 +7,29 @@ export default defineConfig({
     bffPlugin(),
   ],
   output: {
-    // 避免生产环境内联 runtime 造成 chunk 映射漂移，固定为独立 runtime 文件
     disableInlineRuntimeChunk: true,
+    // browserslist 已是 chrome>=110+，这些浏览器原生支持 Promise/Symbol/Map/Set/URL 等
+    polyfill: 'off',
   },
   performance: {
-    // 先确保构建产物映射稳定，避免缓存导致的旧 hash 注入
     buildCache: false,
+    chunkSplit: {
+      strategy: 'split-by-experience',
+      forceSplitting: {
+        // i18next + react-i18next 单独拆包，提升缓存命中率
+        'lib-i18n': /[\\/]node_modules[\\/](i18next|react-i18next)[\\/]/,
+        // zustand + immer 单独拆包
+        'lib-state': /[\\/]node_modules[\\/](zustand|immer)[\\/]/,
+      },
+    },
+    preload: {
+      include: [/main\.\w+\.js$/],
+    },
   },
   server: {
     port: 8080,
   },
   bff: {
-    // 只扫描 api/lambda 目录作为 API 路由
     prefix: '/api',
   },
 });

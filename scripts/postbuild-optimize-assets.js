@@ -7,6 +7,7 @@ import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:z
 const INLINE_MAIN_CSS = (process.env.INLINE_MAIN_CSS || 'true') !== 'false';
 const PRECOMPRESS_ASSETS = (process.env.PRECOMPRESS_ASSETS || 'true') !== 'false';
 const CLEAN_TEMPLATE_MARKERS = (process.env.CLEAN_TEMPLATE_MARKERS || 'true') !== 'false';
+const INJECT_PRELOAD_HINTS = (process.env.INJECT_PRELOAD_HINTS || 'true') !== 'false';
 
 function inlineMainCss(htmlPath) {
   if (!existsSync(htmlPath)) return false;
@@ -96,6 +97,24 @@ function cleanServerTemplateMarkers(htmlPath) {
   return count;
 }
 
+function injectPreloadHints(htmlPath) {
+  if (!existsSync(htmlPath)) return 0;
+  const html = readFileSync(htmlPath, 'utf8');
+
+  const scriptMatches = [...html.matchAll(/<script[^>]*src="(\/static\/js\/main\.[^"]+\.js)"[^>]*>/g)];
+  if (scriptMatches.length === 0) return 0;
+
+  const preloadTags = scriptMatches
+    .map((m) => `<link rel="preload" href="${m[1]}" as="script" crossorigin>`)
+    .join('');
+
+  const injected = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">${preloadTags}`);
+  if (injected === html) return 0;
+
+  writeFileSync(htmlPath, injected);
+  return scriptMatches.length;
+}
+
 function main() {
   if (!existsSync('dist')) {
     throw new Error('dist not found. run build first.');
@@ -114,6 +133,16 @@ function main() {
     console.log(`[postbuild] clean template markers done: ${total} markers removed`);
   } else {
     console.log('[postbuild] skip clean template markers');
+  }
+
+  if (INJECT_PRELOAD_HINTS) {
+    let total = 0;
+    htmlEntries.forEach((htmlPath) => {
+      total += injectPreloadHints(htmlPath);
+    });
+    console.log(`[postbuild] preload hints injected: ${total} links`);
+  } else {
+    console.log('[postbuild] skip preload hints');
   }
 
   if (INLINE_MAIN_CSS) {
