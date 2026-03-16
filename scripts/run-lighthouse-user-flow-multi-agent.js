@@ -210,9 +210,13 @@ async function run() {
       prepareStaticEntry();
       serverProcess = startProcess('npx', ['http-server', 'dist', '-p', String(FLOW_PORT), '-c-1', '-g', '-b']);
     }
-    const ready = await waitForServer(`http://localhost:${FLOW_PORT}/`);
+    const serveTimeout = FLOW_MODE === 'serve' ? 120_000 : 90_000;
+    const ready = await waitForServer(`http://localhost:${FLOW_PORT}/`, serveTimeout);
     if (!ready) {
-      throw new Error(`压测服务未在预期时间内启动: http://localhost:${FLOW_PORT}/`);
+      throw new Error(`压测服务未在预期时间内启动: http://localhost:${FLOW_PORT}/ (mode=${FLOW_MODE}, timeout=${serveTimeout}ms)`);
+    }
+    if (FLOW_MODE === 'serve') {
+      console.log('✅ modern serve 已就绪，BFF 路由可用');
     }
   }
 

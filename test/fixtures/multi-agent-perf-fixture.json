@@ -1,0 +1,1338 @@
+{
+  "generatedAt": "2026-03-13T21:15:56.947Z",
+  "config": {
+    "messageCount": 30,
+    "multiAgentMessages": 6,
+    "roundsPerDiscussion": 5,
+    "paragraphsPerAgent": 4
+  },
+  "conversationId": "perf-mock-conversation",
+  "messages": [
+    {
+      "id": "fixture-user-0",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 1。",
+      "timestamp": 1773436106947
+    },
+    {
+      "id": "fixture-assistant-1",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 2。",
+      "timestamp": 1773436121947
+    },
+    {
+      "id": "fixture-user-2",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 3。",
+      "timestamp": 1773436136947
+    },
+    {
+      "id": "fixture-assistant-3",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 4。",
+      "timestamp": 1773436151947
+    },
+    {
+      "id": "fixture-user-4",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 5。",
+      "timestamp": 1773436166947
+    },
+    {
+      "id": "fixture-assistant-5",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 6。",
+      "timestamp": 1773436181947
+    },
+    {
+      "id": "fixture-user-6",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 7。",
+      "timestamp": 1773436196947
+    },
+    {
+      "id": "fixture-assistant-7",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 8。",
+      "timestamp": 1773436211947
+    },
+    {
+      "id": "fixture-user-8",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 9。",
+      "timestamp": 1773436226947
+    },
+    {
+      "id": "fixture-assistant-9",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 10。",
+      "timestamp": 1773436241947
+    },
+    {
+      "id": "fixture-user-10",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 11。",
+      "timestamp": 1773436256947
+    },
+    {
+      "id": "fixture-assistant-11",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 12。",
+      "timestamp": 1773436271947
+    },
+    {
+      "id": "fixture-user-12",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 13。",
+      "timestamp": 1773436286947
+    },
+    {
+      "id": "fixture-assistant-13",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 14。",
+      "timestamp": 1773436301947
+    },
+    {
+      "id": "fixture-user-14",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 15。",
+      "timestamp": 1773436316947
+    },
+    {
+      "id": "fixture-assistant-15",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 16。",
+      "timestamp": 1773436331947
+    },
+    {
+      "id": "fixture-user-16",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 17。",
+      "timestamp": 1773436346947
+    },
+    {
+      "id": "fixture-assistant-17",
+      "role": "assistant",
+      "content": "这是一条用于性能测试的普通助手消息 18。",
+      "timestamp": 1773436361947
+    },
+    {
+      "id": "fixture-user-18",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 19。",
+      "timestamp": 1773436376947
+    },
+    {
+      "id": "fixture-assistant-multi-19",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436391947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "fixture-user-20",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 21。",
+      "timestamp": 1773436406947
+    },
+    {
+      "id": "fixture-assistant-multi-21",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436421947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "fixture-user-22",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 23。",
+      "timestamp": 1773436436947
+    },
+    {
+      "id": "fixture-assistant-multi-23",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436451947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "fixture-user-24",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 25。",
+      "timestamp": 1773436466947
+    },
+    {
+      "id": "fixture-assistant-multi-25",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436481947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "fixture-user-26",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 27。",
+      "timestamp": 1773436496947
+    },
+    {
+      "id": "fixture-assistant-multi-27",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436511947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    },
+    {
+      "id": "fixture-user-28",
+      "role": "user",
+      "content": "这是一条用于性能测试的用户消息 29。",
+      "timestamp": 1773436526947
+    },
+    {
+      "id": "fixture-assistant-multi-29",
+      "role": "assistant",
+      "content": "多 Agent 协作已完成，包含完整轮次记录。",
+      "timestamp": 1773436541947,
+      "multiAgentData": {
+        "rounds": [
+          {
+            "round": 1,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 规划师第 1 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:57.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 批评家第 1 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 1,
+                "output_type": "text",
+                "content": "### 主持人第 1 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=1; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:58.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.7,
+              "timestamp": "2026-03-13T21:15:58.747Z"
+            }
+          },
+          {
+            "round": 2,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 规划师第 2 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:58.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 批评家第 2 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 2,
+                "output_type": "text",
+                "content": "### 主持人第 2 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=2; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:15:59.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.76,
+              "timestamp": "2026-03-13T21:15:59.747Z"
+            }
+          },
+          {
+            "round": 3,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 规划师第 3 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:15:59.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 批评家第 3 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 3,
+                "output_type": "text",
+                "content": "### 主持人第 3 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=3; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:00.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.8200000000000001,
+              "timestamp": "2026-03-13T21:16:00.747Z"
+            }
+          },
+          {
+            "round": 4,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 规划师第 4 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:00.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 批评家第 4 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 4,
+                "output_type": "text",
+                "content": "### 主持人第 4 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=4; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:01.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "continue",
+              "reason": "仍存在分歧，继续讨论。",
+              "next_agents": [
+                "planner",
+                "critic"
+              ],
+              "consensus_level": 0.88,
+              "timestamp": "2026-03-13T21:16:01.747Z"
+            }
+          },
+          {
+            "round": 5,
+            "outputs": [
+              {
+                "agent": "planner",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 规划师第 5 轮方案\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=planner; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:01.947Z"
+              },
+              {
+                "agent": "critic",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 批评家第 5 轮审查\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=3;\n```\n\n#### 分析片段 4\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=critic; section=4;\n```",
+                "timestamp": "2026-03-13T21:16:02.147Z"
+              },
+              {
+                "agent": "host",
+                "round": 5,
+                "output_type": "text",
+                "content": "### 主持人第 5 轮决策\n\n#### 分析片段 1\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=1;\n```\n\n#### 分析片段 2\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=2;\n```\n\n#### 分析片段 3\n- 假设：用户希望在有限时间内最大化目标达成率。\n- 约束：需要兼顾执行成本、风险和可追踪性。\n- 结论：采用分阶段方案，并设立可验收检查点。\n\n```text\nround=5; agent=host; section=3;\n```",
+                "timestamp": "2026-03-13T21:16:02.347Z"
+              }
+            ],
+            "hostDecision": {
+              "action": "converge",
+              "reason": "已达到收敛条件，进入报告阶段。",
+              "next_agents": [
+                "reporter"
+              ],
+              "consensus_level": 0.94,
+              "timestamp": "2026-03-13T21:16:02.747Z"
+            }
+          }
+        ],
+        "status": "converged",
+        "consensusTrend": [
+          0.7,
+          0.76,
+          0.8200000000000001,
+          0.88,
+          0.94
+        ]
+      }
+    }
+  ]
+}

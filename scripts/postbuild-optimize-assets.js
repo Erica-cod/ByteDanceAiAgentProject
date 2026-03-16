@@ -6,6 +6,7 @@ import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:z
 
 const INLINE_MAIN_CSS = (process.env.INLINE_MAIN_CSS || 'true') !== 'false';
 const PRECOMPRESS_ASSETS = (process.env.PRECOMPRESS_ASSETS || 'true') !== 'false';
+const CLEAN_TEMPLATE_MARKERS = (process.env.CLEAN_TEMPLATE_MARKERS || 'true') !== 'false';
 
 function inlineMainCss(htmlPath) {
   if (!existsSync(htmlPath)) return false;
@@ -71,6 +72,30 @@ function createPrecompressedAssets() {
   return compressedCount;
 }
 
+function cleanServerTemplateMarkers(htmlPath) {
+  if (!existsSync(htmlPath)) return false;
+  const html = readFileSync(htmlPath, 'utf8');
+
+  const markers = [
+    /<!--<\?-\s*html\s*\?>-->/g,
+    /<!--<\?-\s*chunksMap\.js\s*\?>-->/g,
+    /<!--<\?-\s*SSRDataScript\s*\?>-->/g,
+  ];
+
+  let cleaned = html;
+  let count = 0;
+  for (const marker of markers) {
+    const before = cleaned;
+    cleaned = cleaned.replace(marker, '');
+    if (cleaned !== before) count += 1;
+  }
+
+  if (count > 0) {
+    writeFileSync(htmlPath, cleaned);
+  }
+  return count;
+}
+
 function main() {
   if (!existsSync('dist')) {
     throw new Error('dist not found. run build first.');
@@ -80,6 +105,16 @@ function main() {
     join('dist', 'html', 'main', 'index.html'),
     join('dist', 'index.html'),
   ];
+
+  if (CLEAN_TEMPLATE_MARKERS) {
+    let total = 0;
+    htmlEntries.forEach((htmlPath) => {
+      total += cleanServerTemplateMarkers(htmlPath);
+    });
+    console.log(`[postbuild] clean template markers done: ${total} markers removed`);
+  } else {
+    console.log('[postbuild] skip clean template markers');
+  }
 
   if (INLINE_MAIN_CSS) {
     let inlined = 0;

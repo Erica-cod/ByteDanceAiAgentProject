@@ -74,19 +74,27 @@ async function checkRenderable(url) {
   page.on('pageerror', e => errors.push(String(e)));
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3500);
     const state = await page.evaluate(() => {
       const root = document.querySelector('#root');
       const rootHtml = (root?.innerHTML || '').trim();
       const bodyLen = document.body?.innerText?.length || 0;
+      const hasVisibleElement = Array.from(document.querySelectorAll('#root *')).some((el) => {
+        const style = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return style.display !== 'none'
+          && style.visibility !== 'hidden'
+          && rect.width > 0
+          && rect.height > 0;
+      });
       return {
-        rootHtml,
+        rootHtml: rootHtml.slice(0, 500),
         bodyLen,
+        hasVisibleElement,
       };
     });
 
-    const hasTemplateMarker = state.rootHtml.includes('<!--<?- html ?>-->');
-    const isRenderable = state.bodyLen > 0 && !hasTemplateMarker;
+    const isRenderable = state.bodyLen > 0 && state.hasVisibleElement;
     return { isRenderable, errors, state };
   } finally {
     await browser.close();
