@@ -141,6 +141,7 @@ function injectAppShell(htmlPath) {
     '加载中...',
     '</div>',
     '</div>',
+    '<div class="chat-layout__footer"></div>',
     '</div>',
     '</div>',
     '</div>',
