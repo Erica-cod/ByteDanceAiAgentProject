@@ -13,6 +13,8 @@ export default defineConfig({
   },
   performance: {
     buildCache: false,
+    // 生产包移除 console.log/info，保留 warn/error 供排障
+    removeConsole: ['log', 'info'],
     chunkSplit: {
       strategy: 'split-by-experience',
       forceSplitting: {
