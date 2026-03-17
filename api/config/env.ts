@@ -20,11 +20,11 @@ if (env === 'production') {
 }
 
 console.log(`🔧 环境模式: ${env}`);
-console.log(`🔧 Ollama URL: ${process.env.OLLAMA_API_URL}`);
-console.log(`🔧 Ollama Model: ${process.env.OLLAMA_MODEL}`);
+console.log(`🔧 [本地] Ollama URL: ${process.env.OLLAMA_API_URL || 'http://localhost:11434'}`);
+console.log(`🔧 [本地] Ollama Model: ${process.env.OLLAMA_MODEL || 'qwen3:8b (默认)'}`);
+console.log(`🔧 [远程] 火山引擎 API Key: ${process.env.ARK_API_KEY ? '已配置 (' + process.env.ARK_API_KEY.substring(0, 10) + '...)' : '❌ 未配置'}`);
+console.log(`🔧 [远程] 火山引擎 Model: ${process.env.ARK_MODEL || '使用默认值'}`);
 console.log(`🔧 MongoDB URI: ${process.env.MONGODB_URI}`);
-console.log(`🔧 火山引擎 API Key: ${process.env.ARK_API_KEY ? '已配置 (' + process.env.ARK_API_KEY.substring(0, 10) + '...)' : '❌ 未配置'}`);
-console.log(`🔧 火山引擎 Model: ${process.env.ARK_MODEL || '使用默认值'}`);
 console.log(`🔧 Tavily API Key: ${process.env.TAVILY_API_KEY ? '已配置 (' + process.env.TAVILY_API_KEY.substring(0, 10) + '...)' : '❌ 未配置'}`);
 
 export {};

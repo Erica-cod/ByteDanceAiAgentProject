@@ -15,10 +15,14 @@ import { connectToDatabase } from '../db/connection.js';
 // ✅ V2: 初始化工具系统
 import { initializeToolSystem } from '../tools/v2/index.js';
 
+// ✅ 模块化 LLM Provider 注册表（预热）
+import { getRegistry } from '../_clean/infrastructure/llm/providers/registry.js';
+
 // 初始化标志（确保只初始化一次）
 let toolSystemInitialized = false;
 if (!toolSystemInitialized) {
   initializeToolSystem();
+  getRegistry(); // 预热：基于环境变量自动注册本地/远程 Provider
   toolSystemInitialized = true;
 }
 import { errorResponse, errorResponseWithStatus } from './_utils/response.js';
@@ -28,7 +32,6 @@ import { getContainer } from '../_clean/di-container.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
 import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
-import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { handleMultiAgentMode } from '../handlers/multiAgentHandler.js';
 import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentHandler.js';
 import { handleResumeRequest } from '../handlers/resumeHandler.js';
@@ -437,21 +440,21 @@ export async function post({
             message
           );
         } else if (modelType === 'volcano') {
+          const remoteProvider = getRegistry().get('remote');
+          const remoteAvailable = remoteProvider ? await remoteProvider.isAvailable() : false;
           console.log('==========================================');
           console.log('🌋 开始调用火山引擎豆包模型（V2 - Function Calling）...');
-          console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
-          console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
+          console.log('🔑 远程 Provider 状态:', remoteAvailable ? '已配置' : '未配置');
+          console.log('🎯 目标模型:', remoteProvider?.getModelName() || 'N/A');
           console.log('==========================================');
           
-          // 检查配置
-          if (!volcengineService.isConfigured()) {
-            console.error('❌ 火山引擎 API 未配置！');
-            return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
+          if (!remoteAvailable) {
+            console.error('❌ 远程模型 API 未配置！');
+            return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
           }
 
           const stream = await callVolcengineModelV2(messages, { tools });
-          console.log('✅ 已收到火山引擎的流式响应');
-          console.log('🔍 [V2] 准备调用 handleVolcanoStreamV2...');
+          console.log('✅ 已收到远程模型的流式响应');
           
           handoffToStream = true;
           const result = handleVolcanoStreamV2(
@@ -486,20 +489,21 @@ export async function post({
             message // 传递原始请求文本用于缓存
           );
         } else if (modelType === 'volcano') {
+          const remoteProviderV1 = getRegistry().get('remote');
+          const remoteAvailableV1 = remoteProviderV1 ? await remoteProviderV1.isAvailable() : false;
           console.log('==========================================');
           console.log('🌋 开始调用火山引擎豆包模型...');
-          console.log('🔑 ARK_API_KEY 配置状态:', volcengineService.isConfigured() ? '已配置' : '未配置');
-          console.log('🎯 目标模型:', process.env.ARK_MODEL || 'doubao-1-5-thinking-pro-250415');
+          console.log('🔑 远程 Provider 状态:', remoteAvailableV1 ? '已配置' : '未配置');
+          console.log('🎯 目标模型:', remoteProviderV1?.getModelName() || 'N/A');
           console.log('==========================================');
           
-          // 检查配置
-          if (!volcengineService.isConfigured()) {
-            console.error('❌ 火山引擎 API 未配置！');
-            return errorResponse('火山引擎 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
+          if (!remoteAvailableV1) {
+            console.error('❌ 远程模型 API 未配置！');
+            return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
           }
 
           const stream = await callVolcengineModel(messages /* , abortController.signal */);
-          console.log('✅ 已收到火山引擎的流式响应');
+          console.log('✅ 已收到远程模型的流式响应');
           
           handoffToStream = true;
           return handleVolcanoStream(
