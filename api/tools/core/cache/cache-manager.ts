@@ -10,7 +10,7 @@
 
 import crypto from 'crypto';
 import type { CacheConfig, ToolContext } from '../types.js';
-import { getRedisClient, isRedisAvailable } from '../../../../_clean/infrastructure/cache/redis-client.js';
+import { getRedisClient, isRedisAvailable } from '../../../_clean/infrastructure/cache/redis-client.js';
 import {
   getToolCache,
   getStaleToolCache,
