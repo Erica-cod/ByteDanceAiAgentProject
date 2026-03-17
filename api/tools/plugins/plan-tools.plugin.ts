@@ -4,7 +4,7 @@
  * 包含 4 个工具：create_plan, update_plan, get_plan, list_plans
  */
 
-import { getContainer } from '../../../_clean/di-container.js';
+import { getContainer } from '../../_clean/di-container.js';
 import type { ToolPlugin } from '../core/types.js';
 
 // ============ 创建计划工具 ============

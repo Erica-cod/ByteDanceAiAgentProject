@@ -7,7 +7,7 @@
  */
 
 import type { ChatMessage } from '../../../../types/chat.js';
-import type { FunctionSchema } from '../../../../tools/v2/core/types.js';
+import type { FunctionSchema } from '../../../../tools/core/types.js';
 
 // ─────────────── 流协议 ───────────────
 

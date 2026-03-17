@@ -6,7 +6,10 @@
  */
 
 import { toolExecutor } from '../core/execution/tool-executor.js';
-import type { ToolExecutionResult } from '../../toolExecutor.js';
+export interface ToolExecutionResult {
+  resultText: string;
+  sources?: Array<{ title: string; url: string }>;
+}
 import type { ToolContext } from '../core/types.js';
 import '../protocols/builtins.js';
 import { toolCallProtocolRegistry } from '../protocols/protocol-registry.js';
@@ -20,7 +23,7 @@ import { toolCallProtocolRegistry } from '../protocols/protocol-registry.js';
  * import { executeToolCall } from './tools/toolExecutor.js';
  * 
  * // 新代码（只需修改导入）：
- * import { executeToolCall } from './tools/v2/adapters/legacy-adapter.js';
+ * import { executeToolCall } from './tools/adapters/legacy-adapter.js';
  * ```
  */
 export async function executeToolCall(

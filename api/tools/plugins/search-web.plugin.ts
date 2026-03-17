@@ -4,7 +4,7 @@
  * 功能：使用 Tavily API 搜索互联网
  */
 
-import { searchWeb } from '../../tavilySearch.js';
+import { searchWeb } from '../tavilySearch.js';
 import type { ToolPlugin } from '../core/types.js';
 import crypto from 'crypto';
 

@@ -13,7 +13,7 @@
 import { SSEStreamWriter } from '../../../../utils/sseStreamWriter.js';
 import { splitTextIntoChunks, type TextChunk } from '../../../../utils/textChunker.js';
 import { buildMapPrompt, buildReducePrompt } from '../../../../config/chunkingPrompts.js';
-import { callVolcengineModel } from '../../../infrastructure/llm/llm-caller.js';
+import { callVolcengineModel } from '../../../infrastructure/llm/model-service.js';
 import { volcengineService } from '../../../infrastructure/llm/volcengine-service.js';
 import { extractThinkingAndContent } from '../../../shared/utils/content-extractor.js';
 import type { ChatMessage } from '../../../../types/chat.js';

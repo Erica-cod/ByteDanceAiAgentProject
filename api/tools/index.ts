@@ -1,5 +1,5 @@
 /**
- * 可插拔工具系统 V2 - 入口文件
+ * 可插拔工具系统 - 入口文件
  */
 
 // ============ 核心组件 ============
@@ -60,7 +60,7 @@ import {
  * 注册所有内置插件
  */
 export function initializeToolSystem(): void {
-  console.log('\n🚀 初始化可插拔工具系统 V2');
+  console.log('\n🚀 初始化可插拔工具系统');
   console.log('═'.repeat(50));
 
   /**

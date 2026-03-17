@@ -12,17 +12,14 @@
 import '../config/env.js';
 import { connectToDatabase } from '../db/connection.js';
 
-// ✅ V2: 初始化工具系统
-import { initializeToolSystem } from '../tools/v2/index.js';
+import { initializeToolSystem, toolRegistry } from '../tools/index.js';
 
-// ✅ 模块化 LLM Provider 注册表（预热）
 import { getRegistry } from '../_clean/infrastructure/llm/providers/registry.js';
 
-// 初始化标志（确保只初始化一次）
 let toolSystemInitialized = false;
 if (!toolSystemInitialized) {
   initializeToolSystem();
-  getRegistry(); // 预热：基于环境变量自动注册本地/远程 Provider
+  getRegistry();
   toolSystemInitialized = true;
 }
 import { errorResponse, errorResponseWithStatus } from './_utils/response.js';
@@ -375,31 +372,16 @@ export async function post({
       }
 
       // ==================== 单Agent模式 ====================
-      // ✅ V2: 检查是否启用 Function Calling
-      const useV2 = process.env.TOOL_SYSTEM_V2 === 'true';
-      console.log(`🔧 工具系统版本: ${useV2 ? 'V2 (Function Calling)' : 'V1 (Prompt-based)'}`);
-
-      // 🆕 使用新的 Clean Architecture - Memory 模块
       const memoryConfig = getRecommendedConfig(modelType);
       const getConversationContextUseCase = container.getGetConversationContextUseCase();
       
       console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
 
-      // ✅ V2: 根据版本选择 System Prompt
-      let systemPrompt: string;
-      if (useV2) {
-        const { SYSTEM_PROMPT_V2 } = await import('../config/systemPrompt.v2.js');
-        systemPrompt = SYSTEM_PROMPT_V2;
-      } else {
-        systemPrompt = SYSTEM_PROMPT;
-      }
-
-      // 构建消息历史（带上下文记忆）
       const contextResult = await getConversationContextUseCase.execute({
         conversationId,
         userId,
         currentMessage: message,
-        systemPrompt: systemPrompt,
+        systemPrompt: SYSTEM_PROMPT,
         config: memoryConfig,
       });
       
@@ -407,118 +389,53 @@ export async function post({
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       console.log(`📊 记忆统计: ${contextResult.stats.uniqueMessages} 条唯一消息, 预估 ${contextResult.stats.estimatedTokens} tokens`);
 
-      // ✅ 创建 AbortController（用于用户断连时中断上游请求）
-      // 注意：暂不实现，因为需要在更底层传递，留待后续优化
-      // const abortController = new AbortController();
-      
-      // 调用模型
-      if (useV2) {
-        // ==================== V2: Function Calling 模式 ====================
-        console.log('🔍 [V2] 开始动态导入 V2 模块...');
-        const { callLocalModelV2, callVolcengineModelV2 } = await import('../_clean/infrastructure/llm/model-service.v2.js');
-        const { handleLocalStreamV2, handleVolcanoStreamV2 } = await import('../handlers/singleAgentHandler.v2.js');
-        const { toolRegistry } = await import('../tools/v2/index.js');
-        console.log('✅ [V2] 动态导入成功');
-        console.log('✅ [V2] handleVolcanoStreamV2 类型:', typeof handleVolcanoStreamV2);
+      const tools = toolRegistry.getAllSchemas();
+      console.log(`🔧 传递 ${tools.length} 个工具定义给模型`);
 
-        // 获取工具定义
-        const tools = toolRegistry.getAllSchemas();
-        console.log(`🔧 传递 ${tools.length} 个工具定义给模型`);
-
-        if (modelType === 'local') {
-          console.log('开始调用本地模型（V2 - Function Calling）...');
-          const stream = await callLocalModelV2(messages, { tools });
-          handoffToStream = true;
-          return handleLocalStreamV2(
-            stream,
-            conversationId,
-            userId,
-            modelType,
-            messages,
-            clientAssistantMessageId,
-            slot.release,
-            message
-          );
-        } else if (modelType === 'volcano') {
-          const remoteProvider = getRegistry().get('remote');
-          const remoteAvailable = remoteProvider ? await remoteProvider.isAvailable() : false;
-          console.log('==========================================');
-          console.log('🌋 开始调用火山引擎豆包模型（V2 - Function Calling）...');
-          console.log('🔑 远程 Provider 状态:', remoteAvailable ? '已配置' : '未配置');
-          console.log('🎯 目标模型:', remoteProvider?.getModelName() || 'N/A');
-          console.log('==========================================');
-          
-          if (!remoteAvailable) {
-            console.error('❌ 远程模型 API 未配置！');
-            return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
-          }
-
-          const stream = await callVolcengineModelV2(messages, { tools });
-          console.log('✅ 已收到远程模型的流式响应');
-          
-          handoffToStream = true;
-          const result = handleVolcanoStreamV2(
-            stream,
-            conversationId,
-            userId,
-            modelType,
-            messages,
-            clientAssistantMessageId,
-            slot.release,
-            message
-          );
-          console.log('🔍 [V2] handleVolcanoStreamV2 已返回，result 类型:', typeof result, result?.constructor?.name);
-          return result;
-        } else {
-          return errorResponse('不支持的模型类型', requestOrigin);
+      if (modelType === 'local') {
+        console.log('开始调用本地模型...');
+        const stream = await callLocalModel(messages, { tools });
+        handoffToStream = true;
+        return handleLocalStream(
+          stream,
+          conversationId,
+          userId,
+          modelType,
+          messages,
+          clientAssistantMessageId,
+          slot.release,
+          message
+        );
+      } else if (modelType === 'volcano') {
+        const remoteProvider = getRegistry().get('remote');
+        const remoteAvailable = remoteProvider ? await remoteProvider.isAvailable() : false;
+        console.log('==========================================');
+        console.log('🌋 开始调用火山引擎豆包模型...');
+        console.log('🔑 远程 Provider 状态:', remoteAvailable ? '已配置' : '未配置');
+        console.log('🎯 目标模型:', remoteProvider?.getModelName() || 'N/A');
+        console.log('==========================================');
+        
+        if (!remoteAvailable) {
+          console.error('❌ 远程模型 API 未配置！');
+          return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
         }
+
+        const stream = await callVolcengineModel(messages, { tools });
+        console.log('✅ 已收到远程模型的流式响应');
+        
+        handoffToStream = true;
+        return handleVolcanoStream(
+          stream,
+          conversationId,
+          userId,
+          modelType,
+          messages,
+          clientAssistantMessageId,
+          slot.release,
+          message
+        );
       } else {
-        // ==================== V1: Prompt-based 模式 ====================
-        if (modelType === 'local') {
-          console.log('开始调用本地模型...');
-          const stream = await callLocalModel(messages /* , abortController.signal */);
-          handoffToStream = true;
-          return handleLocalStream(
-            stream,
-            conversationId,
-            userId,
-            modelType,
-            messages,
-            clientAssistantMessageId,
-            slot.release,
-            message // 传递原始请求文本用于缓存
-          );
-        } else if (modelType === 'volcano') {
-          const remoteProviderV1 = getRegistry().get('remote');
-          const remoteAvailableV1 = remoteProviderV1 ? await remoteProviderV1.isAvailable() : false;
-          console.log('==========================================');
-          console.log('🌋 开始调用火山引擎豆包模型...');
-          console.log('🔑 远程 Provider 状态:', remoteAvailableV1 ? '已配置' : '未配置');
-          console.log('🎯 目标模型:', remoteProviderV1?.getModelName() || 'N/A');
-          console.log('==========================================');
-          
-          if (!remoteAvailableV1) {
-            console.error('❌ 远程模型 API 未配置！');
-            return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
-          }
-
-          const stream = await callVolcengineModel(messages /* , abortController.signal */);
-          console.log('✅ 已收到远程模型的流式响应');
-          
-          handoffToStream = true;
-          return handleVolcanoStream(
-            stream,
-            conversationId,
-            userId,
-            modelType,
-            messages,
-            clientAssistantMessageId,
-            slot.release,
-            message // 传递原始请求文本用于缓存
-          );
-        } else {
-          return errorResponse('不支持的模型类型', requestOrigin);
-        }
+        return errorResponse('不支持的模型类型', requestOrigin);
       }
     } finally {
       // ✅ 没有进入流式返回，就在这里释放名额（避免泄漏）

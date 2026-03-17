@@ -1,27 +1,49 @@
 /**
- * 单Agent处理器
- * 处理单Agent模式的SSE流式响应（支持工具调用）
+ * 单Agent处理器 - 支持 Function Calling
  */
 
 import { SSEStreamWriter } from '../utils/sseStreamWriter.js';
 import { volcengineService } from '../_clean/infrastructure/llm/volcengine-service.js';
 import { extractThinkingAndContent } from '../_clean/shared/utils/content-extractor.js';
 import { getContainer } from '../_clean/di-container.js';
-import { MultiToolCallManager } from '../workflows/chatWorkflowIntegration.js';
-import { executeToolCall } from '../tools/v2/adapters/legacy-adapter.js'; // ✅ V2: 使用新工具系统（兼容适配器）
-import { extractToolCallWithRemainder } from '../_clean/shared/utils/json-extractor.js';
-import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
 import type { ChatMessage } from '../types/chat.js';
-import { requestCacheService } from '../_clean/infrastructure/cache/request-cache.service.js';
 import { 
-  ControlledSSEWriter,
   createLocalControlledWriter,
   createRemoteControlledWriter
 } from '../_clean/infrastructure/streaming/controlled-sse-writer.js';
 import { StreamProgressManager } from '../_clean/infrastructure/streaming/stream-progress-manager.js';
 
+import { toolRegistry, toolExecutor } from '../tools/index.js';
+import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
+
 /**
- * 处理火山引擎流式响应并转换为 SSE 格式
+ * 保存助手消息到数据库
+ */
+async function saveMessage(
+  conversationId: string,
+  userId: string,
+  content: string,
+  clientAssistantMessageId?: string,
+  thinking?: string,
+  sources?: Array<{title: string; url: string}>
+): Promise<void> {
+  const container = getContainer();
+  const createMessageUseCase = container.getCreateMessageUseCase();
+  
+  await createMessageUseCase.execute(
+    conversationId,
+    userId,
+    'assistant',
+    content,
+    clientAssistantMessageId,
+    undefined, // modelType
+    thinking,
+    sources
+  );
+}
+
+/**
+ * 处理火山引擎流式响应并转换为 SSE 格式（Function Calling）
  */
 export async function handleVolcanoStream(
   stream: any,
@@ -31,217 +53,293 @@ export async function handleVolcanoStream(
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
   onFinally?: () => void,
-  requestText?: string // 新增：用于缓存的原始请求文本
+  requestText?: string
 ): Promise<Response> {
+  console.log('🚀 handleVolcanoStream 被调用');
+  console.log('🚀 stream 类型:', typeof stream, stream?.constructor?.name);
+  
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const sseWriter = new SSEStreamWriter(writer);
   
-  // ✅ 使用受控 SSE Writer（根据模型类型选择不同的打字机速率）
+  // ✅ 使用受控 SSE Writer
   const controlledWriter = modelType === 'local' 
-    ? createLocalControlledWriter(sseWriter)  // 本地模型：快速
-    : createRemoteControlledWriter(sseWriter); // 远程模型：适中
+    ? createLocalControlledWriter(sseWriter)
+    : createRemoteControlledWriter(sseWriter);
 
   let buffer = '';
   let accumulatedText = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
+  
+  // 累积 tool_calls（流式模式下分批返回）
+  let accumulatedToolCalls: Map<number, { name?: string; arguments: string }> = new Map();
 
-  // ✅ 流式进度管理器（用于续流）
+  // ✅ 流式进度管理器
   const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
   const container = getContainer();
   const streamProgressRepo = container.getStreamProgressRepository();
   const progressManager = new StreamProgressManager(streamProgressRepo, {
-    updateIntervalMs: 1000,  // 每1秒更新一次
-    updateCharThreshold: 100, // 或每100字符更新一次
+    updateIntervalMs: 1000,
+    updateCharThreshold: 100,
   });
 
-  // ⚠️ 内存保护：单个响应最大长度限制（防止内存溢出）
-  const MAX_RESPONSE_LENGTH = 100000; // 100KB，约5万字
-  let isMemoryLimitExceeded = false;
+
+  // 处理流的辅助函数（支持递归调用）
+  async function processStream(currentStream: any, depth: number = 0): Promise<void> {
+    let chunkCount = 0;
+    
+    for await (const chunk of currentStream) {
+      chunkCount++;
+      
+      if (sseWriter.isClosed()) {
+        console.log('⚠️  客户端已断开连接，停止处理流');
+        return;
+      }
+
+      const text = chunk.toString();
+      buffer += text;
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim() || line.startsWith(':')) continue;
+        if (!line.startsWith('data: ')) continue;
+
+        const data = line.slice(6);
+        if (data === '[DONE]') {
+          console.log('✅ 流式响应完成');
+          continue;
+        }
+
+        try {
+          const jsonData = JSON.parse(data);
+          
+          // 火山引擎格式: choices[0].delta
+          const choice = jsonData.choices?.[0];
+          if (!choice) {
+            continue;
+          }
+          
+          const delta = choice.delta;
+          if (!delta) {
+            continue;
+          }
+          
+          // 累积 tool_calls（流式模式）
+          if (delta.tool_calls && delta.tool_calls.length > 0) {
+            for (const toolCall of delta.tool_calls) {
+              const index = toolCall.index || 0;
+              const func = toolCall.function;
+              
+              if (!accumulatedToolCalls.has(index)) {
+                accumulatedToolCalls.set(index, { arguments: '' });
+              }
+              
+              const accumulated = accumulatedToolCalls.get(index)!;
+              
+              // 累积函数名
+              if (func?.name) {
+                accumulated.name = func.name;
+              }
+              
+              // 累积参数
+              if (func?.arguments) {
+                accumulated.arguments += func.arguments;
+              }
+            }
+            
+            continue; // 继续累积，不要立即执行
+          }
+
+          // 检查是否完成并执行工具
+          if (choice.finish_reason === 'tool_calls') {
+            console.log('🔧 工具调用完成，开始执行...');
+            
+            // 执行所有累积的工具调用
+            for (const [index, accumulated] of accumulatedToolCalls.entries()) {
+              if (sseWriter.isClosed()) {
+                console.log('⚠️  客户端已断开，跳过工具调用');
+                return;
+              }
+
+              const toolName = accumulated.name;
+              if (!toolName) {
+                console.error('❌ 工具名缺失');
+                continue;
+              }
+              
+              let params: any;
+              
+              try {
+                params = JSON.parse(accumulated.arguments);
+              } catch (e) {
+                console.error('❌ 解析工具参数失败:', e);
+                params = {};
+              }
+
+              console.log(`🔧 执行工具: ${toolName}`, params);
+
+              // 发送工具调用通知
+              await controlledWriter.sendEvent('正在执行工具...', {
+                toolCall: { tool: toolName, ...params },
+              });
+
+              // 使用 toolExecutor 执行工具
+              const context = {
+                userId,
+                conversationId,
+                requestId: clientAssistantMessageId || `req_${Date.now()}`,
+                timestamp: Date.now(),
+              };
+
+              const result = await toolExecutor.execute(toolName, params, context);
+
+              if (!result.success) {
+                console.error(`❌ 工具执行失败: ${result.error}`);
+                
+                // 将错误信息返回给模型
+                messages.push(
+                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'user', content: `工具执行失败: ${result.error}` }
+                );
+              } else {
+                console.log(`✅ 工具执行成功 (${result.duration}ms, 缓存: ${result.fromCache})`);
+                
+                // 保存搜索来源（如果有）- sources 在 result 顶层，不在 data 里
+                if (result.sources && Array.isArray(result.sources)) {
+                  searchSources = result.sources;
+                  console.log(`📎 已保存 ${result.sources.length} 个搜索来源`);
+                }
+
+                // 将工具结果返回给模型
+                const resultText = typeof result.data === 'string' 
+                  ? result.data 
+                  : JSON.stringify(result.data, null, 2);
+
+                messages.push(
+                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'user', content: `工具执行结果：\n\n${resultText}\n\n请基于这个结果回答用户的问题。` }
+                );
+              }
+            }
+            
+            // 所有工具执行完成，重新调用模型
+            if (sseWriter.isClosed()) {
+              console.log('⚠️  客户端已断开，停止后续调用');
+              return;
+            }
+
+            console.log('🔄 基于工具结果继续生成...');
+            
+            accumulatedText = '';
+            buffer = '';
+            accumulatedToolCalls.clear(); // 清空累积的工具调用
+            
+            const newStream = modelType === 'local'
+              ? await callLocalModel(messages, { 
+                  tools: toolRegistry.getAllSchemas() 
+                })
+              : await callVolcengineModel(messages, { 
+                  tools: toolRegistry.getAllSchemas() 
+                });
+
+            // 递归处理新的流
+            await processStream(newStream, (depth || 0) + 1);
+            return; // 新流处理完成后退出当前流
+          }
+
+          // 处理普通文本流
+          const content = delta.content || '';
+          if (content) {
+            accumulatedText += content;
+
+            // 提取 thinking 和实际内容
+            const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+
+            if (!sseWriter.isClosed()) {
+              await controlledWriter.sendEvent(mainContent, {
+                thinking: thinking || undefined,
+              });
+            }
+          }
+
+          // 处理完成（只处理 stop，tool_calls 已在上面处理）
+          if (choice.finish_reason === 'stop') {
+            console.log('✅ 模型响应完成');
+            
+            // 保存消息到数据库
+            if (!messageSaved && accumulatedText) {
+              messageSaved = true;
+              try {
+                const { thinking } = extractThinkingAndContent(accumulatedText);
+                await saveMessage(
+                  conversationId,
+                  userId,
+                  accumulatedText,
+                  clientAssistantMessageId,
+                  thinking,
+                  searchSources
+                );
+                console.log(`💾 助手消息已保存${searchSources ? ` (含 ${searchSources.length} 个来源)` : ''}`);
+              } catch (error) {
+                console.error('❌ 保存助手消息失败:', error);
+              }
+            }
+
+            // 发送完成信号
+            if (!sseWriter.isClosed()) {
+              await controlledWriter.sendDirect({
+                done: true,
+                assistantMessageId: clientAssistantMessageId,
+                sources: searchSources,
+              });
+            }
+          }
+
+        } catch (e) {
+          console.error('❌ 解析 JSON 失败:', e);
+        }
+      }
+    }
+  }
 
   // 异步处理流
   (async () => {
     try {
-      // 发送初始化事件（直接发送，不需要打字机效果）
-      await controlledWriter.sendDirect({
-        conversationId,
-        type: 'init'
-      });
+      // ✅ 发送初始化数据
+      if (!sseWriter.isClosed()) {
+        await controlledWriter.sendDirect({
+          conversationId,
+          assistantMessageId: clientAssistantMessageId,
+          type: 'init',
+        });
+      }
 
-      // 启动心跳
+      // ✅ 启动心跳
       sseWriter.startHeartbeat(15000);
 
-      for await (const chunk of stream) {
-        const chunkStr = chunk.toString();
-        buffer += chunkStr;
-        
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+      // 开始处理流
+      await processStream(stream);
 
-        for (const line of lines) {
-          if (line.trim()) {
-            const content = volcengineService.parseStreamLine(line);
-            
-            if (content) {
-              accumulatedText += content;
-              
-              // 🛡️ 内存保护：检查是否超过限制
-              if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
-                if (!isMemoryLimitExceeded) {
-                  console.warn(`⚠️  [Volcano] 响应长度超过限制 (${MAX_RESPONSE_LENGTH} 字符)，停止累积`);
-                  isMemoryLimitExceeded = true;
-                  
-                  // 提取thinking用于保存
-                  const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
-                  
-                  // 最后一次保存到 MongoDB
-                  await progressManager.updateProgress(
-                    messageId,
-                    accumulatedText + '\n\n[响应过长，已截断]',
-                    {
-                      userId,
-                      conversationId,
-                      modelType,
-                      thinking: thinkingPart,
-                      sources: searchSources,
-                    },
-                    true // 强制更新
-                  );
-                }
-                continue; // 跳过后续内容
-              }
-              
-              const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
-
-              // ✅ 尝试发送给前端（如果连接还在）
-              if (!sseWriter.isClosed()) {
-                await controlledWriter.sendEvent(mainContent, {
-                  thinking: thinking || undefined,
-                });
-              } else {
-                // 🔥 关键：前端断开，但继续累积（不中断模型）
-                console.log('⚠️  [Volcano] 前端断开，继续累积模型输出（续流模式）');
-              }
-
-              // ✅ 批量更新进度到 MongoDB（用于续流）
-              await progressManager.updateProgress(
-                messageId,
-                accumulatedText,
-                {
-                  userId,
-                  conversationId,
-                  modelType,
-                  thinking,
-                  sources: searchSources,
-                }
-              );
-            }
-
-            // 检查是否完成
-            if (line.includes('[DONE]')) {
-              console.log('✅ 火山引擎流式响应完成');
-              
-              // 🔥 多工具调用工作流（即使前端断开也要执行，因为需要完整内容）
-              const workflowResult = await processToolCallWorkflow(
-                accumulatedText,
-                userId,
-                messages,
-                sseWriter,
-                () => !sseWriter.isClosed() // ✅ 连接检查器
-              );
-              
-              if (workflowResult) {
-                accumulatedText = workflowResult.finalResponse;
-                searchSources = workflowResult.sources;
-              }
-              
-              // 最终处理和保存
-              if (accumulatedText) {
-                const { thinking, content } = extractThinkingAndContent(accumulatedText);
-                
-                // 尝试发送最终结果（如果前端还连接着）
-                if (!sseWriter.isClosed()) {
-                  await sseWriter.sendEvent({
-                    content: content || accumulatedText,
-                    thinking: thinking || undefined,
-                    sources: searchSources || undefined,
-                  });
-                }
-                
-                // 保存到数据库和缓存
-                await saveMessage(
-                  conversationId,
-                  userId,
-                  content || accumulatedText,
-                  clientAssistantMessageId,
-                  thinking,
-                  modelType,
-                  searchSources,
-                  requestText // 传递请求文本用于缓存
-                );
-                messageSaved = true;
-
-                // ✅ 标记流式进度为完成
-                await progressManager.markCompleted(
-                  messageId,
-                  content || accumulatedText,
-                  thinking,
-                  searchSources
-                );
-                console.log('✅ [StreamProgress] 标记为完成');
-              }
-              
-              await sseWriter.close();
-              return;
-            }
-          }
-        }
-      }
-
-      // 处理缓冲区剩余数据
-      if (buffer.trim()) {
-        const content = volcengineService.parseStreamLine(buffer);
-        if (content) {
-          accumulatedText += content;
-          const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
-          
-          await sseWriter.sendEvent({
-            content: mainContent || accumulatedText,
-            thinking: thinking || undefined,
-          });
-        }
-      }
-      
-      await sseWriter.close();
     } catch (error: any) {
-      console.error('❌ [SSE] 流处理错误:', error);
+      console.error('❌ 流处理错误:', error);
       
       if (!sseWriter.isClosed()) {
-        await sseWriter.sendEvent({ error: error.message });
+        await controlledWriter.sendDirect({
+          error: '处理失败',
+          message: error.message,
+        });
       }
-      
-      await sseWriter.close();
     } finally {
-      // 保存不完整的回答
-      if (!messageSaved && accumulatedText && accumulatedText.trim()) {
-        try {
-          const { thinking, content } = extractThinkingAndContent(accumulatedText);
-          await saveMessage(
-            conversationId,
-            userId,
-            content || accumulatedText,
-            clientAssistantMessageId,
-            thinking,
-            modelType,
-            searchSources
-          );
-        } catch (dbError) {
-          console.error('❌ [Finally] 保存不完整回答失败:', dbError);
-        }
-      }
+      // 清理
+      sseWriter.stopHeartbeat();
+      await sseWriter.close();
       
-      onFinally?.();
+      if (onFinally) {
+        onFinally();
+      }
     }
   })();
 
@@ -255,7 +353,7 @@ export async function handleVolcanoStream(
 }
 
 /**
- * 处理本地模型流式响应并转换为 SSE 格式
+ * 处理本地 Ollama 模型流式响应并转换为 SSE 格式（Function Calling）
  */
 export async function handleLocalStream(
   stream: any,
@@ -265,22 +363,18 @@ export async function handleLocalStream(
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
   onFinally?: () => void,
-  requestText?: string // 新增：用于缓存的原始请求文本
+  requestText?: string
 ): Promise<Response> {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const sseWriter = new SSEStreamWriter(writer);
-  
-  // ✅ 使用受控 SSE Writer（本地模型使用快速配置）
+
   const controlledWriter = createLocalControlledWriter(sseWriter);
 
-  let buffer = '';
   let accumulatedText = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
-  const originalRequestText = requestText; // 保存原始请求文本
 
-  // ✅ 流式进度管理器（用于续流）
   const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
   const container = getContainer();
   const streamProgressRepo = container.getStreamProgressRepository();
@@ -289,277 +383,235 @@ export async function handleLocalStream(
     updateCharThreshold: 100,
   });
 
-  // ⚠️ 内存保护：单个响应最大长度限制
-  const MAX_RESPONSE_LENGTH = 100000; // 100KB，约5万字
-  let isMemoryLimitExceeded = false;
+  /**
+   * 处理 Ollama JSON 行格式的流（支持递归工具调用）
+   */
+  async function processOllamaStream(currentStream: any, depth: number = 0): Promise<void> {
+    const MAX_DEPTH = 5;
+    if (depth >= MAX_DEPTH) {
+      console.warn(`⚠️  [Ollama] 递归深度达到上限 (${MAX_DEPTH})，停止`);
+      return;
+    }
+
+    let localBuffer = '';
+
+    for await (const chunk of currentStream) {
+      if (sseWriter.isClosed()) {
+        console.log('⚠️  [Ollama] 客户端已断开，停止处理');
+        return;
+      }
+
+      const text = chunk.toString();
+      localBuffer += text;
+
+      const lines = localBuffer.split('\n');
+      localBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        let jsonData: any;
+        try {
+          jsonData = JSON.parse(line);
+        } catch {
+          console.error('❌ [Ollama] JSON 解析失败:', line.substring(0, 100));
+          continue;
+        }
+
+        // Ollama 文本内容: message.content
+        if (jsonData.message?.content) {
+          accumulatedText += jsonData.message.content;
+          const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+
+          if (!sseWriter.isClosed()) {
+            await controlledWriter.sendEvent(mainContent, {
+              thinking: thinking || undefined,
+            });
+          }
+
+          await progressManager.updateProgress(
+            messageId,
+            accumulatedText,
+            { userId, conversationId, modelType, thinking, sources: searchSources }
+          );
+        }
+
+        // Ollama 完成标记：done === true
+        if (jsonData.done) {
+          // Ollama 工具调用：tool_calls 在 done=true 的消息中
+          const ollamaToolCalls = jsonData.message?.tool_calls;
+
+          if (Array.isArray(ollamaToolCalls) && ollamaToolCalls.length > 0) {
+            console.log(`🔧 [Ollama] 检测到 ${ollamaToolCalls.length} 个工具调用`);
+
+            for (const tc of ollamaToolCalls) {
+              if (sseWriter.isClosed()) {
+                console.log('⚠️  [Ollama] 客户端已断开，跳过工具执行');
+                return;
+              }
+
+              const toolName = tc.function?.name;
+              if (!toolName) {
+                console.error('❌ [Ollama] 工具名缺失');
+                continue;
+              }
+
+              let params: any;
+              try {
+                params = typeof tc.function.arguments === 'string'
+                  ? JSON.parse(tc.function.arguments)
+                  : tc.function.arguments || {};
+              } catch {
+                params = {};
+              }
+
+              console.log(`🔧 [Ollama] 执行工具: ${toolName}`, params);
+
+              await controlledWriter.sendEvent('正在执行工具...', {
+                toolCall: { tool: toolName, ...params },
+              });
+
+              const context = {
+                userId,
+                conversationId,
+                requestId: clientAssistantMessageId || `req_${Date.now()}`,
+                timestamp: Date.now(),
+              };
+
+              const result = await toolExecutor.execute(toolName, params, context);
+
+              if (!result.success) {
+                console.error(`❌ [Ollama] 工具执行失败: ${result.error}`);
+                messages.push(
+                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'user', content: `工具执行失败: ${result.error}` }
+                );
+              } else {
+                console.log(`✅ [Ollama] 工具执行成功 (${result.duration}ms)`);
+
+                if (result.sources && Array.isArray(result.sources)) {
+                  searchSources = result.sources;
+                }
+
+                const resultText = typeof result.data === 'string'
+                  ? result.data
+                  : JSON.stringify(result.data, null, 2);
+
+                messages.push(
+                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'user', content: `工具执行结果：\n\n${resultText}\n\n请基于这个结果回答用户的问题。` }
+                );
+              }
+            }
+
+            // 所有工具执行完，重新调用 Ollama
+            if (sseWriter.isClosed()) return;
+
+            console.log('🔄 [Ollama] 基于工具结果继续生成...');
+            accumulatedText = '';
+
+            const newStream = await callLocalModel(messages, {
+              tools: toolRegistry.getAllSchemas(),
+            });
+
+            await processOllamaStream(newStream, depth + 1);
+            return;
+          }
+
+          // 没有工具调用，正常结束
+          console.log('✅ [Ollama] 本地模型响应完成');
+
+          if (!messageSaved && accumulatedText) {
+            messageSaved = true;
+            try {
+              const { thinking } = extractThinkingAndContent(accumulatedText);
+              await saveMessage(
+                conversationId,
+                userId,
+                accumulatedText,
+                clientAssistantMessageId,
+                thinking,
+                searchSources
+              );
+              console.log(`💾 [Ollama] 消息已保存${searchSources ? ` (含 ${searchSources.length} 个来源)` : ''}`);
+            } catch (error) {
+              console.error('❌ [Ollama] 保存消息失败:', error);
+            }
+          }
+
+          if (!sseWriter.isClosed()) {
+            await controlledWriter.sendDirect({
+              done: true,
+              assistantMessageId: clientAssistantMessageId,
+              sources: searchSources,
+            });
+          }
+
+          return;
+        }
+      }
+    }
+
+    // 处理 localBuffer 中可能残留的最后一行
+    if (localBuffer.trim()) {
+      try {
+        const jsonData = JSON.parse(localBuffer);
+        if (jsonData.message?.content) {
+          accumulatedText += jsonData.message.content;
+        }
+      } catch {
+        // 忽略解析失败
+      }
+    }
+  }
 
   // 异步处理流
   (async () => {
     try {
-      // 发送初始化事件（直接发送）
-      await controlledWriter.sendDirect({
-        conversationId,
-        type: 'init'
-      });
-
-      // 启动心跳
-      sseWriter.startHeartbeat(15000);
-      
-      for await (const chunk of stream) {
-        const chunkStr = chunk.toString();
-        buffer += chunkStr;
-        
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const jsonData = JSON.parse(line);
-
-              if (jsonData.message && jsonData.message.content !== undefined) {
-                accumulatedText += jsonData.message.content;
-                
-                // 🛡️ 内存保护：检查是否超过限制
-                if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
-                  if (!isMemoryLimitExceeded) {
-                    console.warn(`⚠️  [Local] 响应长度超过限制 (${MAX_RESPONSE_LENGTH} 字符)，停止累积`);
-                    isMemoryLimitExceeded = true;
-                    
-                    const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
-                    
-                    await progressManager.updateProgress(
-                      messageId,
-                      accumulatedText + '\n\n[响应过长，已截断]',
-                      {
-                        userId,
-                        conversationId,
-                        modelType,
-                        thinking: thinkingPart,
-                        sources: searchSources,
-                      },
-                      true
-                    );
-                  }
-                  continue;
-                }
-                
-                const { thinking, content } = extractThinkingAndContent(accumulatedText);
-
-                // ✅ 尝试发送给前端（如果连接还在）
-                if (!sseWriter.isClosed()) {
-                  await controlledWriter.sendEvent(content, {
-                    thinking: thinking || undefined,
-                  });
-                } else {
-                  // 🔥 关键：前端断开，但继续累积（不中断模型）
-                  console.log('⚠️  [Local] 前端断开，继续累积模型输出（续流模式）');
-                }
-
-                // ✅ 批量更新进度到 MongoDB
-                await progressManager.updateProgress(
-                  messageId,
-                  accumulatedText,
-                  {
-                    userId,
-                    conversationId,
-                    modelType,
-                    thinking,
-                    sources: searchSources,
-                  }
-                );
-              }
-
-              if (jsonData.done) {
-                console.log('✅ 本地模型流式响应完成');
-                
-                // 检测工具调用
-                const toolCallResult = extractToolCallWithRemainder(accumulatedText);
-                
-                if (toolCallResult) {
-                  console.log('🔧 [本地模型] 检测到工具调用:', toolCallResult.data);
-                  
-                  // ✅ 工具调用前检查连接
-                  if (sseWriter.isClosed()) {
-                    console.log('⚠️  [Local] 客户端已断开，跳过工具调用');
-                    return;
-                  }
-                  
-                  // 执行工具调用
-                  const { resultText, sources } = await executeToolCall(toolCallResult.data, userId);
-                  searchSources = sources;
-                  
-                  // ✅ 工具执行后再次检查连接
-                  if (sseWriter.isClosed()) {
-                    console.log('⚠️  [Local] 工具执行期间客户端已断开，停止后续调用');
-                    return;
-                  }
-                  
-                  // 将工具结果添加到消息历史
-                  messages.push(
-                    { role: 'assistant', content: accumulatedText },
-                    { role: 'user', content: `以下是搜索结果，请基于这些搜索结果回答用户的问题：\n\n${resultText}\n\n请现在根据上述搜索结果，详细回答用户的问题。` }
-                  );
-                  
-                  // 重新调用模型（不传 signal，因为这里无法创建新的 AbortController）
-                  const newStream = await callLocalModel(messages);
-                  
-                  // 重置累积文本
-                  accumulatedText = '';
-                  buffer = '';
-                  
-                  // 继续处理新的流
-                  for await (const newChunk of newStream) {
-                    const newChunkStr = newChunk.toString();
-                    buffer += newChunkStr;
-                    
-                    const newLines = buffer.split('\n');
-                    buffer = newLines.pop() || '';
-
-                    for (const newLine of newLines) {
-                      if (newLine.trim()) {
-                        try {
-                          const newJsonData = JSON.parse(newLine);
-
-                          if (newJsonData.message && newJsonData.message.content !== undefined) {
-                            accumulatedText += newJsonData.message.content;
-                            
-                            // 🛡️ 内存保护
-                            if (accumulatedText.length > MAX_RESPONSE_LENGTH) {
-                              if (!isMemoryLimitExceeded) {
-                                console.warn(`⚠️  [Local] 二次调用响应长度超过限制，停止累积`);
-                                isMemoryLimitExceeded = true;
-                                
-                                const { thinking: thinkingPart } = extractThinkingAndContent(accumulatedText);
-                                
-                                await progressManager.updateProgress(
-                                  messageId,
-                                  accumulatedText + '\n\n[响应过长，已截断]',
-                                  {
-                                    userId,
-                                    conversationId,
-                                    modelType,
-                                    thinking: thinkingPart,
-                                    sources: searchSources,
-                                  },
-                                  true
-                                );
-                              }
-                              continue;
-                            }
-                            
-                            const { thinking, content } = extractThinkingAndContent(accumulatedText);
-
-                            // ✅ 尝试发送（如果连接还在）
-                            if (!sseWriter.isClosed()) {
-                              await controlledWriter.sendEvent(content, {
-                                thinking: thinking || undefined,
-                              });
-                            } else {
-                              console.log('⚠️  [Local] 二次调用期间前端断开，继续累积（续流模式）');
-                            }
-
-                            // ✅ 更新进度
-                            await progressManager.updateProgress(
-                              messageId,
-                              accumulatedText,
-                              {
-                                userId,
-                                conversationId,
-                                modelType,
-                                thinking,
-                                sources: searchSources,
-                              }
-                            );
-                          }
-
-                          if (newJsonData.done) {
-                            break;
-                          }
-                        } catch (error) {
-                          console.error('解析流数据失败:', error);
-                        }
-                      }
-                    }
-                  }
-                }
-                
-                // 最终处理和保存
-                if (accumulatedText) {
-                  const { thinking, content } = extractThinkingAndContent(accumulatedText);
-                  
-                  // 尝试发送最终结果（如果前端还连接着）
-                  if (!sseWriter.isClosed()) {
-                    await sseWriter.sendEvent({
-                      content: content || accumulatedText,
-                      thinking: thinking || undefined,
-                      sources: searchSources || undefined,
-                    });
-                  }
-                  
-                  // 保存到数据库和缓存
-                  await saveMessage(
-                    conversationId,
-                    userId,
-                    content || accumulatedText,
-                    clientAssistantMessageId,
-                    thinking,
-                    modelType,
-                    searchSources,
-                    originalRequestText // 传递请求文本用于缓存
-                  );
-                  messageSaved = true;
-
-                  // ✅ 标记流式进度为完成
-                  await progressManager.markCompleted(
-                    messageId,
-                    content || accumulatedText,
-                    thinking,
-                    searchSources
-                  );
-                  console.log('✅ [StreamProgress] 标记为完成');
-                }
-                
-                await sseWriter.close();
-                return;
-              }
-            } catch (error) {
-              console.error('解析流数据失败:', error);
-            }
-          }
-        }
-      }
-
-      await sseWriter.close();
-    } catch (error: any) {
-      console.error('❌ [SSE] 流处理错误:', error);
-      
       if (!sseWriter.isClosed()) {
-        await sseWriter.sendEvent({ error: error.message });
+        await controlledWriter.sendDirect({
+          conversationId,
+          assistantMessageId: clientAssistantMessageId,
+          type: 'init',
+        });
       }
-      
-      await sseWriter.close();
+
+      sseWriter.startHeartbeat(15000);
+
+      await processOllamaStream(stream);
+
+    } catch (error: any) {
+      console.error('❌ [Ollama] 流处理错误:', error);
+
+      if (!sseWriter.isClosed()) {
+        await controlledWriter.sendDirect({
+          error: '处理失败',
+          message: error.message,
+        });
+      }
     } finally {
-      // 保存不完整的回答
+      sseWriter.stopHeartbeat();
+      await sseWriter.close();
+
       if (!messageSaved && accumulatedText && accumulatedText.trim()) {
         try {
-          const { thinking, content } = extractThinkingAndContent(accumulatedText);
+          const { thinking } = extractThinkingAndContent(accumulatedText);
           await saveMessage(
             conversationId,
             userId,
-            content || accumulatedText,
+            accumulatedText,
             clientAssistantMessageId,
             thinking,
-            modelType,
-            searchSources,
-            originalRequestText // 传递请求文本用于缓存
+            searchSources
           );
         } catch (dbError) {
-          console.error('❌ [Finally] 保存不完整回答失败:', dbError);
+          console.error('❌ [Ollama V2 Finally] 保存不完整回答失败:', dbError);
         }
       }
-      
-      onFinally?.();
+
+      if (onFinally) {
+        onFinally();
+      }
     }
   })();
 
@@ -571,250 +623,3 @@ export async function handleLocalStream(
     },
   });
 }
-
-/**
- * 处理工具调用工作流（多轮工具调用）
- */
-async function processToolCallWorkflow(
-  initialResponse: string,
-  userId: string,
-  messages: ChatMessage[],
-  sseWriter: SSEStreamWriter,
-  connectionChecker?: () => boolean // ✅ 新增：连接检查器
-): Promise<{ finalResponse: string; sources?: Array<{title: string; url: string}> } | null> {
-  const workflowManager = new MultiToolCallManager(5);
-  let currentResponse = initialResponse;
-  let searchSources: Array<{title: string; url: string}> | undefined;
-  let continueLoop = true;
-  let loopIteration = 0;
-  const MAX_LOOP_ITERATIONS = 10;
-  const MAX_TOTAL_TIME_MS = 120000; // 总时间限制120秒
-  const loopStartTime = Date.now();
-  
-  const originalUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
-  
-  while (continueLoop && loopIteration < MAX_LOOP_ITERATIONS) {
-    // ✅ 关键修复：检查连接状态
-    if (connectionChecker && !connectionChecker()) {
-      console.log('⚠️  [Workflow] 客户端已断开，停止工具调用循环');
-      return { finalResponse: currentResponse, sources: searchSources };
-    }
-    
-    // ✅ 检查总时间限制
-    const elapsedTime = Date.now() - loopStartTime;
-    if (elapsedTime > MAX_TOTAL_TIME_MS) {
-      console.warn(`⏰ [Workflow] 工具调用超时（${elapsedTime}ms），强制结束循环`);
-      break;
-    }
-    
-    loopIteration++;
-    
-    const workflowResult = await workflowManager.processAIResponse(currentResponse, userId);
-    
-    if (!workflowResult.hasToolCall) {
-      break;
-    }
-    
-    // ✅ 工具执行前再次检查连接
-    if (connectionChecker && !connectionChecker()) {
-      console.log('⚠️  [Workflow] 工具执行前客户端已断开');
-      return { finalResponse: currentResponse, sources: searchSources };
-    }
-    
-    // 发送工具调用通知
-    await sseWriter.sendEvent({
-      content: `正在执行工具: ${workflowResult.toolCall?.tool}...`,
-      toolCall: workflowResult.toolCall,
-    });
-    
-    // 保存搜索来源
-    if (workflowResult.toolResult?.sources) {
-      searchSources = workflowResult.toolResult.sources;
-    }
-    
-    // 构建工具结果反馈消息
-    const feedbackMessage = buildToolFeedbackMessage(
-      workflowResult,
-      originalUserMessage,
-      workflowManager.getHistory()
-    );
-    
-    // 将工具结果反馈给 AI
-    messages.push(
-      { role: 'assistant', content: currentResponse },
-      { role: 'user', content: feedbackMessage }
-    );
-    
-    if (!workflowResult.shouldContinue) {
-      continueLoop = false;
-      break;
-    }
-    
-    // ✅ 二次调用前检查连接
-    if (connectionChecker && !connectionChecker()) {
-      console.log('⚠️  [Workflow] 二次调用前客户端已断开');
-      return { finalResponse: currentResponse, sources: searchSources };
-    }
-    
-    // 重新调用 AI 模型（不传 signal，因为无法共享 AbortController）
-    const newStream = await callVolcengineModel(messages);
-    
-    // 重置累积文本
-    currentResponse = '';
-    let buffer = '';
-    
-    // 继续处理新的流
-    for await (const chunk of newStream) {
-      // ✅ 二次调用中也要检查连接
-      if (connectionChecker && !connectionChecker()) {
-        console.log('⚠️  [Workflow] 二次调用期间客户端已断开');
-        try {
-          const readableStream = newStream as any;
-          if (readableStream.cancel && typeof readableStream.cancel === 'function') {
-            await readableStream.cancel();
-          }
-        } catch (e) {
-          // 忽略取消错误
-        }
-        return { finalResponse: currentResponse, sources: searchSources };
-      }
-      
-      const chunkStr = chunk.toString();
-      buffer += chunkStr;
-      
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.trim()) {
-          const content = volcengineService.parseStreamLine(line);
-          
-          if (content) {
-            currentResponse += content;
-            const { thinking, content: mainContent } = extractThinkingAndContent(currentResponse);
-
-            await sseWriter.sendEvent({
-              content: mainContent,
-              thinking: thinking || undefined,
-            });
-          }
-
-          if (line.includes('[DONE]')) {
-            break;
-          }
-        }
-      }
-    }
-  }
-  
-  return { finalResponse: currentResponse, sources: searchSources };
-}
-
-/**
- * 构建工具反馈消息
- */
-function buildToolFeedbackMessage(
-  workflowResult: any,
-  originalUserMessage: string,
-  toolHistory: any[]
-): string {
-  const completedTools = toolHistory.map(h => h.tool).join(' → ');
-  
-  let feedbackMessage = '';
-  
-  if (workflowResult.error) {
-    feedbackMessage = `${workflowResult.toolResult?.resultText}\n\n---\n\n`;
-    feedbackMessage += `**用户的原始请求**："${originalUserMessage}"\n\n`;
-    feedbackMessage += `⚠️ 刚才的工具调用有误，请仔细检查错误提示，立即重新生成正确的工具调用。\n`;
-    feedbackMessage += `不要向用户解释错误，而是直接修正并重试。`;
-  } else {
-    feedbackMessage = `## 工具执行结果\n\n${workflowResult.toolResult?.resultText}\n\n---\n\n`;
-    feedbackMessage += `**📌 用户的原始请求**："${originalUserMessage}"\n\n`;
-    feedbackMessage += `**✅ 已完成步骤**: ${completedTools}\n\n`;
-    
-    // 根据工具类型给出更明确的指引
-    const hasMultiStepKeywords = /然后|接着|再|之后|并且|同时|最后/.test(originalUserMessage);
-    const hasUpdateKeyword = /修改|更新|改|调整|变更/.test(originalUserMessage);
-    const hasCreateKeyword = /制定|创建|新建|建立/.test(originalUserMessage);
-    
-    if (hasMultiStepKeywords) {
-      feedbackMessage += `⚠️ **重要**：用户的请求包含多个步骤（"然后"、"再"等关键词），你必须完成所有步骤！\n\n`;
-    }
-    
-    if (workflowResult.toolCall?.tool === 'search_web') {
-      feedbackMessage += `🔍 搜索已完成，现在分析下一步：\n`;
-      if (hasCreateKeyword) {
-        feedbackMessage += `✋ **你必须立即调用 create_plan 工具**创建计划，不要直接回复用户！\n`;
-      } else if (hasUpdateKeyword) {
-        feedbackMessage += `✋ **你必须立即调用 update_plan 工具**更新计划，不要直接回复用户！\n`;
-      }
-    }
-  }
-  
-  return feedbackMessage;
-}
-
-/**
- * 保存消息到数据库（抽取公共逻辑）
- */
-async function saveMessage(
-  conversationId: string,
-  userId: string,
-  content: string,
-  clientAssistantMessageId?: string,
-  thinking?: string,
-  modelType?: 'local' | 'volcano',
-  sources?: Array<{title: string; url: string}>,
-  requestText?: string // 新增：用于缓存的请求文本
-): Promise<void> {
-  const container = getContainer();
-  const createMessageUseCase = container.getCreateMessageUseCase();
-  const updateConversationUseCase = container.getUpdateConversationUseCase();
-  
-  await createMessageUseCase.execute(
-    conversationId,
-    userId,
-    'assistant',
-    content,
-    clientAssistantMessageId,
-    modelType,
-    thinking,
-    sources
-  );
-  
-  // 增加消息计数
-  const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
-  if (conversation) {
-    await updateConversationUseCase.execute(
-      conversationId,
-      userId,
-      { messageCount: conversation.messageCount + 1 }
-    );
-  }
-  console.log('✅ 消息已保存到数据库');
-  
-  // 保存到缓存（如果有请求文本）
-  if (requestText && modelType) {
-    try {
-      await requestCacheService.saveToCache(
-        requestText,
-        content,
-        userId,
-        {
-          modelType,
-          mode: 'single',
-          responseThinking: thinking,
-          metadata: {
-            hasSources: !!sources,
-            sourcesCount: sources?.length || 0,
-            conversationId,
-          },
-        }
-      );
-      console.log('✅ 响应已保存到缓存');
-    } catch (error) {
-      console.error('⚠️  保存缓存失败（不影响主流程）:', error);
-    }
-  }
-}
-
