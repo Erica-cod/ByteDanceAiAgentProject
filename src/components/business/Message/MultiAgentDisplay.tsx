@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
 import { useThrottle } from '../../../hooks';
+import { tryParseStreamingJSON, formatPartialAgentData } from '../../../utils/json/streamingJsonParser';
 import './MultiAgentDisplay.css';
 
 /**
@@ -75,6 +76,13 @@ const ACTION_NAMES: Record<string, string> = {
   converge: '进入收敛',
   force_opposition: '强制反方',
   terminate: '终止讨论',
+};
+
+const AGENT_STREAMING_MESSAGES: Record<string, string> = {
+  planner: '正在制定规划方案...',
+  critic: '正在审查方案可行性...',
+  host: '正在评估讨论进展...',
+  reporter: '正在撰写最终报告...',
 };
 
 const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
@@ -304,6 +312,17 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                       return null;
                     }
 
+                    // 流式阶段：尝试将 LLM 原始 JSON 输出解析为结构化 Markdown，
+                    // 解析成功则展示可读卡片，否则降级到 StreamingMarkdown
+                    let effectiveContent = displayContent;
+                    if (isStreaming && displayContent) {
+                      const parsed = tryParseStreamingJSON(displayContent);
+                      const formatted = parsed ? formatPartialAgentData(parsed) : null;
+                      if (formatted) {
+                        effectiveContent = formatted;
+                      }
+                    }
+
                     return (
                       <div key={index} className={`agent-output agent-${output.agent}`}>
                         <div className="agent-header">
@@ -317,8 +336,8 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                           {isStreaming && <span className="streaming-indicator">⚡ 生成中...</span>}
                         </div>
                         <div className="agent-content">
-                          {displayContent && displayContent.trim() ? (
-                            <StreamingMarkdown content={displayContent} />
+                          {effectiveContent && effectiveContent.trim() ? (
+                            <StreamingMarkdown content={effectiveContent} />
                           ) : isStreaming ? (
                             <div className="streaming-placeholder">
                               <div className="typing-indicator">
@@ -326,7 +345,9 @@ const MultiAgentDisplay: React.FC<MultiAgentDisplayProps> = ({
                                 <span></span>
                                 <span></span>
                               </div>
-                              <span className="streaming-text">正在生成分析...</span>
+                              <span className="streaming-text">
+                                {AGENT_STREAMING_MESSAGES[output.agent] || '正在生成分析...'}
+                              </span>
                             </div>
                           ) : (
                             <div className="typing-indicator">
