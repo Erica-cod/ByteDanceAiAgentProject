@@ -15,12 +15,11 @@ export interface ModelCallOptions {
 
 /**
  * 调用本地 Ollama 模型（V2 - 支持 Function Calling）
- * 
- * 注意：Ollama 支持 Function Calling（从 0.3.0+ 版本开始）
- * 格式与 OpenAI 兼容
- * 
- * @param messages - 对话消息列表
- * @param options - 调用选项（包含 tools 定义）
+ *
+ * Ollama /api/chat 的注意事项：
+ *   - 不支持 tool_choice 参数（OpenAI 专属），发送会导致 400
+ *   - 并非所有模型都支持 Function Calling（如 deepseek-r1 是推理模型）
+ *   - 如果带 tools 发送 400，会自动降级为不带 tools 重试
  */
 export async function callLocalModelV2(
   messages: ChatMessage[],
@@ -29,33 +28,55 @@ export async function callLocalModelV2(
   const fetch = (await import('node-fetch')).default;
   const modelName = process.env.OLLAMA_MODEL || 'deepseek-r1:7b';
   const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
-  
-  const requestBody: any = {
+
+  const baseBody: any = {
     model: modelName,
     messages,
     stream: true,
-    keep_alive: '30m', // 保持模型在内存中 30 分钟，避免频繁重新加载
+    keep_alive: '30m',
     options: {
-      num_gpu: 999,  // 强制所有层使用 GPU（999 表示尽可能多）
+      num_gpu: 999,
     }
   };
 
-  // ✅ 如果提供了工具定义，添加到请求中
-  if (options.tools && options.tools.length > 0) {
-    requestBody.tools = options.tools;
-    requestBody.tool_choice = options.tool_choice || 'auto';
-    console.log(`🔧 [Ollama] 传递 ${options.tools.length} 个工具定义`);
+  // Ollama 不支持 tool_choice，只传 tools
+  const hasTools = !!(options.tools && options.tools.length > 0);
+  if (hasTools) {
+    baseBody.tools = options.tools;
+    console.log(`🔧 [Ollama] 传递 ${options.tools!.length} 个工具定义（不含 tool_choice）`);
   }
-  
-  const response = await fetch(`${ollamaUrl}/api/chat`, {
+
+  let response = await fetch(`${ollamaUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(baseBody),
     signal: options.signal as any,
   });
 
+  // 如果带 tools 时返回 400，说明该模型不支持 Function Calling，降级重试
+  if (!response.ok && hasTools) {
+    let errorBody = '';
+    try { errorBody = await response.text(); } catch { /* ignore */ }
+    console.warn(
+      `⚠️  [Ollama] 带 tools 请求失败 (${response.status}): ${errorBody.substring(0, 200)}`
+    );
+    console.warn('⚠️  [Ollama] 模型可能不支持 Function Calling，降级为无 tools 模式');
+
+    const fallbackBody = { ...baseBody };
+    delete fallbackBody.tools;
+
+    response = await fetch(`${ollamaUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fallbackBody),
+      signal: options.signal as any,
+    });
+  }
+
   if (!response.ok) {
-    throw new Error(`Ollama API 错误: ${response.statusText}`);
+    let errorBody = '';
+    try { errorBody = await response.text(); } catch { /* ignore */ }
+    throw new Error(`Ollama API 错误: ${response.statusText} - ${errorBody.substring(0, 300)}`);
   }
 
   return response.body;
