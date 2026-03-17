@@ -10,28 +10,41 @@
 
 ```
 docs/
-├── 00-Project-Overview/          项目总览、架构决策、STAR 故事
-├── 01-Architecture-Refactoring/  Clean Architecture 迁移全过程
-│   ├── clean-architecture/       CA 核心文档（原则、示例、指南）
-│   ├── phases/                   分阶段重构记录（Phase 1/2/3）
-│   ├── migration/                代码迁移对照与状态分析
-│   └── troubleshooting/          重构中遇到的坑和修复
-├── 02-Security-System/           安全认证（OAuth/OIDC、CORS、设备指纹）
-├── 03-Streaming/                 SSE 流式传输（背压、续流、连接守卫）
-├── 04-Multi-Agent/               多智能体协作系统
-├── 05-Large-Text-Handling/       大文本上传、分片、渐进加载
-├── 06-Performance-Optimization/  前端性能（Web Vitals、Bundle、内存）
-│   ├── Bundle-Analyzer-P0/       Bundle 分析报告
-│   ├── Large-Markdown-Optimization/ 大 Markdown 渲染优化
+├── 00-Project-Overview/            项目总览、架构决策、STAR 故事
+├── 01-Architecture-Refactoring/    Clean Architecture 迁移全过程
+│   ├── clean-architecture/           CA 核心文档（原则、示例、指南）
+│   ├── phases/                       分阶段重构记录（Phase 1/2/3）
+│   ├── migration/                    代码迁移对照与状态分析
+│   └── troubleshooting/              重构中遇到的坑和修复
+├── 02-Security-System/             安全认证体系
+│   ├── auth/                         OAuth/OIDC、IdP、限流降级
+│   └── cors/                         CORS 配置与更新记录
+├── 03-Streaming/                   SSE 流式传输
+│   ├── resume/                       断点续传（机制、内存保护、意图识别）
+│   └── connection/                   连接管理（守卫、中断修复、跨 Tab）
+├── 04-Multi-Agent/                 多智能体协作系统
+├── 05-Large-Text-Handling/         大文本处理
+│   ├── chunking/                     分片策略（容错、续传、存储方案）
+│   └── upload/                       上传优化（渐进式、压缩对比、文件系统）
+├── 06-Performance-Optimization/    前端性能优化
+│   ├── web-vitals/                   Core Web Vitals（LCP、CLS、SSR）
+│   ├── react-rendering/              React 渲染（Hooks、虚拟列表、内存、事件）
+│   ├── build-startup/                构建与启动（Bundle、开发启动、环境配置）
+│   ├── Bundle-Analyzer-P0/           Bundle 分析报告
+│   ├── Large-Markdown-Optimization/  大 Markdown 渲染优化
 │   └── Lighthouse-Flow-Prod-Stabilization/ Lighthouse 压测与稳定化
-├── 07-Tools-System/              LLM 工具调用与防幻觉
-├── 08-Data-Management/           缓存策略、数据库设计、Redis
-├── 09-Third-Party-Integration/   LLM 集成（Ollama、火山引擎、Embedding）
-├── 10-Deployment/                Docker 部署、CI/CD、环境配置
-├── 11-Interview-Prep/            面试准备
-│   ├── questions/                追问题库（按模块分类）
-│   └── transcripts/              面试演讲稿（可照读版）
-└── 12-Miscellaneous/             杂项（i18n、JSON 修复、Markdown 容错）
+├── 07-Tools-System/                LLM 工具调用与防幻觉
+├── 08-Data-Management/             缓存策略、数据库设计、Redis
+├── 09-Third-Party-Integration/     LLM 集成（Ollama、火山引擎、Embedding）
+├── 10-Deployment/                  部署运维
+│   └── docker/                       Docker 配置（部署、迁移、MongoDB、Redis）
+├── 11-Interview-Prep/              面试准备
+│   ├── questions/                    追问题库（按模块分类）
+│   └── transcripts/                  面试演讲稿（可照读版）
+└── 12-Miscellaneous/               杂项
+    ├── i18n-theme/                   国际化与主题切换
+    ├── json-repair/                  JSON 修复（垃圾字符、策略、实现）
+    └── markdown-tolerance/           Markdown 容错（方案、实现、react-markdown）
 ```
 
 ---
