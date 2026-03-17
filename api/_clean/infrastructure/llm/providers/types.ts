@@ -47,6 +47,8 @@ export interface LLMCallOptions {
 
 export type ProviderType = 'ollama' | 'openai-compatible';
 
+export type ThinkingMode = 'field' | 'tags' | 'none';
+
 export interface ModelConfig {
   /** 使用的 Provider 类型 */
   provider: ProviderType;
@@ -54,6 +56,14 @@ export interface ModelConfig {
   modelName: string;
   /** 是否支持 Function Calling */
   supportsTools: boolean;
+  /** thinking 输出方式：'field'=独立字段, 'tags'=XML标签嵌在content中, 'none'=无 */
+  thinkingMode?: ThinkingMode;
+  /** 'field' 模式：message 对象中的字段名（默认 'thinking'，如 qwen3 用 'thinking'，其他模型可能用 'reasoning'） */
+  thinkingField?: string;
+  /** 'tags' 模式：XML 标签名（默认 'think'，即 <think>...</think>，其他模型可能用 'Imaging' 等） */
+  thinkingTag?: string;
+  /** tool_calls 可能出现在非 done 消息中（如 qwen3） */
+  toolCallsInStream?: boolean;
   /** 预估显存占用（GB），仅本地模型有意义 */
   vramGB?: number;
   /** 模型描述 */
@@ -79,9 +89,11 @@ export interface ToolCallDelta {
 export interface ParsedChunk {
   /** 本次解析到的文本增量 */
   content?: string;
+  /** thinking 增量内容（来自 message.thinking 字段或 <think> 标签提取） */
+  thinking?: string;
   /** 工具调用增量（流式累积） */
   toolCalls?: ToolCallDelta[];
-  /** 完整的工具调用（Ollama 在 done=true 时一次性返回） */
+  /** 完整的工具调用（可能来自 done=true 或流式消息） */
   completeToolCalls?: Array<{ name: string; arguments: Record<string, any> }>;
   /** 完成原因 */
   finishReason?: 'stop' | 'tool_calls' | null;

@@ -52,11 +52,18 @@ export class LLMProviderRegistry {
     return result;
   }
 
-  /** 根据 Provider 的 streamProtocol 获取对应的 StreamParser */
+  /** 根据 Provider 的 streamProtocol 获取对应的 StreamParser（自动传入模型格式配置） */
   getStreamParser(provider: LLMProvider): StreamParser {
     switch (provider.streamProtocol) {
-      case 'ollama':
-        return new OllamaStreamParser();
+      case 'ollama': {
+        const ollamaProvider = provider as OllamaProvider;
+        return new OllamaStreamParser({
+          thinkingMode: ollamaProvider.getThinkingMode(),
+          thinkingField: ollamaProvider.getThinkingField(),
+          thinkingTag: ollamaProvider.getThinkingTag(),
+          toolCallsInStream: ollamaProvider.getToolCallsInStream(),
+        });
+      }
       case 'openai-sse':
         return new OpenAIStreamParser();
       default:

@@ -7,7 +7,7 @@
  *   - keep_alive / num_gpu 等 Ollama 专属参数
  */
 
-import type { LLMProvider, LLMCallOptions, StreamProtocol, ModelConfig } from './types.js';
+import type { LLMProvider, LLMCallOptions, StreamProtocol, ModelConfig, ThinkingMode } from './types.js';
 import type { ChatMessage } from '../../../../types/chat.js';
 
 export class OllamaProvider implements LLMProvider {
@@ -17,6 +17,10 @@ export class OllamaProvider implements LLMProvider {
   private apiUrl: string;
   private modelName: string;
   private _supportsTools: boolean;
+  private _thinkingMode: ThinkingMode;
+  private _thinkingField: string;
+  private _thinkingTag: string;
+  private _toolCallsInStream: boolean;
   private keepAlive: string;
   private numGpu: number;
 
@@ -25,6 +29,10 @@ export class OllamaProvider implements LLMProvider {
     this.apiUrl = config.apiUrl || process.env.OLLAMA_API_URL || 'http://localhost:11434';
     this.modelName = config.modelName;
     this._supportsTools = config.supportsTools;
+    this._thinkingMode = config.thinkingMode ?? 'none';
+    this._thinkingField = config.thinkingField ?? 'thinking';
+    this._thinkingTag = config.thinkingTag ?? 'think';
+    this._toolCallsInStream = config.toolCallsInStream ?? false;
     this.keepAlive = config.keepAlive || '30m';
     this.numGpu = config.numGpu ?? 999;
   }
@@ -44,10 +52,11 @@ export class OllamaProvider implements LLMProvider {
     const hasTools = !!(this._supportsTools && options?.tools?.length);
     if (hasTools) {
       body.tools = options!.tools;
-      // 带 tools 时禁用 thinking 模式（qwen3 等模型的 thinking 与 tool calling 不兼容，
-      // 会导致模型只产生 thinking 而不输出 content）
-      body.think = false;
-      console.log(`🔧 [${this.name}] 传递 ${options!.tools!.length} 个工具定义 (think: false)`);
+      // thinkingMode='field' 的模型（如 qwen3）thinking 与 tool calling 不兼容
+      if (this._thinkingMode === 'field') {
+        body.think = false;
+      }
+      console.log(`🔧 [${this.name}] 传递 ${options!.tools!.length} 个工具定义${body.think === false ? ' (think: false)' : ''}`);
     }
 
     let response = await fetch(`${this.apiUrl}/api/chat`, {
@@ -102,5 +111,21 @@ export class OllamaProvider implements LLMProvider {
 
   getModelName(): string {
     return this.modelName;
+  }
+
+  getThinkingMode(): ThinkingMode {
+    return this._thinkingMode;
+  }
+
+  getThinkingField(): string {
+    return this._thinkingField;
+  }
+
+  getThinkingTag(): string {
+    return this._thinkingTag;
+  }
+
+  getToolCallsInStream(): boolean {
+    return this._toolCallsInStream;
   }
 }

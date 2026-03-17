@@ -353,7 +353,9 @@ export async function handleVolcanoStream(
 }
 
 /**
- * 处理本地 Ollama 模型流式响应并转换为 SSE 格式（Function Calling）
+ * 处理本地 Ollama 模型流式响应并转换为 SSE 格式
+ *
+ * 通过 StreamParser 统一适配不同 Ollama 模型的格式差异（thinking/toolCalls）。
  */
 export async function handleLocalStream(
   stream: any,
@@ -371,8 +373,12 @@ export async function handleLocalStream(
 
   const controlledWriter = createLocalControlledWriter(sseWriter);
 
-  let accumulatedText = '';
-  let accumulatedThinking = '';
+  // 从 registry 获取对应的 StreamParser（自动传入模型格式配置）
+  const { getRegistry } = await import('../_clean/infrastructure/llm/providers/registry.js');
+  const registry = getRegistry();
+  const provider = registry.getByType('local');
+  const parser = registry.getStreamParser(provider) as import('../_clean/infrastructure/llm/stream-parsers/ollama-stream-parser.js').OllamaStreamParser;
+
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
   let lastThinkingSendTime = 0;
@@ -386,7 +392,7 @@ export async function handleLocalStream(
   });
 
   /**
-   * 处理 Ollama JSON 行格式的流（支持递归工具调用）
+   * 处理 Ollama JSON 行格式的流（支持递归工具调用），解析逻辑委托给 StreamParser
    */
   async function processOllamaStream(currentStream: any, depth: number = 0): Promise<void> {
     const MAX_DEPTH = 5;
@@ -396,7 +402,6 @@ export async function handleLocalStream(
     }
 
     let localBuffer = '';
-    let pendingToolCalls: any[] = [];
 
     for await (const chunk of currentStream) {
       if (sseWriter.isClosed()) {
@@ -411,93 +416,49 @@ export async function handleLocalStream(
       localBuffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (!line.trim()) continue;
+        const parsed = parser.parseLine(line);
+        if (!parsed) continue;
 
-        let jsonData: any;
-        try {
-          jsonData = JSON.parse(line);
-        } catch {
-          console.error('❌ [Ollama] JSON 解析失败:', line.substring(0, 100));
-          continue;
-        }
-
-        // Ollama 新版 thinking 字段（qwen3 等支持 thinking 的模型）
-        if (jsonData.message?.thinking) {
-          accumulatedThinking += jsonData.message.thinking;
-
+        // ── thinking 推送（节流 150ms） ──
+        if (parsed.thinking) {
           const now = Date.now();
           if (!sseWriter.isClosed() && now - lastThinkingSendTime > 150) {
             lastThinkingSendTime = now;
-            await controlledWriter.sendDirect({
-              thinking: accumulatedThinking,
-            });
+            await controlledWriter.sendDirect({ thinking: parsed.thinking });
           }
         }
 
-        // Ollama 文本内容: message.content
-        if (jsonData.message?.content) {
-          accumulatedText += jsonData.message.content;
-
-          // 如果 thinking 已由 Ollama 分离，直接用累积值；否则回退到 <think> 标签提取
-          let thinking = accumulatedThinking;
-          let mainContent = accumulatedText;
-          if (!thinking) {
-            const extracted = extractThinkingAndContent(accumulatedText);
-            thinking = extracted.thinking;
-            mainContent = extracted.content;
-          }
-
+        // ── content 推送 ──
+        if (parsed.content) {
           if (!sseWriter.isClosed()) {
-            await controlledWriter.sendEvent(mainContent, {
-              thinking: thinking || undefined,
+            await controlledWriter.sendEvent(parsed.content, {
+              thinking: parsed.thinking || undefined,
             });
           }
 
           await progressManager.updateProgress(
             messageId,
-            accumulatedText,
-            { userId, conversationId, modelType, thinking, sources: searchSources }
+            parser.getAccumulatedContent(),
+            { userId, conversationId, modelType, thinking: parsed.thinking, sources: searchSources }
           );
         }
 
-        // Ollama 工具调用：tool_calls 可能出现在 done=false 或 done=true 的消息中
-        const ollamaToolCalls = jsonData.message?.tool_calls;
-        if (Array.isArray(ollamaToolCalls) && ollamaToolCalls.length > 0) {
-          pendingToolCalls.push(...ollamaToolCalls);
-          console.log(`🔧 [Ollama] 累积 ${ollamaToolCalls.length} 个工具调用 (总计: ${pendingToolCalls.length})`);
-        }
-
-        // Ollama 完成标记：done === true
-        if (jsonData.done) {
+        // ── done 处理 ──
+        if (parsed.done) {
           // 有工具调用需要执行
-          if (pendingToolCalls.length > 0) {
-            console.log(`🔧 [Ollama] 开始执行 ${pendingToolCalls.length} 个工具调用`);
+          if (parsed.finishReason === 'tool_calls' && parsed.completeToolCalls?.length) {
+            console.log(`🔧 [Ollama] 开始执行 ${parsed.completeToolCalls.length} 个工具调用`);
 
-            for (const tc of pendingToolCalls) {
+            for (const tc of parsed.completeToolCalls) {
               if (sseWriter.isClosed()) {
                 console.log('⚠️  [Ollama] 客户端已断开，跳过工具执行');
                 return;
               }
 
-              const toolName = tc.function?.name;
-              if (!toolName) {
-                console.error('❌ [Ollama] 工具名缺失');
-                continue;
-              }
-
-              let params: any;
-              try {
-                params = typeof tc.function.arguments === 'string'
-                  ? JSON.parse(tc.function.arguments)
-                  : tc.function.arguments || {};
-              } catch {
-                params = {};
-              }
-
-              console.log(`🔧 [Ollama] 执行工具: ${toolName}`, params);
+              console.log(`🔧 [Ollama] 执行工具: ${tc.name}`, tc.arguments);
 
               await controlledWriter.sendEvent('正在执行工具...', {
-                toolCall: { tool: toolName, ...params },
+                toolCall: { tool: tc.name, ...tc.arguments },
               });
 
               const context = {
@@ -507,12 +468,13 @@ export async function handleLocalStream(
                 timestamp: Date.now(),
               };
 
-              const result = await toolExecutor.execute(toolName, params, context);
+              const result = await toolExecutor.execute(tc.name, tc.arguments, context);
+              const accContent = parser.getAccumulatedContent();
 
               if (!result.success) {
                 console.error(`❌ [Ollama] 工具执行失败: ${result.error}`);
                 messages.push(
-                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'assistant', content: accContent || `使用工具 ${tc.name}` },
                   { role: 'user', content: `工具执行失败: ${result.error}` }
                 );
               } else {
@@ -527,19 +489,16 @@ export async function handleLocalStream(
                   : JSON.stringify(result.data, null, 2);
 
                 messages.push(
-                  { role: 'assistant', content: accumulatedText || `使用工具 ${toolName}` },
+                  { role: 'assistant', content: accContent || `使用工具 ${tc.name}` },
                   { role: 'user', content: `工具执行结果：\n\n${resultText}\n\n请基于这个结果回答用户的问题。` }
                 );
               }
             }
 
-            // 所有工具执行完，重新调用 Ollama
             if (sseWriter.isClosed()) return;
 
             console.log('🔄 [Ollama] 基于工具结果继续生成...');
-            accumulatedText = '';
-            accumulatedThinking = '';
-            pendingToolCalls = [];
+            parser.reset();
 
             const newStream = await callLocalModel(messages, {
               tools: toolRegistry.getAllSchemas(),
@@ -550,32 +509,26 @@ export async function handleLocalStream(
           }
 
           // 没有工具调用，正常结束
-          console.log(`✅ [Ollama] 本地模型响应完成 (content: ${accumulatedText.length} chars, thinking: ${accumulatedThinking.length} chars)`);
+          const finalContent = parser.getAccumulatedContent();
+          const finalThinking = parser.getAccumulatedThinking();
+          console.log(`✅ [Ollama] 本地模型响应完成 (content: ${finalContent.length} chars, thinking: ${finalThinking.length} chars)`);
 
-          // 确保最终内容发送到前端（thinking 阶段可能没有发送过）
-          if (!sseWriter.isClosed() && accumulatedText) {
-            let thinking = accumulatedThinking;
-            let mainContent = accumulatedText;
-            if (!thinking) {
-              const extracted = extractThinkingAndContent(accumulatedText);
-              thinking = extracted.thinking;
-              mainContent = extracted.content;
-            }
-            await controlledWriter.sendEvent(mainContent, {
-              thinking: thinking || undefined,
+          // 确保最终内容发送到前端
+          if (!sseWriter.isClosed() && finalContent) {
+            await controlledWriter.sendEvent(finalContent, {
+              thinking: finalThinking || undefined,
             });
           }
 
-          if (!messageSaved && accumulatedText) {
+          if (!messageSaved && finalContent) {
             messageSaved = true;
             try {
-              const thinking = accumulatedThinking || extractThinkingAndContent(accumulatedText).thinking;
               await saveMessage(
                 conversationId,
                 userId,
-                accumulatedText,
+                parser.getRawAccumulatedContent(),
                 clientAssistantMessageId,
-                thinking,
+                finalThinking,
                 searchSources
               );
               console.log(`💾 [Ollama] 消息已保存${searchSources ? ` (含 ${searchSources.length} 个来源)` : ''}`);
@@ -599,14 +552,7 @@ export async function handleLocalStream(
 
     // 处理 localBuffer 中可能残留的最后一行
     if (localBuffer.trim()) {
-      try {
-        const jsonData = JSON.parse(localBuffer);
-        if (jsonData.message?.content) {
-          accumulatedText += jsonData.message.content;
-        }
-      } catch {
-        // 忽略解析失败
-      }
+      parser.parseLine(localBuffer);
     }
   }
 
@@ -638,19 +584,19 @@ export async function handleLocalStream(
       sseWriter.stopHeartbeat();
       await sseWriter.close();
 
-      if (!messageSaved && accumulatedText && accumulatedText.trim()) {
+      const finalContent = parser.getAccumulatedContent();
+      if (!messageSaved && finalContent && finalContent.trim()) {
         try {
-          const thinking = accumulatedThinking || extractThinkingAndContent(accumulatedText).thinking;
           await saveMessage(
             conversationId,
             userId,
-            accumulatedText,
+            parser.getRawAccumulatedContent(),
             clientAssistantMessageId,
-            thinking,
+            parser.getAccumulatedThinking(),
             searchSources
           );
         } catch (dbError) {
-          console.error('❌ [Ollama V2 Finally] 保存不完整回答失败:', dbError);
+          console.error('❌ [Ollama Finally] 保存不完整回答失败:', dbError);
         }
       }
 
