@@ -372,8 +372,10 @@ export async function handleLocalStream(
   const controlledWriter = createLocalControlledWriter(sseWriter);
 
   let accumulatedText = '';
+  let accumulatedThinking = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
+  let lastThinkingSendTime = 0;
 
   const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
   const container = getContainer();
@@ -394,6 +396,7 @@ export async function handleLocalStream(
     }
 
     let localBuffer = '';
+    let pendingToolCalls: any[] = [];
 
     for await (const chunk of currentStream) {
       if (sseWriter.isClosed()) {
@@ -418,10 +421,31 @@ export async function handleLocalStream(
           continue;
         }
 
+        // Ollama 新版 thinking 字段（qwen3 等支持 thinking 的模型）
+        if (jsonData.message?.thinking) {
+          accumulatedThinking += jsonData.message.thinking;
+
+          const now = Date.now();
+          if (!sseWriter.isClosed() && now - lastThinkingSendTime > 150) {
+            lastThinkingSendTime = now;
+            await controlledWriter.sendDirect({
+              thinking: accumulatedThinking,
+            });
+          }
+        }
+
         // Ollama 文本内容: message.content
         if (jsonData.message?.content) {
           accumulatedText += jsonData.message.content;
-          const { thinking, content: mainContent } = extractThinkingAndContent(accumulatedText);
+
+          // 如果 thinking 已由 Ollama 分离，直接用累积值；否则回退到 <think> 标签提取
+          let thinking = accumulatedThinking;
+          let mainContent = accumulatedText;
+          if (!thinking) {
+            const extracted = extractThinkingAndContent(accumulatedText);
+            thinking = extracted.thinking;
+            mainContent = extracted.content;
+          }
 
           if (!sseWriter.isClosed()) {
             await controlledWriter.sendEvent(mainContent, {
@@ -436,15 +460,20 @@ export async function handleLocalStream(
           );
         }
 
+        // Ollama 工具调用：tool_calls 可能出现在 done=false 或 done=true 的消息中
+        const ollamaToolCalls = jsonData.message?.tool_calls;
+        if (Array.isArray(ollamaToolCalls) && ollamaToolCalls.length > 0) {
+          pendingToolCalls.push(...ollamaToolCalls);
+          console.log(`🔧 [Ollama] 累积 ${ollamaToolCalls.length} 个工具调用 (总计: ${pendingToolCalls.length})`);
+        }
+
         // Ollama 完成标记：done === true
         if (jsonData.done) {
-          // Ollama 工具调用：tool_calls 在 done=true 的消息中
-          const ollamaToolCalls = jsonData.message?.tool_calls;
+          // 有工具调用需要执行
+          if (pendingToolCalls.length > 0) {
+            console.log(`🔧 [Ollama] 开始执行 ${pendingToolCalls.length} 个工具调用`);
 
-          if (Array.isArray(ollamaToolCalls) && ollamaToolCalls.length > 0) {
-            console.log(`🔧 [Ollama] 检测到 ${ollamaToolCalls.length} 个工具调用`);
-
-            for (const tc of ollamaToolCalls) {
+            for (const tc of pendingToolCalls) {
               if (sseWriter.isClosed()) {
                 console.log('⚠️  [Ollama] 客户端已断开，跳过工具执行');
                 return;
@@ -509,6 +538,8 @@ export async function handleLocalStream(
 
             console.log('🔄 [Ollama] 基于工具结果继续生成...');
             accumulatedText = '';
+            accumulatedThinking = '';
+            pendingToolCalls = [];
 
             const newStream = await callLocalModel(messages, {
               tools: toolRegistry.getAllSchemas(),
@@ -519,12 +550,26 @@ export async function handleLocalStream(
           }
 
           // 没有工具调用，正常结束
-          console.log('✅ [Ollama] 本地模型响应完成');
+          console.log(`✅ [Ollama] 本地模型响应完成 (content: ${accumulatedText.length} chars, thinking: ${accumulatedThinking.length} chars)`);
+
+          // 确保最终内容发送到前端（thinking 阶段可能没有发送过）
+          if (!sseWriter.isClosed() && accumulatedText) {
+            let thinking = accumulatedThinking;
+            let mainContent = accumulatedText;
+            if (!thinking) {
+              const extracted = extractThinkingAndContent(accumulatedText);
+              thinking = extracted.thinking;
+              mainContent = extracted.content;
+            }
+            await controlledWriter.sendEvent(mainContent, {
+              thinking: thinking || undefined,
+            });
+          }
 
           if (!messageSaved && accumulatedText) {
             messageSaved = true;
             try {
-              const { thinking } = extractThinkingAndContent(accumulatedText);
+              const thinking = accumulatedThinking || extractThinkingAndContent(accumulatedText).thinking;
               await saveMessage(
                 conversationId,
                 userId,
@@ -595,7 +640,7 @@ export async function handleLocalStream(
 
       if (!messageSaved && accumulatedText && accumulatedText.trim()) {
         try {
-          const { thinking } = extractThinkingAndContent(accumulatedText);
+          const thinking = accumulatedThinking || extractThinkingAndContent(accumulatedText).thinking;
           await saveMessage(
             conversationId,
             userId,

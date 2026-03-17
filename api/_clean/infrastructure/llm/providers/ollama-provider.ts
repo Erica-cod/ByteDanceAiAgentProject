@@ -44,7 +44,10 @@ export class OllamaProvider implements LLMProvider {
     const hasTools = !!(this._supportsTools && options?.tools?.length);
     if (hasTools) {
       body.tools = options!.tools;
-      console.log(`🔧 [${this.name}] 传递 ${options!.tools!.length} 个工具定义`);
+      // 带 tools 时禁用 thinking 模式（qwen3 等模型的 thinking 与 tool calling 不兼容，
+      // 会导致模型只产生 thinking 而不输出 content）
+      body.think = false;
+      console.log(`🔧 [${this.name}] 传递 ${options!.tools!.length} 个工具定义 (think: false)`);
     }
 
     let response = await fetch(`${this.apiUrl}/api/chat`, {
