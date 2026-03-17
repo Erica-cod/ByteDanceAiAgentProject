@@ -226,7 +226,8 @@ export abstract class BaseAgent {
     // 委托给统一的提取工具，保持接口兼容
     return extractJSON(text, {
       autoFix: true,
-      logPrefix: `🔍 [${this.agentId}]`
+      logPrefix: `🔍 [${this.agentId}]`,
+      source: this.agentId,
     });
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import { jsonrepair } from 'jsonrepair';
+import { recordJSONRepairFailure, type StrategyErrorDetail } from '../../../db/jsonRepairTelemetry.js';
 
 /**
  * 提取选项
@@ -94,6 +95,9 @@ export function extractJSON<T = any>(
     customFixSuccess: 0,
   };
 
+  // 累积每个策略各阶段的错误信息，全部失败时写入埋点
+  const strategyErrors: StrategyErrorDetail[] = [];
+
   const emitSuccessMetrics = (strategy: string, stage: RepairStage) => {
     emitJSONExtractorMetrics(options, {
       event: 'json_extraction',
@@ -118,6 +122,15 @@ export function extractJSON<T = any>(
       ...metrics,
       finalError,
     });
+
+    // 持久化到 MongoDB（异步，不阻塞主流程）
+    recordJSONRepairFailure({
+      source,
+      rawResponsePreview: text.slice(0, 2000),
+      rawResponseLength: text.length,
+      strategiesAttempted: strategyErrors,
+      durationMs: Date.now() - startTime,
+    }).catch(() => {});
   };
   
   console.log(`${logPrefix} 开始提取 JSON...`);
@@ -263,6 +276,11 @@ export function extractJSON<T = any>(
         emitSuccessMetrics(strategy.name, 'raw');
         return result;
       } catch (parseError: any) {
+        const errorEntry: StrategyErrorDetail = {
+          name: strategy.name,
+          parseError: parseError.message,
+        };
+
         // 如果失败且启用自动修复，尝试修复后再解析
         if (autoFix) {
           console.warn(`${logPrefix} ⚠️  JSON 解析失败: ${parseError.message}`);
@@ -278,6 +296,7 @@ export function extractJSON<T = any>(
             emitSuccessMetrics(strategy.name, 'jsonrepair');
             return result;
           } catch (repairError: any) {
+            errorEntry.jsonrepairError = repairError.message;
             console.warn(`${logPrefix} ⚠️  jsonrepair 包修复失败: ${repairError.message}`);
             
             // 🔧 修复策略 2: 使用自定义修复逻辑（备用方案）
@@ -295,14 +314,18 @@ export function extractJSON<T = any>(
               emitSuccessMetrics(strategy.name, 'custom');
               return result;
             } catch (fixError: any) {
+              errorEntry.customFixError = fixError.message;
               console.warn(`${logPrefix} ❌ 自定义修复也失败: ${fixError.message}`);
               // 继续尝试下一个策略
             }
           }
         }
+
+        strategyErrors.push(errorEntry);
       }
     } catch (error: any) {
       console.warn(`${logPrefix} ⚠️  策略 ${strategy.name} 执行失败: ${error.message}`);
+      strategyErrors.push({ name: strategy.name, parseError: `策略执行异常: ${error.message}` });
     }
   }
   
@@ -437,7 +460,8 @@ export function extractToolCall<T = any>(text: string, autoFix = true): T | null
   return extractJSON<T>(text, { 
     tagName: 'tool_call', 
     autoFix,
-    logPrefix: '🔧 [ToolCallExtractor]'
+    logPrefix: '🔧 [ToolCallExtractor]',
+    source: 'tool_call',
   });
 }
 
@@ -451,7 +475,8 @@ export function extractToolCallWithRemainder<T = any>(
   return extractJSONWithRemainder<T>(text, { 
     tagName: 'tool_call', 
     autoFix,
-    logPrefix: '🔧 [ToolCallExtractor]'
+    logPrefix: '🔧 [ToolCallExtractor]',
+    source: 'tool_call',
   });
 }
 

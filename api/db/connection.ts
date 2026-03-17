@@ -127,7 +127,17 @@ async function createIndexes() {
       { expireAfterSeconds: 1800, name: 'stream_progress_ttl' }
     );
 
-    console.log('✅ Database indexes created (包括多Agent会话TTL索引 + 续流进度TTL索引)');
+    // ✅ JSON 修复打穿埋点集合 TTL 索引（30天自动清理）
+    await db.collection('json_repair_failures').createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0, name: 'json_repair_ttl' }
+    );
+    await db.collection('json_repair_failures').createIndex(
+      { source: 1, createdAt: -1 },
+      { name: 'source_time_index' }
+    );
+
+    console.log('✅ Database indexes created (包括多Agent会话TTL索引 + 续流进度TTL索引 + JSON修复埋点TTL索引)');
   } catch (error) {
     console.error('❌ Failed to create indexes:', error);
   }
