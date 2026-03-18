@@ -141,6 +141,7 @@ SSE 流式传输的完整实现：自适应背压、断点续传、连接守卫�
 | `MEMORY_LEAK_FIX.md` | 内存泄漏排查与修复 |
 | `DEV_STARTUP_OPTIMIZATION.md` | 开发环境启动速度优化 |
 | `HIGH_CONCURRENCY_SOLUTION.md` | 高并发解决方案 |
+| `LONG_MESSAGE_CLS_RENDER_OPTIMIZATION.md` | 长消息虚拟列表 CLS 与渲染优化（方案横向对比 + 分层实施） |
 
 子目录：`Bundle-Analyzer-P0/`、`Large-Markdown-Optimization/`、`Lighthouse-Flow-Prod-Stabilization/`
 

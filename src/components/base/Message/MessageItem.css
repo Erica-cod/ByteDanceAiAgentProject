@@ -4,8 +4,8 @@
   padding: 16px;
   margin-bottom: 12px;
   border-radius: 12px;
-  animation: messageSlideIn 0.3s ease-out;
   min-height: 60px;
+  contain: layout style;
 }
 
 .message-item--user {
@@ -28,7 +28,11 @@
   line-height: 1.6;
 }
 
-/* 动画 */
+/* 仅对新消息（最后一条）应用入场动画，避免向上滚动时旧消息批量动画导致 CLS */
+.message-item:last-child {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
 @keyframes messageSlideIn {
   from {
     opacity: 0;

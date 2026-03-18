@@ -120,6 +120,25 @@
   transform: translateY(-1px);
 }
 
+/* 高度锚点：为虚拟列表项提供 min-height，减少向上滚动时的 CLS */
+.message-item-height-anchor {
+  contain: content;
+}
+
+/* 快速滚动占位符 */
+.message-item-seek-placeholder {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* 暗色模式 */
 @media (prefers-color-scheme: dark) {
   .message-list-refactored__mask {
@@ -135,6 +154,11 @@
   .message-list-refactored__loading {
     background: rgba(45, 45, 45, 0.9);
     border-color: rgba(80, 80, 80, 0.5);
+  }
+
+  .message-item-seek-placeholder {
+    background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+    background-size: 200% 100%;
   }
 }
 

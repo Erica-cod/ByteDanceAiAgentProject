@@ -152,9 +152,12 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
       />
     ) : undefined;
 
-    // 内容渲染：渐进式加载 vs 普通渲染
+    const contentLen = message.contentLength || message.content?.length || 0;
+    const fallbackLines = Math.max(1, Math.ceil(contentLen / 55));
+    const fallbackHeight = fallbackLines * 24;
+
     const contentNode = message.contentLength && message.contentLength > 1000 ? (
-      <Suspense fallback={<div>加载大消息渲染器中...</div>}>
+      <Suspense fallback={<div style={{ minHeight: fallbackHeight }} />}>
         <ProgressiveMessageRefactoredLazy
           messageId={message.id}
           userId={userId}
@@ -164,7 +167,7 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
         />
       </Suspense>
     ) : message.content ? (
-      <Suspense fallback={<div>渲染消息中...</div>}>
+      <Suspense fallback={<div style={{ minHeight: fallbackHeight }} />}>
         <StreamingMarkdownLazy content={message.content} />
       </Suspense>
     ) : (

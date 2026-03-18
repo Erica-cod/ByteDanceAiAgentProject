@@ -14,6 +14,7 @@ import { MessageItemRenderer } from './MessageItemRenderer';
 import type { Message } from '../../../stores/chatStore';
 import type { QueueItem } from '../../../stores/queueStore';
 import { useChatStore } from '../../../stores';
+import { estimateMessageHeight } from './messageHeightEstimator';
 import './MessageListRefactored.css';
 
 interface MessageListRefactoredProps {
@@ -52,8 +53,6 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
   const userId = useChatStore((s) => s.userId);
   const isAtBottomRef = useRef(true);
 
-  // 关键：不要把 atBottom 放进 React state（会导致布局变化/输入变化触发频繁 setState → 列表闪烁）
-  // 用 ref 记录即可，并提供一个稳定的 followOutput 回调。
   const followOutput = useCallback(() => (isAtBottomRef.current ? 'auto' : false), []);
 
   const VirtuosoScroller = useMemo(() => {
@@ -93,7 +92,6 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
     hasStartedFadeOutRef.current = true;
     setTransitionOpacity(0);
 
-    // 兜底：极端情况下 transitionend 可能不触发，超时后强制移除遮罩
     removeFallbackTimerRef.current = window.setTimeout(() => {
       setIsTransitioning(false);
     }, 500);
@@ -106,7 +104,6 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
     hasInitialDataRef.current = false;
     hasStartedFadeOutRef.current = false;
 
-    // 空会话兜底：没有消息也不应长期停留在遮罩态
     emptyConversationFallbackTimerRef.current = window.setTimeout(() => {
       startMaskFadeOut();
     }, 800);
@@ -114,12 +111,10 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
     return clearMaskTimers;
   }, [clearMaskTimers, startMaskFadeOut]);
   
-  // 监听数据加载状态
   React.useEffect(() => {
     if (messages.length > 0 && !hasInitialDataRef.current) {
       hasInitialDataRef.current = true;
 
-      // 等待至少一帧，确保遮罩先以 opacity=1 渲染，再触发淡出
       const rafId = window.requestAnimationFrame(() => {
         startMaskFadeOut();
       });
@@ -130,11 +125,6 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
     }
   }, [messages.length, startMaskFadeOut]);
 
-  // 注意：不要在流式输出的每个 chunk 里主动 scrollToIndex。
-  // 这会导致 Virtuoso 频繁布局 + 滚动联动，产生“闪烁/抖动”。
-  // 我们只用 Virtuoso 自带 followOutput 来跟随底部，并用 atBottomStateChange 控制是否跟随。
-
-  // 暴露方法
   useImperativeHandle(ref, () => ({
     scrollToRow: (index: number) => {
       virtuosoRef.current?.scrollToIndex({ index, align: 'end', behavior: 'auto' });
@@ -145,42 +135,53 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
       }
     },
     recomputeRowHeights: (index?: number) => {
-      // Virtuoso 会自动测量并处理动态高度，这里保留接口用于兼容调用方
-      // 如果后续需要强制刷新，可通过 key 或 data 触发 Virtuoso 内部重算
       void index;
     },
   }));
 
-  // Virtuoso item renderer
+  // 高度缓存：存储已测量的消息实际高度，避免重新挂载时的高度跳变
+  const heightCacheRef = useRef<Map<string, number>>(new Map());
+
   const itemContent = useCallback(
     (index: number) => {
       const message = messages[index];
       const queueItem = queue.find((q) => q.userMessageId === message.id);
+      const cachedHeight = heightCacheRef.current.get(message.id);
+      const minHeight = cachedHeight || estimateMessageHeight(message);
 
       return (
-        <MessageItemRenderer
-          message={message}
-          userId={userId}
-          queuePosition={queueItem ? queue.indexOf(queueItem) + 1 : undefined}
-          onRetry={(id) => {
-            const msgIndex = messages.findIndex((m) => m.id === id);
-            const prevUserMsg = messages[msgIndex - 1];
-            if (prevUserMsg?.role === 'user') {
-              onRetry(prevUserMsg.id);
+        <div
+          className="message-item-height-anchor"
+          style={{ minHeight }}
+          ref={(el) => {
+            if (!el) return;
+            const measured = el.getBoundingClientRect().height;
+            if (measured > 0) {
+              heightCacheRef.current.set(message.id, measured);
             }
           }}
-          onHeightChange={() => {
-            // 流式输出会频繁触发高度变化；这里不主动滚动，交给 followOutput 处理。
-            // 只有“用户在底部”时，Virtuoso 才会自动跟随到底部。
-            void index;
-          }}
-        />
+        >
+          <MessageItemRenderer
+            message={message}
+            userId={userId}
+            queuePosition={queueItem ? queue.indexOf(queueItem) + 1 : undefined}
+            onRetry={(id) => {
+              const msgIndex = messages.findIndex((m) => m.id === id);
+              const prevUserMsg = messages[msgIndex - 1];
+              if (prevUserMsg?.role === 'user') {
+                onRetry(prevUserMsg.id);
+              }
+            }}
+            onHeightChange={() => {
+              void index;
+            }}
+          />
+        </div>
       );
     },
     [messages, queue, userId, onRetry]
   );
 
-  // 空状态
   const noRowsRenderer = () => (
     <div className="message-list-refactored__empty">
       <p>开始新的对话吧！</p>
@@ -220,27 +221,31 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
           data={messages}
           itemContent={(index) => itemContent(index)}
           computeItemKey={(_, item) => item.id}
-          // 关键：初始渲染从底部开始（聊天默认展示最新消息）
           initialTopMostItemIndex={messages.length - 1}
-          // 关键：避免“流式输出想到底部却卡顶部”
-          // - 只有在用户接近底部时才自动跟随
           followOutput={followOutput}
           atBottomStateChange={(isAtBottom) => {
-            // atBottom = true 表示用户在底部；否则用户在看历史，不要抢滚动
             isAtBottomRef.current = isAtBottom;
           }}
-          // 上拉加载历史：滚动到顶部触发
           startReached={() => {
             if (hasMoreMessages && !isLoadingMore) {
               onLoadOlder();
             }
           }}
-          // 如果你们有“firstItemIndex”用于分页锚定，这里预留入口（当前实现先不强依赖它）
-          // initialTopMostItemIndex={Math.max(0, firstItemIndex)}
-          overscan={600}
+          defaultItemHeight={200}
+          increaseViewportBy={{ top: 2000, bottom: 800 }}
           components={{
             Scroller: VirtuosoScroller,
             Footer: () => <div ref={thinkingEndRef} />,
+            ScrollSeekPlaceholder: ({ height }) => (
+              <div
+                className="message-item-height-anchor message-item-seek-placeholder"
+                style={{ height, contain: 'strict' }}
+              />
+            ),
+          }}
+          scrollSeekConfiguration={{
+            enter: (velocity) => Math.abs(velocity) > 1200,
+            exit: (velocity) => Math.abs(velocity) < 150,
           }}
         />
       )}
@@ -262,4 +267,3 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
 MessageListRefactoredInner.displayName = 'MessageListRefactored';
 
 export default memo(MessageListRefactoredInner);
-
