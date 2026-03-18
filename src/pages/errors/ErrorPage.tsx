@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CountdownRedirect } from '../../components/routing/CountdownRedirect';
+import { CountdownRedirect } from '@/components/routing/CountdownRedirect';
 
 export type ErrorCode = 400 | 403 | 404 | 500;
 

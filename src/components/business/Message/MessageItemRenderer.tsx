@@ -9,13 +9,13 @@
  */
 
 import React, { Suspense, useMemo, useState } from 'react';
-import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '../../base/Message';
-import type { Message } from '../../../stores/chatStore';
+import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '@/components/base/Message';
+import type { Message } from '@/stores/chatStore';
 
 const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgentDisplay'));
 const StreamingMarkdownLazy = React.lazy(() => import('./StreamingMarkdown'));
-const ProgressiveMessageRefactoredLazy = React.lazy(() =>
-  import('./ProgressiveMessageRefactored').then(module => ({ default: module.ProgressiveMessageRefactored }))
+const ProgressiveMessageLazy = React.lazy(() =>
+  import('./ProgressiveMessage').then(module => ({ default: module.ProgressiveMessage }))
 );
 
 export interface MessageItemRendererProps {
@@ -158,7 +158,7 @@ export const MessageItemRenderer: React.FC<MessageItemRendererProps> = ({
 
     const contentNode = message.contentLength && message.contentLength > 1000 ? (
       <Suspense fallback={<div style={{ minHeight: fallbackHeight }} />}>
-        <ProgressiveMessageRefactoredLazy
+        <ProgressiveMessageLazy
           messageId={message.id}
           userId={userId}
           initialContent={message.content}

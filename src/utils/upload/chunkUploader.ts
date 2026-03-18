@@ -2,7 +2,7 @@
  * 分片上传器（支持hash校验、断点续传、失败重试）
  */
 
-import { UPLOAD_THRESHOLDS } from '../../constants/uploadThresholds';
+import { UPLOAD_THRESHOLDS } from '@/constants/uploadThresholds';
 import { calculateHash } from './compression';
 import { fetchWithCsrf } from '../auth/fetchWithCsrf';
 

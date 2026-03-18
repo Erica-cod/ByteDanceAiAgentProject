@@ -8,12 +8,12 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { safeFixMarkdown } from '../../utils/markdown/markdownFixer';
-import { removeJSONFromContent } from '../../utils/markdown/jsonFilter';
+import { safeFixMarkdown } from '@/utils/markdown/markdownFixer';
+import { removeJSONFromContent } from '@/utils/markdown/jsonFilter';
 import type {
   MarkdownPreprocessRequest,
   MarkdownPreprocessResponse,
-} from '../../workers/markdownParse.worker';
+} from '@/workers/markdownParse.worker';
 
 const WORKER_THRESHOLD = 2000;
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
-import { useQueueStore, useUIStore } from '../../stores';
-import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../utils/events/conversationSendLock';
+import { useQueueStore, useUIStore } from '@/stores';
+import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '@/utils/events/conversationSendLock';
 
 interface UseMessageQueueOptions {
   onProcessQueue: () => Promise<void>;

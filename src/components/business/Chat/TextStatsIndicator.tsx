@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLongTextDetection } from '../../../hooks/interaction/useLongTextDetection';
+import { useLongTextDetection } from '@/hooks/interaction/useLongTextDetection';
 import './TextStatsIndicator.css';
 
 interface TextStatsIndicatorProps {

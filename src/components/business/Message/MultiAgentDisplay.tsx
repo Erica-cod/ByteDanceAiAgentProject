@@ -10,41 +10,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import StreamingMarkdown from './StreamingMarkdown';
-import { useThrottle } from '../../../hooks';
-import { tryParseStreamingJSON, formatPartialAgentData } from '../../../utils/json/streamingJsonParser';
+import { useThrottle } from '@/hooks';
+import { tryParseStreamingJSON, formatPartialAgentData } from '@/utils/json/streamingJsonParser';
 import './MultiAgentDisplay.css';
 
-/**
- * Agent输出接口
- */
-export interface AgentOutput {
-  agent: string;
-  round: number;
-  output_type: string;
-  content: string;
-  metadata?: any;
-  timestamp: string;
-}
-
-/**
- * Host决策接口
- */
-export interface HostDecision {
-  action: string;
-  reason: string;
-  next_agents: string[];
-  consensus_level: number;
-  timestamp: string;
-}
-
-/**
- * 轮次数据接口
- */
-export interface RoundData {
-  round: number;
-  outputs: AgentOutput[];
-  hostDecision?: HostDecision;
-}
+import type { AgentOutput, HostDecision, RoundData } from '@/types/message';
+export type { AgentOutput, HostDecision, RoundData } from '@/types/message';
 
 /**
  * 组件Props

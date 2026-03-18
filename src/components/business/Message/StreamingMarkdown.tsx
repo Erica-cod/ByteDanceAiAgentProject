@@ -15,12 +15,12 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { fixIncompleteMarkdown, safeFixMarkdown } from '../../../utils/markdown/markdownFixer';
-import { removeJSONFromContent } from '../../../utils/markdown/jsonFilter';
-import { renderMarkdownFallback } from '../../../utils/markdown/fallbackMarkdownRenderer';
+import { fixIncompleteMarkdown, safeFixMarkdown } from '@/utils/markdown/markdownFixer';
+import { removeJSONFromContent } from '@/utils/markdown/jsonFilter';
+import { renderMarkdownFallback } from '@/utils/markdown/fallbackMarkdownRenderer';
 import PlanCard, { extractPlanData } from './PlanCard';
 import PlanListCard, { extractPlanListData } from './PlanListCard';
-import { BaseMarkdownRenderer } from '../../base';
+import { BaseMarkdownRenderer } from '@/components/base';
 import './StreamingMarkdown.css';
 
 interface StreamingMarkdownProps {

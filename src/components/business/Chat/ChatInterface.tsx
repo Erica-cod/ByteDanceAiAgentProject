@@ -11,21 +11,21 @@
 
 import React, { useState, useRef, useEffect, useCallback, Suspense, startTransition } from 'react';
 import { useTranslation } from 'react-i18next';
-import MessageListRefactored, { type MessageListRefactoredHandle } from '../Message/MessageListRefactored';
-import { ChatLayout } from '../../base/Layout';
-import { ChatHeader } from '../../base/Layout';
+import MessageList, { type MessageListHandle } from '../Message/MessageList';
+import { ChatLayout } from '@/components/base/Layout';
+import { ChatHeader } from '@/components/base/Layout';
 import { HeaderControls } from './HeaderControls';
 import { ChatInputArea } from './ChatInputArea';
-import { getUserId, initializeUser } from '../../../utils/auth/userManager';
-import { getPrivacyFirstDeviceId, showPrivacyNotice } from '../../../utils/device/privacyFirstFingerprint';
-import { useChatStore, useUIStore } from '../../../stores';
-import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '../../../hooks';
-import { useAuthStore } from '../../../stores/authStore';
-import { subscribeCrossTabEvents } from '../../../utils/events/crossTabChannel';
-import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '../../../utils/events/conversationSendLock';
-import { runWhenIdle, cancelIdleTask } from '../../../utils/perf/scheduling';
-import { buildMultiAgentPerfMock } from '../../../dev/fixtures/multiAgentPerfFixture';
-import './ChatInterfaceRefactored.css';
+import { getUserId, initializeUser } from '@/utils/auth/userManager';
+import { getPrivacyFirstDeviceId, showPrivacyNotice } from '@/utils/device/privacyFirstFingerprint';
+import { useChatStore, useUIStore } from '@/stores';
+import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '@/hooks';
+import { useAuthStore } from '@/stores/authStore';
+import { subscribeCrossTabEvents } from '@/utils/events/crossTabChannel';
+import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '@/utils/events/conversationSendLock';
+import { runWhenIdle, cancelIdleTask } from '@/utils/perf/scheduling';
+import { buildMultiAgentPerfMock } from '@/dev/fixtures/multiAgentPerfFixture';
+import './ChatInterface.css';
 
 const ConversationListLazy = React.lazy(() => import('./ConversationList'));
 const SettingsPanelLazy = React.lazy(() => import('./SettingsPanel'));
@@ -37,7 +37,7 @@ const ConversationSidebarPlaceholder: React.FC = () => (
   />
 );
 
-const ChatInterfaceRefactored: React.FC = () => {
+const ChatInterface: React.FC = () => {
   const { t } = useTranslation();
   
   // ===== Zustand Stores =====
@@ -72,7 +72,7 @@ const ChatInterfaceRefactored: React.FC = () => {
   // ===== 本地 UI 状态 =====
   const [inputValue, setInputValue] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const listRef = useRef<MessageListRefactoredHandle>(null);
+  const listRef = useRef<MessageListHandle>(null);
   const thinkingEndRef = useRef<HTMLDivElement>(null);
   const messageCountRefs = useRef<Map<string, HTMLElement>>(new Map());
   const pendingConversationListSyncRef = useRef(false);
@@ -357,7 +357,7 @@ const ChatInterfaceRefactored: React.FC = () => {
 
   // 主内容
   const mainContent = (
-    <MessageListRefactored
+    <MessageList
       key={conversationId || 'new'}
       ref={listRef}
       messages={messages}
@@ -432,5 +432,5 @@ const ChatInterfaceRefactored: React.FC = () => {
   );
 };
 
-export default ChatInterfaceRefactored;
+export default ChatInterface;
 

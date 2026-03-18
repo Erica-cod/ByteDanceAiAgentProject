@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import ChatInterfaceRefactored from '../components/business/Chat/ChatInterfaceRefactored';
+import ChatInterface from '../components/business/Chat/ChatInterface';
 
 const ErrorPageLazy = lazy(() =>
   import('../pages/errors/ErrorPage').then(module => ({ default: module.ErrorPage }))
@@ -22,7 +22,7 @@ const LoadingFallback = () => (
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<ChatInterfaceRefactored />} />
+      <Route path="/" element={<ChatInterface />} />
 
       {/* 统一错误页（非关键路径，保持懒加载） */}
       <Route

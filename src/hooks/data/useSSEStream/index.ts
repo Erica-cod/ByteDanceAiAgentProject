@@ -1,110 +1,14 @@
 /**
  * useSSEStream - SSE 流式消息处理 Hook
- * 
- * 【性能优化：RAF 批处理】
- * 
- * 本 Hook 使用 requestAnimationFrame (RAF) 批处理来优化流式渲染性能。
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 📚 React 18 自动批处理机制（Automatic Batching）
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * React 18 引入了自动批处理功能，会自动合并多次 setState 调用：
- * 
- * 1. 【工作原理】
- *    - React 会将"一段时间内"的多次状态更新合并为 1 次重渲染
- *    - 使用内部的调度器（Scheduler）来决定批处理边界
- *    - 在"事件处理器"中表现最好（onClick、onChange 等）
- * 
- * 2. 【批处理边界】
- *    React 18 会在以下情况自动批处理：
- *    ✅ 事件处理器内的多次 setState
- *    ✅ useEffect/useLayoutEffect 内的多次 setState
- *    ✅ setTimeout/Promise 回调内的多次 setState（React 18 新增）
- * 
- * 3. 【局限性】
- *    但在以下情况，批处理效果有限：
- *    ❌ 异步回调的批处理边界不确定（如 SSE 流）
- *    ❌ 高频率的异步更新（每 1-10ms 一次）
- *    ❌ 无法精确控制更新频率
- * 
- * 4. 【实际测试】
- *    在 SSE 流式场景下（100 个 chunks，10ms 间隔）：
- *    - React 18 自动批处理：100 次渲染（无明显优化）
- *    - 原因：每个 SSE chunk 到达时，React 无法确定是否还有更多 chunks
- * 
- * Q: 能不能用 useRef 避免重渲染？
- * A: 不推荐！ 原因：
- * ❌ react-markdown 无法工作（需要 props 变化）
- * ❌ 需要手动处理 XSS、事件绑定
- * ❌ 无法使用 React 组件（PlanCard、SourceLinks）
- * ❌ 代码复杂，维护困难
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 🚀 RAF 批处理优化方案
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * 1. 【原理】
- *    - 使用 requestAnimationFrame 作为批处理边界
- *    - 浏览器帧率：60fps = 每 ~16ms 一帧
- *    - 在同一帧内收到的多个 chunks 会被合并为 1 次渲染
- * 
- * 2. 【实现】
- *    ```typescript
- *    const scheduleUpdate = (content) => {
- *      pendingContent = content; // 累积最新内容
- *      
- *      if (rafId !== null) return; // 如果已安排，跳过
- *      
- *      rafId = requestAnimationFrame(() => {
- *        setState(pendingContent); // 1 次渲染
- *        rafId = null;
- *      });
- *    };
- *    ```
- * 
- * 3. 【效果】
- *    实际测试结果（100 个 chunks）：
- *    
- *    | 间隔 | React 18 批处理 | RAF 批处理 | 优化效果 |
- *    |------|----------------|-----------|---------|
- *    | 10ms | 100 次渲染     | 100 次    | 0%      |
- *    | 5ms  | 100 次渲染     | 94 次     | 6%      |
- *    | 1ms  | 100 次渲染     | 75 次     | **25%** ✅ |
- * 
- * 4. 【真实场景预期】
- *    在实际的 LLM 流式输出中（Volcengine/OpenAI）：
- *    
- *    - 高速网络（1-3ms 间隔）：20-30% 优化 ⭐⭐⭐⭐⭐
- *    - 中速网络（3-8ms 间隔）：10-15% 优化 ⭐⭐⭐⭐
- *    - 低速网络（> 10ms）：< 5% 优化 ⭐⭐
- * 
- * 5. 【性能收益】
- *    - ✅ 减少 10-25% 的重渲染次数
- *    - ✅ 降低 CPU 使用率（15-23%）
- *    - ✅ 减少设备发热和电池消耗
- *    - ✅ 更流畅的用户体验（减少卡顿）
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 📊 方案对比
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * | 方案 | 优点 | 缺点 | 推荐度 |
- * |------|------|------|--------|
- * | **React 18 批处理** | 零配置，自动优化 | SSE 流场景效果有限 | ⭐⭐⭐ |
- * | **RAF 批处理** | 精确控制，明显优化 | 需要手动实现 | ⭐⭐⭐⭐⭐ |
- * | **时间节流（100ms）** | 最大优化（80-90%） | 明显延迟感 | ⭐⭐ |
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * @see test/test-sse-raf-proof.html - RAF 批处理效果证明
- * @see test/PERFORMANCE-OPTIMIZATION-SUMMARY.md - 详细性能分析报告
+ *
+ * 使用 RAF 批处理优化流式渲染性能，减少 10-25% 重渲染。
+ * 详细的性能分析、方案对比见 ./README.md
  */
 
 import { useRef, useCallback, useEffect } from 'react';
-import { useChatStore, useQueueStore, useUIStore } from '../../../stores';
-import { getConversationDetails, type Conversation } from '../../../utils/conversation/conversationAPI';
-import { isLongText } from '../../../utils/text/textUtils';
+import { useChatStore, useQueueStore, useUIStore } from '@/stores';
+import { getConversationDetails, type Conversation } from '@/utils/conversation/conversationAPI';
+import { isLongText } from '@/utils/text/textUtils';
 import { useRAFBatching } from './raf-batching';
 import { handleMessageUpload } from './upload';
 import {
@@ -121,8 +25,8 @@ import {
   handleChunkingChunk,
 } from './chunking-handlers';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
-import { fetchWithCsrf } from '../../../utils/auth/fetchWithCsrf';
-import { publishConversationUpdated } from '../../../utils/events/crossTabChannel';
+import { fetchWithCsrf } from '@/utils/auth/fetchWithCsrf';
+import { publishConversationUpdated } from '@/utils/events/crossTabChannel';
 
 export function useSSEStream(options: UseSSEStreamOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);

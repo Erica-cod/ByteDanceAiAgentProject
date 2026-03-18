@@ -10,12 +10,12 @@
  */
 
 import React from 'react';
-import { useProgressiveLoad } from '../../../hooks/data/useProgressiveLoad';
-import { ProgressBar, LoadStats, LoadActions } from '../../base/ProgressiveLoad';
+import { useProgressiveLoad } from '@/hooks/data/useProgressiveLoad';
+import { ProgressBar, LoadStats, LoadActions } from '@/components/base/ProgressiveLoad';
 import { ChunkRenderer } from './ChunkRenderer';
-import './ProgressiveMessageRefactored.css';
+import './ProgressiveMessage.css';
 
-export interface ProgressiveMessageRefactoredProps {
+export interface ProgressiveMessageProps {
   messageId: string;
   userId: string;
   initialContent: string;
@@ -23,7 +23,7 @@ export interface ProgressiveMessageRefactoredProps {
   chunkSize?: number;
 }
 
-export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactoredProps> = ({
+export const ProgressiveMessage: React.FC<ProgressiveMessageProps> = ({
   messageId,
   userId,
   initialContent,
@@ -118,4 +118,4 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
   );
 };
 
-ProgressiveMessageRefactored.displayName = 'ProgressiveMessageRefactored';
+ProgressiveMessage.displayName = 'ProgressiveMessage';

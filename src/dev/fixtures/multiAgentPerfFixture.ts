@@ -1,5 +1,4 @@
-import type { Message } from '../../stores/chatStore';
-import type { RoundData } from '../../components/business/Message/MultiAgentDisplay';
+import type { Message, RoundData } from '@/types/message';
 
 interface BuildPerfMockOptions {
   messageCount?: number;

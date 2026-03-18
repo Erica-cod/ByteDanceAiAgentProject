@@ -1,15 +1,15 @@
 import { useCallback, useRef } from 'react';
-import { useChatStore, useUIStore } from '../../stores';
+import { useChatStore, useUIStore } from '@/stores';
 import { useSSEStream } from './useSSEStream';
-import type { MessageListRefactoredHandle as MessageListHandle } from '../../components/business/Message/MessageListRefactored';
-import { crossTabTabId, publishConversationSendReleased } from '../../utils/events/crossTabChannel';
+import type { MessageListHandle } from '@/types/message';
+import { crossTabTabId, publishConversationSendReleased } from '@/utils/events/crossTabChannel';
 import {
   CONVERSATION_SEND_LOCK_ERROR_CODE,
   type ConversationSendLock,
   tryAcquireConversationSendLock,
   refreshConversationSendLock,
   releaseConversationSendLock,
-} from '../../utils/events/conversationSendLock';
+} from '@/utils/events/conversationSendLock';
 
 interface UseMessageSenderOptions {
   messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>;

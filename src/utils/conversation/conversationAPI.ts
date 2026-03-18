@@ -1,30 +1,11 @@
 // 对话管理 API 工具函数
 import { fetchWithCsrf } from '../auth/fetchWithCsrf';
+import type { Conversation, APIMessage } from '@/types/conversation';
 
-export interface Conversation {
-  _id?: string;
-  conversationId: string;
-  userId: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  messageCount: number;
-  isActive: boolean;
-}
+export type { Conversation } from '@/types/conversation';
+export type { APIMessage as Message } from '@/types/conversation';
 
-export interface Message {
-  _id?: string;
-  messageId: string;
-  clientMessageId?: string; // 前端生成的临时消息ID（用于本地缓存与服务端持久化对齐）
-  conversationId: string;
-  userId: string;
-  role: 'user' | 'assistant';
-  content: string;
-  thinking?: string;
-  sources?: Array<{title: string; url: string}>;  // 搜索来源链接
-  modelType?: 'local' | 'volcano';
-  timestamp: string;
-}
+type Message = APIMessage;
 
 /**
  * 获取用户的所有对话列表

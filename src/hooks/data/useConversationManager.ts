@@ -4,9 +4,9 @@ import {
   createConversation,
   deleteConversation,
   type Conversation,
-} from '../../utils/conversation/conversationAPI';
-import { useChatStore } from '../../stores';
-import { publishConversationListUpdated } from '../../utils/events/crossTabChannel';
+} from '@/utils/conversation/conversationAPI';
+import { useChatStore } from '@/stores';
+import { publishConversationListUpdated } from '@/utils/events/crossTabChannel';
 
 export function useConversationManager(userId: string, onAbort: () => void) {
   const [conversations, setConversations] = useState<Conversation[]>([]);

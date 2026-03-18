@@ -11,7 +11,7 @@
 
 import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAutoResizeTextarea } from '../../../hooks';
+import { useAutoResizeTextarea } from '@/hooks';
 import TextStatsIndicator from './TextStatsIndicator';
 import './ChatInputArea.css';
 

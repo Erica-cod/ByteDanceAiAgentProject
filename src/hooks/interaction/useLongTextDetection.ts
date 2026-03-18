@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isLongText } from '../../utils/text/textUtils';
+import { isLongText } from '@/utils/text/textUtils';
 
 interface WorkerMessage {
   id: number;

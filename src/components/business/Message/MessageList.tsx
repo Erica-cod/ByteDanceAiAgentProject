@@ -11,13 +11,13 @@
 import React, { useRef, useImperativeHandle, useCallback, forwardRef, memo, useMemo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MessageItemRenderer } from './MessageItemRenderer';
-import type { Message } from '../../../stores/chatStore';
-import type { QueueItem } from '../../../stores/queueStore';
-import { useChatStore } from '../../../stores';
+import type { Message, MessageListHandle } from '@/types/message';
+import type { QueueItem } from '@/stores/queueStore';
+import { useChatStore } from '@/stores';
 import { estimateMessageHeight } from './messageHeightEstimator';
-import './MessageListRefactored.css';
+import './MessageList.css';
 
-interface MessageListRefactoredProps {
+interface MessageListProps {
   messages: Message[];
   queue: QueueItem[];
   firstItemIndex: number;
@@ -29,13 +29,9 @@ interface MessageListRefactoredProps {
   onRetry: (userMessageId: string) => void;
 }
 
-export interface MessageListRefactoredHandle {
-  scrollToRow: (index: number) => void;
-  scrollToBottom: () => void;
-  recomputeRowHeights: (index?: number) => void;
-}
+export type { MessageListHandle } from '@/types/message';
 
-const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, MessageListRefactoredProps>((props, ref) => {
+const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props, ref) => {
   const {
     messages,
     queue,
@@ -264,6 +260,6 @@ const MessageListRefactoredInner = forwardRef<MessageListRefactoredHandle, Messa
   );
 });
 
-MessageListRefactoredInner.displayName = 'MessageListRefactored';
+MessageListInner.displayName = 'MessageList';
 
-export default memo(MessageListRefactoredInner);
+export default memo(MessageListInner);

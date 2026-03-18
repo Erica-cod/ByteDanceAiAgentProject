@@ -11,25 +11,8 @@ import { getConversationMessages, type Conversation } from '../utils/conversatio
 import { createEventManager } from '../utils/events/eventManager';
 import { touchConversationCache, smartCleanupConversationCache } from '../utils/storage/localStorageLRU';
 
-export interface Message {
-  id: string;
-  clientMessageId?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  contentLength?: number;  //  新增：完整内容长度
-  thinking?: string;
-  sources?: Array<{ title: string; url: string }>;
-  timestamp: number;
-  pendingSync?: boolean;
-  failed?: boolean; // 标记失败的消息
-  retryCount?: number; // 重试次数
-  multiAgentData?: {
-    rounds: any[];
-    status: 'in_progress' | 'converged' | 'terminated';
-    consensusTrend: number[];
-  };
-  streamingAgentContent?: Record<string, string>; //  新增：流式内容（"agentId:round" -> 累积内容）
-}
+import type { Message } from '@/types/message';
+export type { Message } from '@/types/message';
 
 interface ChatState {
   // 状态
