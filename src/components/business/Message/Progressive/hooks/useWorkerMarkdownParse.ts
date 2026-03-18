@@ -40,7 +40,7 @@ export function useWorkerMarkdownParse(text: string, isFirstChunk: boolean = fal
   const getWorker = useCallback(() => {
     if (!workerRef.current && typeof Worker !== 'undefined') {
       workerRef.current = new Worker(
-        new URL('../../workers/markdownParse.worker.ts', import.meta.url),
+        new URL('../../../../../workers/markdownParse.worker.ts', import.meta.url),
         { type: 'module' },
       );
     }

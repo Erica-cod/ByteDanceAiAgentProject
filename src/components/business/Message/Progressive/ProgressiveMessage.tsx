@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { useProgressiveLoad } from '@/hooks/data/useProgressiveLoad';
+import { useProgressiveLoad } from './hooks/useProgressiveLoad';
 import { ProgressBar, LoadStats, LoadActions } from '@/components/base/ProgressiveLoad';
 import { ChunkRenderer } from './ChunkRenderer';
 import styles from './ProgressiveMessage.module.css';

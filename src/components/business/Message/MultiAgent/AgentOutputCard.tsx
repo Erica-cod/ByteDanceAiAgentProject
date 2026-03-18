@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import StreamingMarkdown from './StreamingMarkdown';
+import StreamingMarkdown from '../StreamingMarkdown';
 import { tryParseStreamingJSON, formatPartialAgentData } from '@/utils/json/streamingJsonParser';
 import { AGENT_ICONS, AGENT_NAMES, AGENT_STREAMING_MESSAGES } from '@/constants';
 

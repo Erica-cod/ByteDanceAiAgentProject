@@ -3,11 +3,10 @@
  */
 
 export { HeaderControls } from './HeaderControls';
-export { ChatInputArea } from './ChatInputArea';
-export { default as ConversationList } from './ConversationList';
+export { ChatInputArea } from './Input/ChatInputArea';
+export { default as ConversationList } from './Sidebar/ConversationList';
 export { default as SettingsPanel } from './SettingsPanel';
-export { default as TextStatsIndicator } from './TextStatsIndicator';
+export { default as TextStatsIndicator } from './Input/TextStatsIndicator';
 
 export type { HeaderControlsProps } from './HeaderControls';
-export type { ChatInputAreaProps } from './ChatInputArea';
-
+export type { ChatInputAreaProps } from './Input/ChatInputArea';

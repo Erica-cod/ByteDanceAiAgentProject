@@ -80,7 +80,7 @@ docs/
 | 子目录 | 内容 |
 |--------|------|
 | `convergence-refactoring/` | 收敛性重构系列（P0 消除重复实现、P1 拆分 chat.ts + 合并流处理器、P2 规则外部化 + 遗留工作流清理 + 管理端鉴权） |
-| `convergence-refactroing-frontend/` | 前端 src 模块架构审查与重构计划（路径别名、类型治理、大文件拆分、CSS Modules） |
+| `convergence-refactroing-frontend/` | 前端 src 模块架构审查与重构计划（路径别名、类型治理、大文件拆分、CSS Modules、Hooks 就近放置策略） |
 
 ---
 

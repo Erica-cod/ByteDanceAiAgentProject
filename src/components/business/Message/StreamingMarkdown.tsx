@@ -18,8 +18,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { fixIncompleteMarkdown, safeFixMarkdown } from '@/utils/markdown/markdownFixer';
 import { removeJSONFromContent } from '@/utils/markdown/jsonFilter';
 import { renderMarkdownFallback } from '@/utils/markdown/fallbackMarkdownRenderer';
-import PlanCard, { extractPlanData } from './PlanCard';
-import PlanListCard, { extractPlanListData } from './PlanListCard';
+import PlanCard, { extractPlanData } from './Plan/PlanCard';
+import PlanListCard, { extractPlanListData } from './Plan/PlanListCard';
 import { BaseMarkdownRenderer } from '@/components/base';
 import styles from './StreamingMarkdown.module.css';
 

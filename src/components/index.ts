@@ -13,24 +13,24 @@ export * from './base';
 
 // 聊天相关
 export { HeaderControls } from './business/Chat/HeaderControls';
-export { ChatInputArea } from './business/Chat/ChatInputArea';
+export { ChatInputArea } from './business/Chat/Input/ChatInputArea';
 export { default as ChatInterface } from './business/Chat/ChatInterface';
-export { default as ConversationList } from './business/Chat/ConversationList';
+export { default as ConversationList } from './business/Chat/Sidebar/ConversationList';
 export { default as SettingsPanel } from './business/Chat/SettingsPanel';
-export { default as TextStatsIndicator } from './business/Chat/TextStatsIndicator';
+export { default as TextStatsIndicator } from './business/Chat/Input/TextStatsIndicator';
 
 // 消息相关
-export { ProgressiveMessage } from './business/Message/ProgressiveMessage';
+export { ProgressiveMessage } from './business/Message/Progressive/ProgressiveMessage';
 export { MessageItemRenderer } from './business/Message/MessageItemRenderer';
 export { default as MessageList } from './business/Message/MessageList';
 export { default as StreamingMarkdown } from './business/Message/StreamingMarkdown';
-export { default as MultiAgentDisplay } from './business/Message/MultiAgentDisplay';
-export { default as PlanCard } from './business/Message/PlanCard';
-export { default as PlanListCard } from './business/Message/PlanListCard';
+export { default as MultiAgentDisplay } from './business/Message/MultiAgent/MultiAgentDisplay';
+export { default as PlanCard } from './business/Message/Plan/PlanCard';
+export { default as PlanListCard } from './business/Message/Plan/PlanListCard';
 
 // ==================== 类型导出 ====================
 
 export type { HeaderControlsProps } from './business/Chat/HeaderControls';
-export type { ChatInputAreaProps } from './business/Chat/ChatInputArea';
-export type { ProgressiveMessageProps } from './business/Message/ProgressiveMessage';
+export type { ChatInputAreaProps } from './business/Chat/Input/ChatInputArea';
+export type { ProgressiveMessageProps } from './business/Message/Progressive/ProgressiveMessage';
 export type { MessageItemRendererProps } from './business/Message/MessageItemRenderer';

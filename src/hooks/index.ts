@@ -1,29 +1,11 @@
 /**
- * Hooks 统一导出
- * 
- * 按功能分类组织：
- * - data: 请求与数据类（SSE流、消息管理等）
- * - interaction: 行为交互类（防抖、节流）
- * - utils: 通用工具类（日期格式化、Toggle、网络状态等）
+ * 共享 Hooks 统一导出
+ *
+ * 仅包含被多个组件使用的通用 hooks。
+ * 单消费者 hooks 已就近放置到各自组件目录的 hooks/ 子目录下。
  */
 
-// 数据类（核心业务）
-export {
-  useSSEStream,
-  useMessageSender,
-  useMessageQueue,
-  useConversationManager,
-} from './data';
-
-// 交互类
-export {
-  useThrottle,
-  useLongTextDetection,
-} from './interaction';
-
-// 工具类
-export {
-  useDateFormat,
-  useAutoResizeTextarea,
-  useEventListener,
-} from './utils';
+export { useThrottle } from './useThrottle';
+export { useDateFormat } from './useDateFormat';
+export { useAutoResizeTextarea } from './useAutoResizeTextarea';
+export { useEventListener } from './useEventListener';

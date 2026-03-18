@@ -6,8 +6,8 @@
  */
 
 import React, { useRef, useState, useEffect, memo } from 'react';
-import StreamingMarkdown from './StreamingMarkdown';
-import { useWorkerMarkdownParse } from '@/hooks/data/useWorkerMarkdownParse';
+import StreamingMarkdown from '../StreamingMarkdown';
+import { useWorkerMarkdownParse } from './hooks/useWorkerMarkdownParse';
 
 const LAZY_THRESHOLD = 5;
 const OBSERVER_ROOT_MARGIN = '1000px';

@@ -11,18 +11,21 @@ import MessageList from '../Message/MessageList';
 import { ChatLayout } from '@/components/base/Layout';
 import { ChatHeader } from '@/components/base/Layout';
 import { HeaderControls } from './HeaderControls';
-import { ChatInputArea } from './ChatInputArea';
+import { ChatInputArea } from './Input/ChatInputArea';
 import { useChatStore, useUIStore } from '@/stores';
-import { useConversationManager, useMessageQueue, useMessageSender, useThrottle } from '@/hooks';
+import { useThrottle } from '@/hooks';
 import { useAuthStore } from '@/stores/authStore';
-import { useChatInitialization } from '@/hooks/data/useChatInitialization';
-import { useCrossTabSync } from '@/hooks/data/useCrossTabSync';
-import { usePerfMock, usePerfMockEnabled } from '@/hooks/data/usePerfMock';
+import { useConversationManager } from './hooks/useConversationManager';
+import { useMessageQueue } from './hooks/useMessageQueue';
+import { useMessageSender } from './hooks/useMessageSender';
+import { useChatInitialization } from './hooks/useChatInitialization';
+import { useCrossTabSync } from './hooks/useCrossTabSync';
+import { usePerfMock, usePerfMockEnabled } from './hooks/usePerfMock';
 import { CONVERSATION_SEND_LOCK_ERROR_CODE } from '@/utils/events/conversationSendLock';
 import type { MessageListHandle } from '@/types/message';
 import styles from './ChatInterface.module.css';
 
-const ConversationListLazy = React.lazy(() => import('./ConversationList'));
+const ConversationListLazy = React.lazy(() => import('./Sidebar/ConversationList'));
 const SettingsPanelLazy = React.lazy(() => import('./SettingsPanel'));
 
 const ConversationSidebarPlaceholder: React.FC = () => (

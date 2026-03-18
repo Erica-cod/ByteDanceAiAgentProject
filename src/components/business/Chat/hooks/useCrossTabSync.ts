@@ -11,7 +11,7 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore, useUIStore } from '@/stores';
 import { subscribeCrossTabEvents } from '@/utils/events/crossTabChannel';
-import { useThrottle } from '@/hooks/interaction';
+import { useThrottle } from '@/hooks';
 
 interface UseCrossTabSyncOptions {
   loadConversations: () => Promise<void>;

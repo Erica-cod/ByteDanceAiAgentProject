@@ -12,10 +12,10 @@ import React, { Suspense, useMemo, useState } from 'react';
 import { MessageItem, UserMessage, AssistantMessage, ThinkingSection, SourceLinks } from '@/components/base/Message';
 import type { Message } from '@/stores/chatStore';
 
-const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgentDisplay'));
+const MultiAgentDisplayLazy = React.lazy(() => import('./MultiAgent/MultiAgentDisplay'));
 const StreamingMarkdownLazy = React.lazy(() => import('./StreamingMarkdown'));
 const ProgressiveMessageLazy = React.lazy(() =>
-  import('./ProgressiveMessage').then(module => ({ default: module.ProgressiveMessage }))
+  import('./Progressive/ProgressiveMessage').then(module => ({ default: module.ProgressiveMessage }))
 );
 
 export interface MessageItemRendererProps {
