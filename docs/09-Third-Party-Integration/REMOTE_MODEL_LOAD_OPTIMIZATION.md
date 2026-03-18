@@ -12,18 +12,76 @@
 
 在尽量不影响用户体验的前提下，降低远程模型 token 消耗 50-80%。
 
-### 业界参考
+---
 
-| 项目 | Stars | 核心思路 |
-|------|-------|----------|
-| [RouteLLM (lm-sys)](https://github.com/lm-sys/RouteLLM) | 4.7k | 请求复杂度分类 → 路由到 cheap/expensive 模型 |
-| [vLLM Semantic Router](https://github.com/vllm-project/semantic-router) | 3.4k | 语义路由 + 语义缓存 |
-| [LLMLingua (Microsoft)](https://github.com/microsoft/LLMLingua) | 4k+ | Prompt 压缩，20x 压缩率 |
-| [LiteLLM](https://github.com/BerriAI/litellm) | 18k+ | 统一 LLM Gateway，路由/缓存/监控 |
+## 二、调研与方案选型
+
+### 调研过程
+
+围绕"LLM token 成本优化"搜索了 Web 和 GitHub 高 star 项目，核心搜索关键词：
+
+- `LLM token cost optimization strategies semantic caching routing small large model`
+- `GitHub high star LLM router model cascade semantic cache token optimization`
+- `LLM request routing small model large model cascade reduce API cost open source`
+- `LLM prompt compression token reduction technique LLMLingua`
+
+### 业界核心方案总结
+
+调研结果显示，业界将 LLM 成本优化归纳为三个主轴：**路由 (Routing)**、**缓存 (Caching)**、**压缩 (Compression)**，三者组合可实现 47-80% 的成本降低。
+
+#### 参考项目深度分析
+
+**1. [RouteLLM](https://github.com/lm-sys/RouteLLM) — lm-sys / UC Berkeley（4.7k stars）**
+
+核心思路是训练一个轻量分类器，判断请求该路由到 expensive model 还是 cheap model。论文实验显示：在 MT Bench 上保持 95% GPT-4 质量的前提下，只需 26-54% 的 GPT-4 调用量，成本降低 70-85%。
+
+对本项目的启发：
+- 分类器思路直接适用，但 RouteLLM 需要大量偏好数据训练，我们用规则分类器替代（零训练成本）
+- "strong model + weak model" 二元路由的架构直接借鉴
+
+**2. [vLLM Semantic Router](https://github.com/vllm-project/semantic-router)（3.4k stars）**
+
+系统级 Mixture-of-Models 路由器，支持语义路由 + 语义缓存。2025 年 10 月发表论文 "Category-Aware Semantic Caching for Heterogeneous LLM Workloads"。
+
+对本项目的启发：
+- 语义缓存不只是"命中就返回"，可以分等级处理
+- 缓存决策本身也可以缓存（decision caching），减少重复分类开销
+
+**3. [LLMLingua](https://github.com/microsoft/LLMLingua) — Microsoft Research（4k+ stars）**
+
+用小模型的 perplexity 度量来识别和删除 prompt 中的冗余 token，实现最高 20x 压缩率。核心组件包括 Budget Controller（各 prompt 段分配不同压缩率）和 Token-level Iterative Compression。
+
+对本项目的启发：
+- "用小模型压缩大模型的输入"的思路直接借鉴
+- 我们的场景不需要 token 级压缩（太重），用本地模型做对话摘要即可
+
+**4. [LiteLLM](https://github.com/BerriAI/litellm)（18k+ stars）**
+
+统一 LLM Gateway，100+ 模型 provider 的统一接口，内置路由、缓存、监控、限流。
+
+对本项目的启发：
+- 验证了"Gateway 层做路由+缓存"是成熟架构模式
+- 但我们项目体量不需要引入完整 Gateway，在应用层实现即可
+
+**5. 其他参考**
+
+- [Anyscale LLM Router](https://github.com/anyscale/llm-router)：用 causal-LLM 分类器做路由，MT Bench 上 70% 成本降低
+- [OmniRouter](https://arxiv.org/html/2502.20576v6)：将路由建模为约束优化问题，精度提升 6.3% 同时成本降低 10%+
+- Mavik Labs 2026 年报告：路由+缓存+批处理三板斧，生产系统 47-80% 成本降低
+
+### 方案决策
+
+| 维度 | 业界方案 | 本项目选择 | 取舍理由 |
+|------|---------|-----------|---------|
+| 路由分类 | 训练分类器（RouteLLM） | 规则分类器 | 零训练成本，可逐步迭代到模型辅助 |
+| 路由粒度 | 二元路由 (strong/weak) | 三层路由 (local/lite/premium) | 本地模型零成本，多一层省更多 |
+| 缓存策略 | 语义缓存命中直接返回 | 三级缓存 (L1直返/L2变体/L3未命中) | 解决"用户想要不同回答"的矛盾 |
+| Prompt 压缩 | token 级压缩（LLMLingua） | 对话摘要（本地模型） | 实现简单，对话场景够用 |
+| 工具定义 | 无现成方案 | 三层分类瘦身 | 自研，针对项目工具系统定制 |
 
 ---
 
-## 二、方案设计
+## 三、方案设计
 
 ### 整体架构
 
@@ -37,16 +95,18 @@
     │
     ├─ 2. 请求复杂度分类（规则驱动）
     │     ├─ simple + 高置信度 → 本地模型处理（零远程消耗）
-    │     ├─ simple → remote-lite (doubao-lite-32k)
-    │     ├─ moderate → remote (doubao-pro / thinking-pro)
+    │     ├─ simple → remote-lite (doubao-seed-1-6-lite)
+    │     ├─ moderate → remote (doubao-thinking-pro)
     │     └─ complex → remote (doubao-thinking-pro)
     │
     ├─ 3. 上下文压缩
     │     ├─ 最近 2 轮：保持原文
     │     └─ 更早历史：本地模型摘要化
     │
-    ├─ 4. 工具定义瘦身
-    │     └─ 只发送与用户消息相关的工具 schema
+    ├─ 4. 工具定义瘦身（三层分类）
+    │     ├─ 闲聊 → 零工具
+    │     ├─ 意图匹配 → 相关工具 + 基础工具集
+    │     └─ 兜底 → search_web + get_current_time
     │
     └─ 5. 动态 max_tokens
           └─ 根据请求复杂度调整 500~4000
@@ -107,18 +167,49 @@
 
 对话消息 <= 8 条时不触发压缩（没有必要）。
 
-### 策略四：工具定义瘦身 + 动态 max_tokens
+### 策略四：工具定义瘦身（三层分类）+ 动态 max_tokens
 
-**工具瘦身**：根据用户消息的关键词判断可能用到哪类工具，只发送相关的 schema。
+#### 工具瘦身 V1 → V2 的迭代过程
 
-| 关键词 | 匹配工具 |
-|--------|---------|
-| 时间/日期/几点/星期... | `get_current_time`, `calculate_date`, `parse_natural_date`, `compare_dates` |
-| 搜索/查找/最新/新闻... | `search_web` |
-| 计划/任务/安排... | `create_plan`, `update_plan`, `get_plan`, `list_plans` |
-| 无法判断 | 全量发送（安全 fallback） |
+**V1（初版，纯关键词白名单）**：根据用户消息中的关键词匹配工具类别，无命中则返回全量工具。
 
-**动态 max_tokens**：取代之前固定的 4000：
+上线后发现两个问题：
+
+| 输入 | 期望 | V1 实际 | 问题根因 |
+|------|------|---------|---------|
+| "你好" | 不需要任何工具 | 全部 9 个（fallback 全量） | 闲聊没有关键词 → 走 fallback |
+| "今天天气怎么样" | search_web | 4 个时间工具 | "今天"误触发时间类关键词，漏掉搜索 |
+| "帮我查一下北京房价" | search_web | 全部 9 个 | "查一下"不在搜索关键词中 |
+
+根本原因：关键词白名单是**双向脆弱**的——对无意图的消息误触发全量 fallback，对有隐含意图的消息只命中字面关键词而漏掉真正需要的工具。
+
+**V2（当前版，三层分类）**：
+
+```
+Layer 1: 闲聊检测 → 短消息 + 闲聊模式 → 返回 []（零工具）
+Layer 2: 意图模式匹配 → 命中特定工具组（始终附带基础工具集）
+Layer 3: 兜底 → search_web + get_current_time
+```
+
+关键改进点：
+- **时间关键词收窄**：去掉"今天/明天/昨天"等泛词，只保留"现在几点/什么时间/日期计算/时区"等明确时间意图
+- **搜索关键词大幅扩展**：加入"查一下/看看/天气/怎么样/价格/推荐/排名/教程/攻略"等隐含搜索意图
+- **基础工具集始终附带**：`search_web` + `get_current_time` 作为安全网。`get_current_time` 必须保留是因为**模型的时间认知停留在训练截止日期**，不给它就无法正确回答任何涉及"现在/今天"的问题
+- **闲聊检测作为最高优先级**：问候、感谢、确认类消息不需要任何工具
+
+V2 效果对比：
+
+| 输入 | V1 | V2 |
+|------|-----|-----|
+| "你好" | 全部 9 个 | 0 个（闲聊检测） |
+| "今天天气怎么样" | 4 个时间工具 | search_web + get_current_time |
+| "帮我查一下北京房价" | 全部 9 个 | search_web + get_current_time |
+| "3天后是什么日期" | 4 个时间工具 | 4 时间 + search_web + get_current_time |
+| "帮我制定学习计划" | 4 个计划工具 | 4 计划 + search_web + get_current_time |
+
+#### 动态 max_tokens
+
+取代之前固定的 4000：
 
 | 请求类型 | max_tokens |
 |---------|-----------|
@@ -130,7 +221,7 @@
 
 ---
 
-## 三、实现细节
+## 四、实现细节
 
 ### 修改的文件
 
@@ -145,7 +236,7 @@
 | `api/handlers/cacheHandler.ts` | 重构为三级缓存策略；L2 调用本地模型生成变体 |
 | `api/handlers/singleAgentHandler.ts` | 远程模型解析 `usage` 字段上报 metrics；本地模型估算 token 并上报 |
 | `api/lambda/chat.ts` | volcano 分支加入分类器路由、local-first cascade、工具瘦身 |
-| `api/tools/core/registry/tool-registry.ts` | 新增 `getRelevantSchemas(userMessage)` 方法 |
+| `api/tools/core/registry/tool-registry.ts` | `getRelevantSchemas()` 三层分类：闲聊检测 → 意图匹配 → 基础工具兜底 |
 
 ### 关键代码片段
 
@@ -194,6 +285,22 @@ if (sim >= thresholds.L1 && hitCount < 3) {
 // 否则 L3 未命中
 ```
 
+**工具瘦身三层分类** (`tool-registry.ts`)：
+
+```typescript
+// Layer 1: 闲聊 → 零工具
+if (text.length < 20 && NO_TOOLS_PATTERN.test(text)) return [];
+
+// Layer 2: 意图匹配（收窄时间关键词、扩展搜索关键词）
+if (/现在几点|什么时间|日期计算|时间差|时区/.test(text)) { /* 时间工具 */ }
+if (/搜索|查一下|看看|天气|推荐|怎么做|价格/.test(text)) { /* 搜索工具 */ }
+if (/计划|任务|安排|todo|待办/.test(text)) { /* 计划工具 */ }
+
+// Layer 3: 基础工具集始终附带（模型需要感知真实时间）
+matched.add('search_web');
+matched.add('get_current_time');
+```
+
 ### 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -205,7 +312,7 @@ if (sim >= thresholds.L1 && hitCount < 3) {
 
 ---
 
-## 四、效果验证
+## 五、效果验证
 
 ### 预估节省
 
