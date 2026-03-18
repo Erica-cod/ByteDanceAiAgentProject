@@ -73,23 +73,21 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .progressive-message-refactored__error {
-    background: rgba(239, 68, 68, 0.15);
-    color: #f87171;
-  }
+:global([data-theme="dark"]) .progressive-message-refactored__error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
 
-  .progressive-message-refactored__loading {
-    background-color: rgba(59, 130, 246, 0.15);
-  }
+:global([data-theme="dark"]) .progressive-message-refactored__loading {
+  background-color: rgba(59, 130, 246, 0.15);
+}
 
-  .progressive-message-refactored__controls {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
+:global([data-theme="dark"]) .progressive-message-refactored__controls {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
 
-  .chunk-renderer--placeholder {
-    background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
-    background-size: 200% 100%;
-  }
+:global([data-theme="dark"]) .chunk-renderer--placeholder {
+  background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+  background-size: 200% 100%;
 }

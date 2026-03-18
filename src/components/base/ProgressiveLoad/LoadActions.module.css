@@ -54,17 +54,15 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .load-actions__button.secondary {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #e5e7eb;
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .load-actions__button.secondary:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
+:global([data-theme="dark"]) .load-actions__button.secondary {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global([data-theme="dark"]) .load-actions__button.secondary:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* 响应式 */

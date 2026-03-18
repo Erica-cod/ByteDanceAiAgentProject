@@ -32,14 +32,12 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .assistant-message__thinking {
-    background: rgba(59, 130, 246, 0.1);
-    color: #9ca3af;
-  }
-  
-  .assistant-message__sources {
-    border-top-color: rgba(255, 255, 255, 0.1);
-  }
+:global([data-theme="dark"]) .assistant-message__thinking {
+  background: rgba(59, 130, 246, 0.1);
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .assistant-message__sources {
+  border-top-color: rgba(255, 255, 255, 0.1);
 }
 

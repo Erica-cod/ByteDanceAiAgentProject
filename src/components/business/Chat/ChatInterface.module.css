@@ -33,9 +33,7 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .chat-interface-refactored {
-    background: #1a1a1a;
-  }
+:global([data-theme="dark"]) .chat-interface-refactored {
+  background: #1a1a1a;
 }
 

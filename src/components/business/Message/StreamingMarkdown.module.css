@@ -275,37 +275,35 @@
   }
 }
 
-/* 暗色模式支持（可选） */
-@media (prefers-color-scheme: dark) {
-  .streaming-markdown,
-  :global(.fallback-markdown) {
-    color: #e4e4e4;
-  }
-  
-  .streaming-markdown pre,
-  :global(.fallback-markdown) pre,
-  .streaming-markdown th,
-  :global(.fallback-markdown) th {
-    background-color: #2d2d2d;
-  }
-  
-  .streaming-markdown code,
-  :global(.fallback-markdown) code {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .streaming-markdown blockquote,
-  :global(.fallback-markdown) blockquote {
-    background-color: #2d2d2d;
-    border-left-color: #4d4d4d;
-    color: #b4b4b4;
-  }
-  
-  .streaming-markdown table th,
-  .streaming-markdown table td,
-  :global(.fallback-markdown) table th,
-  :global(.fallback-markdown) table td {
-    border-color: #4d4d4d;
-  }
+/* 暗色模式支持 */
+:global([data-theme="dark"]) .streaming-markdown,
+:global([data-theme="dark"] .fallback-markdown) {
+  color: #e4e4e4;
+}
+
+:global([data-theme="dark"]) .streaming-markdown pre,
+:global([data-theme="dark"] .fallback-markdown) pre,
+:global([data-theme="dark"]) .streaming-markdown th,
+:global([data-theme="dark"] .fallback-markdown) th {
+  background-color: #2d2d2d;
+}
+
+:global([data-theme="dark"]) .streaming-markdown code,
+:global([data-theme="dark"] .fallback-markdown) code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+:global([data-theme="dark"]) .streaming-markdown blockquote,
+:global([data-theme="dark"] .fallback-markdown) blockquote {
+  background-color: #2d2d2d;
+  border-left-color: #4d4d4d;
+  color: #b4b4b4;
+}
+
+:global([data-theme="dark"]) .streaming-markdown table th,
+:global([data-theme="dark"]) .streaming-markdown table td,
+:global([data-theme="dark"] .fallback-markdown) table th,
+:global([data-theme="dark"] .fallback-markdown) table td {
+  border-color: #4d4d4d;
 }
 

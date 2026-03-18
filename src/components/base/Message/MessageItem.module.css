@@ -45,12 +45,10 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .message-item--assistant {
-    background: rgba(45, 45, 45, 0.9);
-    color: #e5e7eb;
-    border-color: rgba(80, 80, 80, 0.5);
-  }
+:global([data-theme="dark"]) .message-item--assistant {
+  background: rgba(45, 45, 45, 0.9);
+  color: #e5e7eb;
+  border-color: rgba(80, 80, 80, 0.5);
 }
 
 /* 响应式 */

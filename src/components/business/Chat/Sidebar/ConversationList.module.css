@@ -307,10 +307,78 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .conversation-list-loading-skeleton__item {
-    background: linear-gradient(90deg, #313131 25%, #3a3a3a 37%, #313131 63%);
-    background-size: 400% 100%;
-  }
+/* 暗色模式 */
+:global([data-theme="dark"]) .conversation-sidebar {
+  background: rgba(26, 26, 26, 0.85);
+  border-right-color: rgba(60, 60, 60, 0.8);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
+}
+
+:global([data-theme="dark"]) .sidebar-header {
+  background: rgba(30, 30, 30, 0.95);
+  color: #e5e7eb;
+  border-bottom-color: rgba(60, 60, 60, 0.8);
+}
+
+:global([data-theme="dark"]) .toggle-sidebar-btn {
+  background: rgba(60, 60, 60, 0.5);
+  border-color: rgba(80, 80, 80, 0.5);
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .toggle-sidebar-btn:hover {
+  background: rgba(80, 80, 80, 0.5);
+  border-color: #667eea;
+  color: #667eea;
+}
+
+:global([data-theme="dark"]) .empty-conversations {
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .empty-conversations .hint {
+  color: #6b7280;
+}
+
+:global([data-theme="dark"]) .conversation-item {
+  background: rgba(45, 45, 45, 0.7);
+  border-color: rgba(80, 80, 80, 0.5);
+}
+
+:global([data-theme="dark"]) .conversation-item:hover {
+  background: rgba(60, 60, 60, 0.9);
+  border-color: #667eea;
+}
+
+:global([data-theme="dark"]) .conversation-title {
+  color: #e5e7eb;
+}
+
+:global([data-theme="dark"]) .conversation-meta {
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .delete-conversation-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+:global([data-theme="dark"]) .delete-conversation-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #f87171;
+}
+
+:global([data-theme="dark"]) .conversations-list::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+:global([data-theme="dark"]) .conversations-list::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+:global([data-theme="dark"]) .conversation-list-loading-skeleton__item {
+  background: linear-gradient(90deg, #313131 25%, #3a3a3a 37%, #313131 63%);
+  background-size: 400% 100%;
 }
 

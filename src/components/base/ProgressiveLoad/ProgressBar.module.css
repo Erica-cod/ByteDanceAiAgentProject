@@ -30,13 +30,11 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .progress-bar__track {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .progress-bar__text {
-    color: #9ca3af;
-  }
+:global([data-theme="dark"]) .progress-bar__track {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+:global([data-theme="dark"]) .progress-bar__text {
+  color: #9ca3af;
 }
 

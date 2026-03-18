@@ -27,14 +27,12 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .load-stats {
-    color: #9ca3af;
-  }
-  
-  .load-stats__separator {
-    color: #4b5563;
-  }
+:global([data-theme="dark"]) .load-stats {
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .load-stats__separator {
+  color: #4b5563;
 }
 
 /* 响应式 */

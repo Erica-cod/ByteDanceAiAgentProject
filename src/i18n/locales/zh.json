@@ -42,6 +42,8 @@
     "chinese": "中文",
     "english": "English",
     "model": "模型选择",
+    "localModel": "本地模型",
+    "remoteModel": "远程模型",
     "chatMode": "对话模式",
     "singleAgent": "单智能体",
     "multiAgent": "多智能体"

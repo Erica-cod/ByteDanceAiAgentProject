@@ -262,23 +262,21 @@
 }
 
 /* 暗色模式适配 */
-@media (prefers-color-scheme: dark) {
-  .task-item {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-  }
+:global([data-theme="dark"]) .task-item {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
 
-  .task-item:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
+:global([data-theme="dark"]) .task-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
 
-  .task-title {
-    color: white;
-  }
+:global([data-theme="dark"]) .task-title {
+  color: white;
+}
 
-  .task-details {
-    color: rgba(255, 255, 255, 0.7);
-  }
+:global([data-theme="dark"]) .task-details {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ==================== 计划卡片精简模式样式 ==================== */
@@ -447,56 +445,53 @@
 }
 
 /* 暗色模式 - 精简模式 */
-@media (prefers-color-scheme: dark) {
-  .plan-card-compact {
-    background: rgba(255, 255, 255, 0.1);
-  }
+:global([data-theme="dark"]) .plan-card-compact {
+  background: rgba(255, 255, 255, 0.1);
+}
 
-  .plan-card-compact:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
+:global([data-theme="dark"]) .plan-card-compact:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
 
-  .plan-compact-title {
-    color: white;
-  }
+:global([data-theme="dark"]) .plan-compact-title {
+  color: white;
+}
 
-  .plan-compact-id {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
-  }
+:global([data-theme="dark"]) .plan-compact-id {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
 
-  .plan-compact-goal {
-    background: rgba(255, 255, 255, 0.05);
-    border-left-color: #818cf8;
-    color: rgba(255, 255, 255, 0.9);
-  }
+:global([data-theme="dark"]) .plan-compact-goal {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: #818cf8;
+  color: rgba(255, 255, 255, 0.9);
+}
 
-  .plan-compact-meta .meta-item {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-  }
+:global([data-theme="dark"]) .plan-compact-meta .meta-item {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
 
-  /* 暗色模式 - 精简任务列表 */
-  .compact-tasks-label {
-    color: rgba(255, 255, 255, 0.8);
-  }
+:global([data-theme="dark"]) .compact-tasks-label {
+  color: rgba(255, 255, 255, 0.8);
+}
 
-  .compact-task-item {
-    background: rgba(255, 255, 255, 0.05);
-  }
+:global([data-theme="dark"]) .compact-task-item {
+  background: rgba(255, 255, 255, 0.05);
+}
 
-  .compact-task-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
+:global([data-theme="dark"]) .compact-task-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
 
-  .compact-task-title {
-    color: rgba(255, 255, 255, 0.9);
-  }
+:global([data-theme="dark"]) .compact-task-title {
+  color: rgba(255, 255, 255, 0.9);
+}
 
-  .compact-task-deadline {
-    background: rgba(129, 140, 248, 0.2);
-    color: rgba(255, 255, 255, 0.8);
-  }
+:global([data-theme="dark"]) .compact-task-deadline {
+  background: rgba(129, 140, 248, 0.2);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* ==================== 计划列表卡片样式 ==================== */

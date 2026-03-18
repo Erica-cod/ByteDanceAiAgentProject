@@ -140,25 +140,23 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .message-list-refactored__mask {
-    background: rgba(26, 26, 26, 0.95);
-  }
-  
-  .message-list-refactored__load-more {
-    background: rgba(45, 45, 45, 0.8);
-    border-bottom-color: rgba(80, 80, 80, 0.5);
-    color: #9ca3af;
-  }
-  
-  .message-list-refactored__loading {
-    background: rgba(45, 45, 45, 0.9);
-    border-color: rgba(80, 80, 80, 0.5);
-  }
+:global([data-theme="dark"]) .message-list-refactored__mask {
+  background: rgba(26, 26, 26, 0.95);
+}
 
-  .message-item-seek-placeholder {
-    background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
-    background-size: 200% 100%;
-  }
+:global([data-theme="dark"]) .message-list-refactored__load-more {
+  background: rgba(45, 45, 45, 0.8);
+  border-bottom-color: rgba(80, 80, 80, 0.5);
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .message-list-refactored__loading {
+  background: rgba(45, 45, 45, 0.9);
+  border-color: rgba(80, 80, 80, 0.5);
+}
+
+:global([data-theme="dark"]) .message-item-seek-placeholder {
+  background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+  background-size: 200% 100%;
 }
 

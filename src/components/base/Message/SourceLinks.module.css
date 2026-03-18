@@ -72,34 +72,32 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .source-links {
-    background: rgba(45, 45, 45, 0.5);
-    border-color: rgba(80, 80, 80, 0.5);
-  }
-  
-  .source-links__header {
-    color: #9ca3af;
-  }
-  
-  .source-links__item {
-    background: rgba(60, 60, 60, 0.5);
-    color: #e5e7eb;
-  }
-  
-  .source-links__item:hover {
-    background: rgba(70, 70, 70, 0.8);
-  }
-  
-  .source-links__toggle {
-    background: transparent;
-    border-color: rgba(80, 80, 80, 0.5);
-    color: #9ca3af;
-  }
-  
-  .source-links__toggle:hover {
-    background: rgba(60, 60, 60, 0.5);
-    color: #60a5fa;
-  }
+:global([data-theme="dark"]) .source-links {
+  background: rgba(45, 45, 45, 0.5);
+  border-color: rgba(80, 80, 80, 0.5);
+}
+
+:global([data-theme="dark"]) .source-links__header {
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .source-links__item {
+  background: rgba(60, 60, 60, 0.5);
+  color: #e5e7eb;
+}
+
+:global([data-theme="dark"]) .source-links__item:hover {
+  background: rgba(70, 70, 70, 0.8);
+}
+
+:global([data-theme="dark"]) .source-links__toggle {
+  background: transparent;
+  border-color: rgba(80, 80, 80, 0.5);
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .source-links__toggle:hover {
+  background: rgba(60, 60, 60, 0.5);
+  color: #60a5fa;
 }
 

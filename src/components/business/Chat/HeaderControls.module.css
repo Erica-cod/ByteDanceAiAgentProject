@@ -66,29 +66,27 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .header-controls__mode-switch {
-    color: #9ca3af;
-  }
-  
-  .mode-btn {
-    background: rgba(60, 60, 60, 0.5);
-    color: #e5e7eb;
-    border-color: rgba(80, 80, 80, 0.5);
-  }
-  
-  .mode-btn:hover:not(:disabled) {
-    background: rgba(70, 70, 70, 0.8);
-  }
-  
-  .header-controls__settings-btn {
-    background: rgba(60, 60, 60, 0.5);
-    color: #e5e7eb;
-    border-color: rgba(80, 80, 80, 0.5);
-  }
-  
-  .header-controls__settings-btn:hover {
-    background: rgba(70, 70, 70, 0.8);
-  }
+:global([data-theme="dark"]) .header-controls__mode-switch {
+  color: #9ca3af;
+}
+
+:global([data-theme="dark"]) .mode-btn {
+  background: rgba(60, 60, 60, 0.5);
+  color: #e5e7eb;
+  border-color: rgba(80, 80, 80, 0.5);
+}
+
+:global([data-theme="dark"]) .mode-btn:hover:not(:disabled) {
+  background: rgba(70, 70, 70, 0.8);
+}
+
+:global([data-theme="dark"]) .header-controls__settings-btn {
+  background: rgba(60, 60, 60, 0.5);
+  color: #e5e7eb;
+  border-color: rgba(80, 80, 80, 0.5);
+}
+
+:global([data-theme="dark"]) .header-controls__settings-btn:hover {
+  background: rgba(70, 70, 70, 0.8);
 }
 

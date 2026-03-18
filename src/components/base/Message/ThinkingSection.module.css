@@ -62,17 +62,15 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .thinking-section {
-    background: rgba(59, 130, 246, 0.1);
-  }
-  
-  .thinking-section__header:hover {
-    background: rgba(59, 130, 246, 0.15);
-  }
-  
-  .thinking-section__content {
-    color: #9ca3af;
-  }
+:global([data-theme="dark"]) .thinking-section {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+:global([data-theme="dark"]) .thinking-section__header:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+:global([data-theme="dark"]) .thinking-section__content {
+  color: #9ca3af;
 }
 

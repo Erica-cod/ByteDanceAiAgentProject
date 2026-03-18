@@ -42,6 +42,8 @@
     "chinese": "中文",
     "english": "English",
     "model": "Model",
+    "localModel": "Local",
+    "remoteModel": "Remote",
     "chatMode": "Chat Mode",
     "singleAgent": "Single Agent",
     "multiAgent": "Multi-Agent"

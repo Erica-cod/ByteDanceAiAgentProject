@@ -87,15 +87,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
                 className={`${styles['settings-option']} ${modelType === 'local' ? styles.active : ''}`}
                 onClick={() => setModelType('local')}
               >
-                <span className={styles['option-icon']}>🤖</span>
-                <span>Ollama</span>
+                <span className={styles['option-icon']}>💻</span>
+                <span>{t('settings.localModel')}</span>
               </button>
               <button
                 className={`${styles['settings-option']} ${modelType === 'volcano' ? styles.active : ''}`}
                 onClick={() => setModelType('volcano')}
               >
-                <span className={styles['option-icon']}>🔥</span>
-                <span>Doubao</span>
+                <span className={styles['option-icon']}>☁️</span>
+                <span>{t('settings.remoteModel')}</span>
               </button>
             </div>
           </div>

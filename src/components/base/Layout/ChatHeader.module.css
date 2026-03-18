@@ -34,11 +34,9 @@
 }
 
 /* 暗色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .chat-header {
-    background: rgba(30, 30, 30, 0.9);
-    border-bottom-color: rgba(60, 60, 60, 0.8);
-    color: #e5e7eb;
-  }
+:global([data-theme="dark"]) .chat-header {
+  background: rgba(30, 30, 30, 0.9);
+  border-bottom-color: rgba(60, 60, 60, 0.8);
+  color: #e5e7eb;
 }
 
