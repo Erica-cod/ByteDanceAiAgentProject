@@ -161,6 +161,8 @@ SSE 流式传输的完整实现：自适应背压、断点续传、连接守卫�
 | `REQUEST_CACHE_GUIDE.md` | 请求缓存与 Embedding 匹配 |
 | `CONVERSATION_MEMORY_GUIDE.md` | 对话记忆管理 |
 
+> 另见：`09-Third-Party-Integration/REMOTE_MODEL_LOAD_OPTIMIZATION.md` — 三级语义缓存 (L1/L2/L3) 与上下文压缩策略
+
 ---
 
 ### 09-Third-Party-Integration — 第三方 / LLM 集成
@@ -169,6 +171,7 @@ SSE 流式传输的完整实现：自适应背压、断点续传、连接守卫�
 |---------|------|
 | `OLLAMA_MULTI_MODEL_FORMAT_COMPATIBILITY.md` | Ollama 多模型流式格式兼容方案 |
 | `VOLCENGINE_DOUBAO_GUIDE.md` | 火山引擎豆包集成 |
+| `REMOTE_MODEL_LOAD_OPTIMIZATION.md` | 远程模型负载调度优化（智能路由 + 分级缓存 + 上下文压缩） |
 | `EMBEDDING_SETUP_GUIDE.md` | Embedding 模型配置 |
 | `TAVILY_SEARCH_GUIDE.md` | Tavily 搜索集成 |
 | `LANGGRAPH_WORKFLOW_GUIDE.md` | LangGraph 工作流 |

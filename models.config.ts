@@ -54,36 +54,6 @@ export const MODEL_CONFIGS = {
     description: 'Qwen3 8B - 支持工具调用，中文优秀，Agent 任务首选',
   },
 
-  'qwen2.5:7b': {
-    provider: 'ollama' as const,
-    modelName: 'qwen2.5:7b',
-    supportsTools: true,
-    thinkingMode: 'none' as const,
-    toolCallsInStream: false,
-    vramGB: 4.7,
-    description: 'Qwen2.5 7B - 支持工具调用，稳定可靠',
-  },
-
-  'llama3.1:8b': {
-    provider: 'ollama' as const,
-    modelName: 'llama3.1:8b',
-    supportsTools: true,
-    thinkingMode: 'none' as const,
-    toolCallsInStream: false,
-    vramGB: 4.7,
-    description: 'Llama 3.1 8B - Meta 开源，工具调用支持好',
-  },
-
-  'mistral:7b': {
-    provider: 'ollama' as const,
-    modelName: 'mistral:7b',
-    supportsTools: true,
-    thinkingMode: 'none' as const,
-    toolCallsInStream: false,
-    vramGB: 4.1,
-    description: 'Mistral 7B - 轻量高效，显存占用小',
-  },
-
   'deepseek-r1:7b': {
     provider: 'ollama' as const,
     modelName: 'deepseek-r1:7b',
@@ -116,29 +86,20 @@ export const MODEL_CONFIGS = {
     toolCallsInStream: false,
     costTier: 3 as const,
     capabilityTier: 3 as const,
-    description: '豆包 1.5 思维版 - 推荐远程模型',
+    description: '豆包 1.5 思维版 - 复杂推理/分析首选',
   },
 
-  'doubao-pro-32k': {
+  'doubao-seed-1-6-lite-251015': {
     provider: 'openai-compatible' as const,
-    modelName: 'doubao-pro-32k',
-    supportsTools: true,
-    thinkingMode: 'none' as const,
-    toolCallsInStream: false,
-    costTier: 2 as const,
-    capabilityTier: 2 as const,
-    description: '豆包 Pro 32K - 长上下文',
-  },
-
-  'doubao-lite-32k': {
-    provider: 'openai-compatible' as const,
-    modelName: 'doubao-lite-32k',
+    modelName: 'doubao-seed-1-6-lite-251015',
     supportsTools: true,
     thinkingMode: 'none' as const,
     toolCallsInStream: false,
     costTier: 1 as const,
     capabilityTier: 1 as const,
-    description: '豆包 Lite 32K - 轻量快速',
+    supportsVision: true,
+    reasoningEffort: 'medium' as const,
+    description: '豆包 Seed 1.6 Lite - 轻量推理，支持多模态，低成本路由首选',
   },
 };
 

@@ -126,7 +126,7 @@ export function initializeRegistry(): LLMProviderRegistry {
     registry.register('remote', provider, 'remote');
 
     // 注册 lite 远程模型（用于简单请求的低成本路由）
-    const liteModel = process.env.ARK_LITE_MODEL || 'doubao-lite-32k';
+    const liteModel = process.env.ARK_LITE_MODEL || 'doubao-seed-1-6-lite-251015';
     const liteCatalog = findModelConfig(liteModel);
     const liteProvider = new OpenAICompatibleProvider({
       provider: 'openai-compatible',
