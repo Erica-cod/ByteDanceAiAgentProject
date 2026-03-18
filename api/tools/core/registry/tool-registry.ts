@@ -8,6 +8,12 @@
  */
 
 import type { ToolPlugin, FunctionSchema, ToolMetadata } from '../types.js';
+import {
+  CHAT_NO_TOOLS_PATTERN,
+  CHAT_NO_TOOLS_MAX_LENGTH,
+  INTENT_RULES,
+  BASE_TOOLS,
+} from '../../../config/toolRelevanceRules.js';
 
 export class ToolRegistry {
   private tools: Map<string, ToolPlugin> = new Map();
@@ -127,39 +133,19 @@ export class ToolRegistry {
   getRelevantSchemas(userMessage: string): Array<{ type: 'function'; function: FunctionSchema }> {
     const text = userMessage.toLowerCase().trim();
 
-    // ── Layer 1: 闲聊检测 → 不需要任何工具 ──
-    const NO_TOOLS = /^(你好|hi|hello|hey|嗨|早上好|晚上好|下午好|谢谢|thanks|thank you|ok|好的|嗯|再见|bye|拜拜|晚安|早安|哈哈|666|收到|明白|懂了|对的|是的|没错|好吧|不用了|可以|行|没问题)\s*[!！。.？?~，,]*$/i;
-    if (text.length < 20 && NO_TOOLS.test(text)) {
+    if (text.length < CHAT_NO_TOOLS_MAX_LENGTH && CHAT_NO_TOOLS_PATTERN.test(text)) {
       console.log('🔧 [ToolRegistry] Layer1 闲聊检测: 不传递工具');
       return [];
     }
 
-    // ── Layer 2: 意图模式匹配 ──
     const matched = new Set<string>();
 
-    // 时间工具（收窄：只匹配明确的时间意图，"今天/明天" 太泛不再触发）
-    if (/现在几点|什么时间|当前时间|日期计算|时间差|时区转换|多少天后|多少天前|周几$|星期几$|几号$/.test(text)) {
-      matched.add('get_current_time');
-      matched.add('calculate_date');
-      matched.add('parse_natural_date');
-      matched.add('compare_dates');
+    for (const rule of INTENT_RULES) {
+      if (rule.pattern.test(text)) {
+        for (const t of rule.tools) matched.add(t);
+      }
     }
 
-    // 搜索工具（扩展：覆盖隐含搜索意图）
-    if (/搜索|搜一下|查找|查询|查一下|查一查|帮我查|帮我搜|帮我找|看一下|看看|了解一下|最新|新闻|天气|热点|热搜|百度|谷歌|google|bing|search|实时|怎么样|价格|多少钱|发布|上市|评测|测评|推荐|排名|排行|教程|攻略|指南|怎么做|如何做|哪里|哪个好|对比|区别/.test(text)) {
-      matched.add('search_web');
-    }
-
-    // 计划工具
-    if (/计划|任务|学习计划|项目计划|制定|安排|进度|plan|todo|待办|日程/.test(text)) {
-      matched.add('create_plan');
-      matched.add('update_plan');
-      matched.add('get_plan');
-      matched.add('list_plans');
-    }
-
-    // 基础工具集：search_web + get_current_time 始终附带（模型需要感知真实时间）
-    const BASE_TOOLS = ['search_web', 'get_current_time'];
     for (const t of BASE_TOOLS) matched.add(t);
 
     const allEnabled = Array.from(this.tools.values())

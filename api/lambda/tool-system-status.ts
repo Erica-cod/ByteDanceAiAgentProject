@@ -12,6 +12,7 @@ import { cacheManager } from '../tools/core/cache/cache-manager.js';
 import { rateLimiter } from '../tools/core/limits/rate-limiter.js';
 import { circuitBreaker } from '../tools/core/resilience/circuit-breaker.js';
 import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
 
 /**
  * OPTIONS - 处理预检请求
@@ -98,13 +99,12 @@ function getToolMetrics(toolName: string) {
  */
 export async function post({ data, headers }: any) {
   const requestOrigin = headers?.origin;
-  
+
   try {
-    // TODO: 添加管理员权限验证
-    // const isAdmin = await verifyAdmin(headers);
-    // if (!isAdmin) {
-    //   return createJsonResponse({ error: '权限不足' }, 403, requestOrigin);
-    // }
+    const session = await getBffSessionFromHeaders(headers);
+    if (!session) {
+      return createJsonResponse({ error: '未登录，无法执行管理操作' }, 403, requestOrigin);
+    }
 
     const { action, toolName } = data || {};
 
