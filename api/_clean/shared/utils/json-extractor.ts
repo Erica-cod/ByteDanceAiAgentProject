@@ -425,18 +425,43 @@ export function extractJSONWithRemainder<T = any>(
   const openMatch = text.match(openTagRegex);
   
   if (openMatch && !text.includes(`</${tagName}>`)) {
+    const jsonStr = openMatch[1].trim();
+    const remainingText = text.substring(0, openMatch.index).trim();
+
+    // 阶段 1：直接解析
     try {
-      const jsonStr = openMatch[1].trim();
       metrics.rawParseAttempts += 1;
       const data = JSON.parse(jsonStr);
       metrics.rawParseSuccess += 1;
-      const remainingText = text.substring(0, openMatch.index).trim();
-      
       console.log(`🔍 [extractJSONWithRemainder] 找到未闭合的 <${tagName}> 标签（可能还在流式输出）`);
       emitMetrics(true, 'raw', 'open_tag');
       return { data, remainingText };
-    } catch (error: any) {
-      console.warn(`⚠️  [extractJSONWithRemainder] 未闭合标签 JSON 解析失败: ${error.message}`);
+    } catch (rawErr: any) {
+      console.warn(`⚠️  [extractJSONWithRemainder] 未闭合标签 JSON 解析失败: ${rawErr.message}`);
+    }
+
+    // 阶段 2：jsonrepair 修复（与闭合标签分支对齐）
+    if (autoFix) {
+      try {
+        metrics.jsonrepairAttempts += 1;
+        const repairedStr = jsonrepair(jsonStr);
+        const data = JSON.parse(repairedStr);
+        metrics.jsonrepairSuccess += 1;
+        console.log(`🔍 [extractJSONWithRemainder] 未闭合标签 JSON 修复成功（jsonrepair）`);
+        emitMetrics(true, 'jsonrepair', 'open_tag');
+        return { data, remainingText };
+      } catch {
+        // 阶段 3：自定义修复（兜底）
+        try {
+          metrics.customFixAttempts += 1;
+          const fixedStr = fixCommonJSONErrors(jsonStr);
+          const data = JSON.parse(fixedStr);
+          metrics.customFixSuccess += 1;
+          console.log(`🔍 [extractJSONWithRemainder] 未闭合标签 JSON 修复成功（自定义）`);
+          emitMetrics(true, 'custom', 'open_tag');
+          return { data, remainingText };
+        } catch {}
+      }
     }
   }
   

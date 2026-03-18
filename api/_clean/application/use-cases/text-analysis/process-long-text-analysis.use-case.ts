@@ -16,6 +16,7 @@ import { buildMapPrompt, buildReducePrompt } from '../../../../config/chunkingPr
 import { callVolcengineModel } from '../../../infrastructure/llm/model-service.js';
 import { volcengineService } from '../../../infrastructure/llm/volcengine-service.js';
 import { extractThinkingAndContent } from '../../../shared/utils/content-extractor.js';
+import { extractJSON } from '../../../shared/utils/json-extractor.js';
 import type { ChatMessage } from '../../../../types/chat.js';
 import { getContainer } from '../../../di-container.js';
 
@@ -183,29 +184,21 @@ export class ProcessLongTextAnalysisUseCase {
   }
 
   /**
-   * 解析提取的数据
+   * 解析提取的数据（复用 extractJSON 多策略 + 三层修复）
    */
   private parseExtractedData(response: string, chunkIndex: number): ExtractedData {
-    // 尝试从markdown代码块中提取JSON
-    const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      try {
-        const jsonStr = jsonMatch[1];
-        const parsed = JSON.parse(jsonStr);
-        return this.normalizeExtractedData(parsed);
-      } catch {
-        // 继续尝试其他解析方法
-      }
-    }
-    
-    // 尝试直接解析整个响应
-    try {
-      const parsed = JSON.parse(response);
+    const parsed = extractJSON(response, {
+      autoFix: true,
+      logPrefix: `📦 [LongText-Map-${chunkIndex}]`,
+      source: `long_text_map_chunk_${chunkIndex}`,
+    });
+
+    if (parsed) {
       return this.normalizeExtractedData(parsed);
-    } catch {
-      console.warn(`⚠️  [Long Text Analysis] Chunk ${chunkIndex} JSON 解析失败，返回空数据`);
-      return this.getEmptyExtractedData();
     }
+
+    console.warn(`⚠️  [Long Text Analysis] Chunk ${chunkIndex} JSON 提取失败（已尝试全部修复策略），返回空数据`);
+    return this.getEmptyExtractedData();
   }
 
   /**

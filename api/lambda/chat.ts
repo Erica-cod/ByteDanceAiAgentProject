@@ -174,6 +174,17 @@ export async function post({
       if (cacheResponse) { handoffToStream = true; return cacheResponse; }
 
       // ==================== 策略分发 ====================
+      // 多 Agent 优先：用户显式选择的协作模式不应被自动节约策略覆盖
+      if (mode === 'multi_agent') {
+        handoffToStream = true;
+        return handleMultiAgent({
+          message, userId, conversationId,
+          clientAssistantMessageId, release,
+          resumeFromRound: data!.resumeFromRound,
+          headers, requestOrigin,
+        });
+      }
+
       const { longTextMode, longTextOptions } = data!;
 
       if (shouldUseChunking(message, longTextMode)) {
@@ -182,16 +193,6 @@ export async function post({
           message, userId, conversationId,
           clientAssistantMessageId, modelType,
           longTextOptions, release, requestOrigin,
-        });
-      }
-
-      if (mode === 'multi_agent') {
-        handoffToStream = true;
-        return handleMultiAgent({
-          message, userId, conversationId,
-          clientAssistantMessageId, release,
-          resumeFromRound: data!.resumeFromRound,
-          headers, requestOrigin,
         });
       }
 
