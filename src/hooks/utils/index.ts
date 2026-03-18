@@ -5,7 +5,6 @@
  */
 
 export { useDateFormat } from './useDateFormat';
-export { useToggle } from './useToggle';
 export { useAutoResizeTextarea } from './useAutoResizeTextarea';
-export { useEventListener, useWindowEvent, useDocumentEvent, useMediaQuery } from './useEventListener';
+export { useEventListener } from './useEventListener';
 
