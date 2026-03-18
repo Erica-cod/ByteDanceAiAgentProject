@@ -1,6 +1,6 @@
 import React from 'react';
 import PlanCard from './PlanCard';
-import './PlanCard.css';
+import styles from './PlanCard.module.css';
 
 interface Task {
   title: string;
@@ -32,16 +32,16 @@ interface PlanListCardProps {
 
 const PlanListCard: React.FC<PlanListCardProps> = ({ listData }) => {
   return (
-    <div className="plan-list-card">
-      <div className="plan-list-header">
-        <h3 className="plan-list-title">
+    <div className={styles['plan-list-card']}>
+      <div className={styles['plan-list-header']}>
+        <h3 className={styles['plan-list-title']}>
           📚 计划列表
-          <span className="plan-count-badge">{listData.total} 个计划</span>
+          <span className={styles['plan-count-badge']}>{listData.total} 个计划</span>
         </h3>
       </div>
 
       {listData.plans.length > 0 ? (
-        <div className="plan-list-items">
+        <div className={styles['plan-list-items']}>
           {listData.plans.map((plan, index) => (
             <PlanCard
               key={plan.plan_id}
@@ -60,15 +60,15 @@ const PlanListCard: React.FC<PlanListCardProps> = ({ listData }) => {
           ))}
         </div>
       ) : (
-        <div className="plan-list-empty">
-          <span className="empty-icon">📭</span>
+        <div className={styles['plan-list-empty']}>
+          <span className={styles['empty-icon']}>📭</span>
           <p>暂无计划</p>
         </div>
       )}
 
       {listData.plans.length < listData.total && (
-        <div className="plan-list-footer">
-          <span className="more-info">
+        <div className={styles['plan-list-footer']}>
+          <span className={styles['more-info']}>
             显示前 {listData.limit} 个计划，共 {listData.total} 个
           </span>
         </div>

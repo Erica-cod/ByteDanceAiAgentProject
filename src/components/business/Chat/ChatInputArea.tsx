@@ -13,7 +13,7 @@ import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAutoResizeTextarea } from '@/hooks';
 import TextStatsIndicator from './TextStatsIndicator';
-import './ChatInputArea.css';
+import styles from './ChatInputArea.module.css';
 
 export interface ChatInputAreaProps {
   /** 输入值 */
@@ -64,21 +64,21 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   };
 
   return (
-    <div className="chat-input-area">
+    <div className={styles['chat-input-area']}>
       {queuedMessages.length > 0 && (
-        <div className="chat-input-area__queue">
-          <div className="chat-input-area__queue-title">
+        <div className={styles['chat-input-area__queue']}>
+          <div className={styles['chat-input-area__queue-title']}>
             队列中 {queuedMessages.length} 条，当前消息发送完成后将依次发送
           </div>
-          <div className="chat-input-area__queue-list">
+          <div className={styles['chat-input-area__queue-list']}>
             {queuedMessages.slice(0, 3).map((item, index) => (
-              <div key={item.id} className="chat-input-area__queue-item">
-                <span className="chat-input-area__queue-index">{index + 1}.</span>
-                <span className="chat-input-area__queue-text">{item.content}</span>
+              <div key={item.id} className={styles['chat-input-area__queue-item']}>
+                <span className={styles['chat-input-area__queue-index']}>{index + 1}.</span>
+                <span className={styles['chat-input-area__queue-text']}>{item.content}</span>
               </div>
             ))}
             {queuedMessages.length > 3 && (
-              <div className="chat-input-area__queue-more">
+              <div className={styles['chat-input-area__queue-more']}>
                 还有 {queuedMessages.length - 3} 条未展示
               </div>
             )}
@@ -86,7 +86,7 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
         </div>
       )}
 
-      <div className="chat-input-area__wrapper">
+      <div className={styles['chat-input-area__wrapper']}>
         <textarea
           ref={textareaRef}
           value={value}
@@ -95,20 +95,20 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
           placeholder={isLoading ? t('chat.generating') : t('chat.inputPlaceholder')}
           disabled={false}
           maxLength={maxLength}
-          className="chat-input-area__textarea"
+          className={styles['chat-input-area__textarea']}
         />
         
         {isLoading ? (
           <button 
             onClick={onStop} 
-            className="chat-input-area__button stop"
+            className={`${styles['chat-input-area__button']} ${styles.stop}`}
           >
             {t('chat.abort')}
           </button>
         ) : (
           <button 
             onClick={onSend} 
-            className="chat-input-area__button send"
+            className={`${styles['chat-input-area__button']} ${styles.send}`}
             disabled={!value.trim()}
           >
             {queueLength > 0 

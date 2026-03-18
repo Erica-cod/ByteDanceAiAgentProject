@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '@/stores/themeStore';
 import { useUIStore } from '@/stores';
-import './SettingsPanel.css';
+import styles from './SettingsPanel.module.css';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -23,98 +23,98 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
 
   return (
     <>
-      <div className="settings-overlay" onClick={onClose} />
-      <div className="settings-panel">
-        <div className="settings-header">
+      <div className={styles['settings-overlay']} onClick={onClose} />
+      <div className={styles['settings-panel']}>
+        <div className={styles['settings-header']}>
           <h2>{t('settings.title')}</h2>
-          <button className="settings-close" onClick={onClose} aria-label="关闭">
+          <button className={styles['settings-close']} onClick={onClose} aria-label="关闭">
             ✕
           </button>
         </div>
 
-        <div className="settings-content">
-          <div className="settings-section">
+        <div className={styles['settings-content']}>
+          <div className={styles['settings-section']}>
             <h3>{t('settings.language')}</h3>
-            <div className="settings-options">
+            <div className={styles['settings-options']}>
               <button
-                className={`settings-option ${i18n.language === 'zh' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${i18n.language === 'zh' ? styles.active : ''}`}
                 onClick={() => changeLanguage('zh')}
               >
-                <span className="option-icon">🇨🇳</span>
+                <span className={styles['option-icon']}>🇨🇳</span>
                 <span>{t('settings.chinese')}</span>
               </button>
               <button
-                className={`settings-option ${i18n.language === 'en' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${i18n.language === 'en' ? styles.active : ''}`}
                 onClick={() => changeLanguage('en')}
               >
-                <span className="option-icon">🇺🇸</span>
+                <span className={styles['option-icon']}>🇺🇸</span>
                 <span>{t('settings.english')}</span>
               </button>
             </div>
           </div>
 
-          <div className="settings-section">
+          <div className={styles['settings-section']}>
             <h3>{t('settings.theme')}</h3>
-            <div className="settings-options">
+            <div className={styles['settings-options']}>
               <button
-                className={`settings-option ${theme === 'light' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${theme === 'light' ? styles.active : ''}`}
                 onClick={() => setTheme('light')}
               >
-                <span className="option-icon">☀️</span>
+                <span className={styles['option-icon']}>☀️</span>
                 <span>{t('settings.light')}</span>
               </button>
               <button
-                className={`settings-option ${theme === 'dark' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${theme === 'dark' ? styles.active : ''}`}
                 onClick={() => setTheme('dark')}
               >
-                <span className="option-icon">🌙</span>
+                <span className={styles['option-icon']}>🌙</span>
                 <span>{t('settings.dark')}</span>
               </button>
               <button
-                className={`settings-option ${theme === 'auto' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${theme === 'auto' ? styles.active : ''}`}
                 onClick={() => setTheme('auto')}
               >
-                <span className="option-icon">🔄</span>
+                <span className={styles['option-icon']}>🔄</span>
                 <span>{t('settings.auto')}</span>
               </button>
             </div>
           </div>
 
-          <div className="settings-section">
+          <div className={styles['settings-section']}>
             <h3>{t('settings.model')}</h3>
-            <div className="settings-options">
+            <div className={styles['settings-options']}>
               <button
-                className={`settings-option ${modelType === 'local' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${modelType === 'local' ? styles.active : ''}`}
                 onClick={() => setModelType('local')}
               >
-                <span className="option-icon">🤖</span>
+                <span className={styles['option-icon']}>🤖</span>
                 <span>Ollama</span>
               </button>
               <button
-                className={`settings-option ${modelType === 'volcano' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${modelType === 'volcano' ? styles.active : ''}`}
                 onClick={() => setModelType('volcano')}
               >
-                <span className="option-icon">🔥</span>
+                <span className={styles['option-icon']}>🔥</span>
                 <span>Doubao</span>
               </button>
             </div>
           </div>
 
-          <div className="settings-section">
+          <div className={styles['settings-section']}>
             <h3>{t('settings.chatMode')}</h3>
-            <div className="settings-options">
+            <div className={styles['settings-options']}>
               <button
-                className={`settings-option ${chatMode === 'single' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${chatMode === 'single' ? styles.active : ''}`}
                 onClick={() => setChatMode('single')}
               >
-                <span className="option-icon">👤</span>
+                <span className={styles['option-icon']}>👤</span>
                 <span>{t('settings.singleAgent')}</span>
               </button>
               <button
-                className={`settings-option ${chatMode === 'multi_agent' ? 'active' : ''}`}
+                className={`${styles['settings-option']} ${chatMode === 'multi_agent' ? styles.active : ''}`}
                 onClick={() => setChatMode('multi_agent')}
               >
-                <span className="option-icon">👥</span>
+                <span className={styles['option-icon']}>👥</span>
                 <span>{t('settings.multiAgent')}</span>
               </button>
             </div>

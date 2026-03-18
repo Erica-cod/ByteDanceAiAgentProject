@@ -9,7 +9,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import './ChatHeader.css';
+import styles from './ChatHeader.module.css';
 
 export interface ChatHeaderProps {
   /** 标题内容 */
@@ -26,12 +26,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`chat-header ${className}`}>
-      <div className="chat-header__title">
+    <div className={`${styles['chat-header']} ${className}`}>
+      <div className={styles['chat-header__title']}>
         {title}
       </div>
       {controls && (
-        <div className="chat-header__controls">
+        <div className={styles['chat-header__controls']}>
           {controls}
         </div>
       )}

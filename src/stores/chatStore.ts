@@ -1,16 +1,14 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import {
-  readConversationCache,
-  writeConversationCache,
-  mergeServerMessagesWithCache,
   type CachedMessage,
 } from '../utils/conversation/secureConversationCache';
 import { getUserId } from '../utils/auth/userManager';
-import { getConversationMessages, type Conversation } from '../utils/conversation/conversationAPI';
+import { type Conversation } from '../utils/conversation/conversationAPI';
 import { createEventManager } from '../utils/events/eventManager';
-import { touchConversationCache, smartCleanupConversationCache } from '../utils/storage/localStorageLRU';
+import { createAsyncActions } from './chatStoreAsync';
 
+import { MAX_MESSAGES_IN_MEMORY } from '@/constants';
 import type { Message } from '@/types/message';
 export type { Message } from '@/types/message';
 
@@ -20,8 +18,8 @@ interface ChatState {
   conversations: Conversation[];
   conversationId: string | null;
   userId: string;
-  deviceId: string; //  新增：设备指纹 ID（用于并发控制）
-  firstItemIndex: number; // Virtuoso 分页索引
+  deviceId: string;
+  firstItemIndex: number;
   hasMoreMessages: boolean;
   totalMessages: number;
   isLoadingMore: boolean;
@@ -34,7 +32,7 @@ interface ChatState {
   removeMessage: (id: string) => void;
   setConversationId: (id: string | null) => void;
   setUserId: (userId: string) => void;
-  setDeviceId: (deviceId: string) => void; //  新增
+  setDeviceId: (deviceId: string) => void;
   setConversations: (conversations: Conversation[]) => void;
   setFirstItemIndex: (index: number) => void;
   setHasMoreMessages: (has: boolean) => void;
@@ -43,7 +41,7 @@ interface ChatState {
   markConversationUnread: (conversationId: string) => void;
   clearConversationUnread: (conversationId: string) => void;
 
-  // 流式更新优化（关键性能优化）
+  // 流式更新优化
   appendToLastMessage: (contentDelta?: string, thinkingDelta?: string, sources?: Array<{ title: string; url: string }>) => void;
   markMessageFailed: (id: string) => void;
   markMessageSuccess: (id: string) => void;
@@ -54,296 +52,122 @@ interface ChatState {
   saveToCache: () => Promise<void>;
 }
 
-//  内存保护：单个对话最多保留的消息数量
-const MAX_MESSAGES_IN_MEMORY = 30; // 约30条消息，防止内存溢出
-
 export const useChatStore = create<ChatState>()(
-  immer((set, get) => ({
-    // 初始状态
-    messages: [],
-    conversations: [],
-    conversationId: null,
-    userId: getUserId(),
-    deviceId: '', //  初始为空，ChatInterface 异步加载后设置
-    firstItemIndex: 0,
-    hasMoreMessages: false,
-    totalMessages: 0,
-    isLoadingMore: false,
-    unreadConversationIds: [],
+  immer((set, get) => {
+    const asyncActions = createAsyncActions(set as any, get as any);
 
-    // 同步 Actions
-    setMessages: (messages) => {
-      //  内存保护：限制消息数量
-      if (messages.length > MAX_MESSAGES_IN_MEMORY) {
-        console.warn(`消息数量超过限制 (${messages.length} > ${MAX_MESSAGES_IN_MEMORY})，保留最新的消息`);
-        const recentMessages = messages.slice(-MAX_MESSAGES_IN_MEMORY);
-        set({ messages: recentMessages });
-      } else {
-        set({ messages });
-      }
-    },
+    return {
+      // 初始状态
+      messages: [],
+      conversations: [],
+      conversationId: null,
+      userId: getUserId(),
+      deviceId: '',
+      firstItemIndex: 0,
+      hasMoreMessages: false,
+      totalMessages: 0,
+      isLoadingMore: false,
+      unreadConversationIds: [],
 
-    addMessage: (message) =>
-      set((state) => {
-        state.messages.push(message);
-        
-        //  内存保护：如果消息过多，移除最早的消息
-        if (state.messages.length > MAX_MESSAGES_IN_MEMORY) {
-          const removed = state.messages.shift();
-          console.warn(`内存保护：移除最早的消息 (ID: ${removed?.id})`);
+      // 同步 Actions
+      setMessages: (messages) => {
+        if (messages.length > MAX_MESSAGES_IN_MEMORY) {
+          console.warn(`消息数量超过限制 (${messages.length} > ${MAX_MESSAGES_IN_MEMORY})，保留最新的消息`);
+          set({ messages: messages.slice(-MAX_MESSAGES_IN_MEMORY) });
+        } else {
+          set({ messages });
         }
-      }),
+      },
 
-    updateMessage: (id, updates) =>
-      set((state) => {
-        const msg = state.messages.find((m) => m.id === id);
-        if (msg) Object.assign(msg, updates);
-      }),
-
-    removeMessage: (id) =>
-      set((state) => {
-        state.messages = state.messages.filter((m) => m.id !== id);
-      }),
-
-    setConversationId: (id) =>
-      set((state) => {
-        state.conversationId = id;
-        if (id) {
-          state.unreadConversationIds = state.unreadConversationIds.filter((convId) => convId !== id);
-        }
-      }),
-    setUserId: (userId) => set({ userId }),
-    setDeviceId: (deviceId) => set({ deviceId }), //  新增
-    setConversations: (conversations) => set({ conversations }),
-    setFirstItemIndex: (index) => set({ firstItemIndex: index }),
-    setHasMoreMessages: (has) => set({ hasMoreMessages: has }),
-    setTotalMessages: (total) => set({ totalMessages: total }),
-    setIsLoadingMore: (loading) => set({ isLoadingMore: loading }),
-    markConversationUnread: (conversationId) =>
-      set((state) => {
-        if (!conversationId) return;
-        if (!state.unreadConversationIds.includes(conversationId)) {
-          state.unreadConversationIds.push(conversationId);
-        }
-      }),
-    clearConversationUnread: (conversationId) =>
-      set((state) => {
-        state.unreadConversationIds = state.unreadConversationIds.filter((id) => id !== conversationId);
-      }),
-
-    // 流式更新优化（性能关键）
-    appendToLastMessage: (contentDelta, thinkingDelta, sources) =>
-      set((state) => {
-        const last = state.messages[state.messages.length - 1];
-        if (last && last.role === 'assistant') {
-          if (contentDelta !== undefined) {
-            last.content = contentDelta; // 直接赋值（SSE 已经是累积的）
-          }
-          if (thinkingDelta !== undefined) {
-            last.thinking = thinkingDelta;
-          }
-          if (sources !== undefined) {
-            last.sources = sources;
-          }
-        }
-      }),
-
-    markMessageFailed: (id) =>
-      set((state) => {
-        const msg = state.messages.find((m) => m.id === id);
-        if (msg) {
-          msg.failed = true;
-          msg.retryCount = (msg.retryCount || 0) + 1;
-          msg.pendingSync = false;
-        }
-      }),
-
-    markMessageSuccess: (id) =>
-      set((state) => {
-        const msg = state.messages.find((m) => m.id === id);
-        if (msg) {
-          msg.failed = false;
-          msg.pendingSync = false;
-        }
-      }),
-
-    // 异步 Actions
-    loadConversation: async (convId) => {
-      try {
-        console.log('从缓存加载对话:', convId);
-        const { userId } = get();
-
-        //  LRU: 记录对话访问
-        touchConversationCache(convId, 0);
-
-        //  先读本地缓存（秒开）- 复用现有函数（加密版）
-        const cached = await readConversationCache(convId);
-        if (cached.length > 0) {
-          const cachedMessages: Message[] = cached.map((m) => ({
-            id: m.id,
-            clientMessageId: m.clientMessageId,
-            role: m.role,
-            content: m.content,
-            thinking: m.thinking,
-            sources: m.sources as any,
-            timestamp: m.timestamp,
-            pendingSync: m.pendingSync,
-          }));
-          set({
-            messages: cachedMessages,
-            conversationId: convId,
-            firstItemIndex: 0,
-          });
-        }
-
-        //  拉服务端数据
-        const PAGE_SIZE = 30;
-        const result = await getConversationMessages(userId, convId, PAGE_SIZE, 0);
-        console.log('首屏消息数据:', result);
-
-        set({ totalMessages: result.total });
-
-        // 计算实际加载的起始位置
-        const actualSkip = Math.max(0, result.total - PAGE_SIZE);
-        const needLoadMore = result.total > PAGE_SIZE;
-
-        // 如果总消息超过一页，重新拉取最后一页
-        const finalResult = needLoadMore
-          ? await getConversationMessages(userId, convId, PAGE_SIZE, actualSkip)
-          : result;
-
-        console.log('消息统计:', {
-          total: result.total,
-          loaded: finalResult.messages.length,
-          skip: actualSkip,
-          hasMore: needLoadMore,
-        });
-
-        // 转换消息格式
-        const serverForCache: CachedMessage[] = finalResult.messages.map((msg) => ({
-          id: msg.messageId,
-          clientMessageId: msg.clientMessageId,
-          role: msg.role,
-          content: msg.content,
-          thinking: msg.thinking,
-          sources: msg.sources as any,
-          timestamp: new Date(msg.timestamp).getTime(),
-        }));
-
-        //  合并服务端 + 本地待同步消息 - 复用现有函数
-        const merged = mergeServerMessagesWithCache(serverForCache, cached);
-
-        const mergedForUI: Message[] = merged.map((m) => ({
-          id: m.id,
-          clientMessageId: m.clientMessageId,
-          role: m.role,
-          content: m.content,
-          thinking: m.thinking,
-          sources: m.sources as any,
-          timestamp: m.timestamp,
-          pendingSync: m.pendingSync,
-        }));
-
-        set({
-          messages: mergedForUI,
-          conversationId: convId,
-          firstItemIndex: actualSkip,
-          hasMoreMessages: needLoadMore,
-        });
-
-        //  写回缓存 - 复用现有函数（加密版）
-        await writeConversationCache(convId, merged);
-
-        //  LRU: 更新访问记录（包含消息数）
-        touchConversationCache(convId, merged.length);
-
-        //  LRU: 智能清理（在后台执行，不阻塞主流程）
-        setTimeout(() => smartCleanupConversationCache(userId), 0);
-      } catch (error) {
-        console.error('加载对话失败:', error);
-        set({
-          messages: [],
-          firstItemIndex: 0,
-          hasMoreMessages: false,
-        });
-      }
-    },
-
-    loadOlderMessages: async () => {
-      const { conversationId, isLoadingMore, hasMoreMessages, messages, totalMessages, userId } = get();
-      if (!conversationId || isLoadingMore || !hasMoreMessages) return;
-
-      set({ isLoadingMore: true });
-
-      try {
-        const PAGE_SIZE = 30;
-        const currentLoaded = messages.length;
-        const skip = Math.max(0, totalMessages - currentLoaded - PAGE_SIZE);
-
-        console.log('加载更早消息:', { skip, limit: PAGE_SIZE, currentLoaded, totalMessages });
-
-        const result = await getConversationMessages(userId, conversationId, PAGE_SIZE, skip);
-
-        if (result.messages.length === 0) {
-          set({ hasMoreMessages: false, isLoadingMore: false });
-          return;
-        }
-
-        // 转换并 prepend 到前面
-        const olderMessages: Message[] = result.messages.map((msg) => ({
-          id: msg.messageId,
-          role: msg.role,
-          content: msg.content,
-          thinking: msg.thinking,
-          sources: msg.sources,
-          timestamp: new Date(msg.timestamp).getTime(),
-        }));
-
+      addMessage: (message) =>
         set((state) => {
-          state.messages = [...olderMessages, ...state.messages];
-          state.firstItemIndex = state.firstItemIndex - olderMessages.length;
-          state.hasMoreMessages = skip > 0;
-        });
+          state.messages.push(message);
+          if (state.messages.length > MAX_MESSAGES_IN_MEMORY) {
+            const removed = state.messages.shift();
+            console.warn(`内存保护：移除最早的消息 (ID: ${removed?.id})`);
+          }
+        }),
 
-        console.log('已加载更早消息:', olderMessages.length, '条，还有更多:', skip > 0);
-      } catch (error) {
-        console.error('加载更早消息失败:', error);
-      } finally {
-        set({ isLoadingMore: false });
-      }
-    },
+      updateMessage: (id, updates) =>
+        set((state) => {
+          const msg = state.messages.find((m) => m.id === id);
+          if (msg) Object.assign(msg, updates);
+        }),
 
-    // 保存到缓存（调用现有工具）
-    saveToCache: async () => {
-      const { conversationId, messages } = get();
-      if (!conversationId) return;
+      removeMessage: (id) =>
+        set((state) => {
+          state.messages = state.messages.filter((m) => m.id !== id);
+        }),
 
-      const cached: CachedMessage[] = messages.map((m) => ({
-        id: m.id,
-        clientMessageId: m.clientMessageId,
-        role: m.role,
-        content: m.content,
-        thinking: m.thinking,
-        sources: m.sources as any,
-        timestamp: m.timestamp,
-        pendingSync: m.pendingSync,
-      }));
+      setConversationId: (id) =>
+        set((state) => {
+          state.conversationId = id;
+          if (id) {
+            state.unreadConversationIds = state.unreadConversationIds.filter((convId) => convId !== id);
+          }
+        }),
+      setUserId: (userId) => set({ userId }),
+      setDeviceId: (deviceId) => set({ deviceId }),
+      setConversations: (conversations) => set({ conversations }),
+      setFirstItemIndex: (index) => set({ firstItemIndex: index }),
+      setHasMoreMessages: (has) => set({ hasMoreMessages: has }),
+      setTotalMessages: (total) => set({ totalMessages: total }),
+      setIsLoadingMore: (loading) => set({ isLoadingMore: loading }),
+      markConversationUnread: (conversationId) =>
+        set((state) => {
+          if (!conversationId) return;
+          if (!state.unreadConversationIds.includes(conversationId)) {
+            state.unreadConversationIds.push(conversationId);
+          }
+        }),
+      clearConversationUnread: (conversationId) =>
+        set((state) => {
+          state.unreadConversationIds = state.unreadConversationIds.filter((id) => id !== conversationId);
+        }),
 
-      //  复用现有函数（加密版）
-      await writeConversationCache(conversationId, cached);
-    },
-  }))
+      // 流式更新优化
+      appendToLastMessage: (contentDelta, thinkingDelta, sources) =>
+        set((state) => {
+          const last = state.messages[state.messages.length - 1];
+          if (last && last.role === 'assistant') {
+            if (contentDelta !== undefined) last.content = contentDelta;
+            if (thinkingDelta !== undefined) last.thinking = thinkingDelta;
+            if (sources !== undefined) last.sources = sources;
+          }
+        }),
+
+      markMessageFailed: (id) =>
+        set((state) => {
+          const msg = state.messages.find((m) => m.id === id);
+          if (msg) {
+            msg.failed = true;
+            msg.retryCount = (msg.retryCount || 0) + 1;
+            msg.pendingSync = false;
+          }
+        }),
+
+      markMessageSuccess: (id) =>
+        set((state) => {
+          const msg = state.messages.find((m) => m.id === id);
+          if (msg) {
+            msg.failed = false;
+            msg.pendingSync = false;
+          }
+        }),
+
+      // 异步 Actions（从 chatStoreAsync.ts 引入）
+      ...asyncActions,
+    };
+  }),
 );
 
-//  使用事件管理器处理多窗口同步
+// 多窗口同步
 const chatEventManager = createEventManager();
 
 if (typeof window !== 'undefined') {
   const handleStorageChange = (e: StorageEvent) => {
     if (e.key?.startsWith('conv_')) {
       const convId = e.key.replace('conv_', '');
-
-      // 如果当前正在看这个对话，自动刷新
       const currentConvId = useChatStore.getState().conversationId;
       if (convId === currentConvId && e.newValue) {
         try {
@@ -366,11 +190,8 @@ if (typeof window !== 'undefined') {
       }
     }
   };
-  
-  // 使用事件管理器注册监听器（自动管理清理）
+
   chatEventManager.addEventListener(window, 'storage', handleStorageChange);
 }
 
-// 导出事件管理器（用于测试或手动清理）
 export { chatEventManager };
-

@@ -6,7 +6,7 @@
  * 避免从底部向上滚动时因高度突变导致 CLS（Cumulative Layout Shift）。
  */
 
-import type { Message } from '@/stores/chatStore';
+import type { Message } from '@/types/message';
 
 const BASE_HEIGHT = 88;
 const LINE_HEIGHT = 24;

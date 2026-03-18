@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import './ProgressBar.css';
+import styles from './ProgressBar.module.css';
 
 export interface ProgressBarProps {
   /** 进度百分比 (0-100) */
@@ -28,15 +28,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const clampedProgress = Math.min(100, Math.max(0, progress));
   
   return (
-    <div className={`progress-bar ${className}`}>
-      <div className="progress-bar__track">
+    <div className={`${styles['progress-bar']} ${className}`}>
+      <div className={styles['progress-bar__track']}>
         <div 
-          className="progress-bar__fill"
+          className={styles['progress-bar__fill']}
           style={{ width: `${clampedProgress}%` }}
         />
       </div>
       {showText && (
-        <span className="progress-bar__text">{clampedProgress}%</span>
+        <span className={styles['progress-bar__text']}>{clampedProgress}%</span>
       )}
     </div>
   );

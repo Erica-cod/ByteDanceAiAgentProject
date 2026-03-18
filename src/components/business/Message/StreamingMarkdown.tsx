@@ -21,7 +21,7 @@ import { renderMarkdownFallback } from '@/utils/markdown/fallbackMarkdownRendere
 import PlanCard, { extractPlanData } from './PlanCard';
 import PlanListCard, { extractPlanListData } from './PlanListCard';
 import { BaseMarkdownRenderer } from '@/components/base';
-import './StreamingMarkdown.css';
+import styles from './StreamingMarkdown.module.css';
 
 interface StreamingMarkdownProps {
   /** 要渲染的 Markdown 内容 */
@@ -228,7 +228,7 @@ const StreamingMarkdown: React.FC<StreamingMarkdownProps> = ({
   };
 
   return (
-    <div className={`streaming-markdown ${className}`}>
+    <div className={`${styles['streaming-markdown']} ${className}`}>
       {/* 渲染计划列表卡片 */}
       {planListData && <PlanListCard listData={planListData} />}
       

@@ -8,4 +8,7 @@ export { useSSEStream } from './useSSEStream';
 export { useMessageSender } from './useMessageSender';
 export { useMessageQueue } from './useMessageQueue';
 export { useConversationManager } from './useConversationManager';
+export { useChatInitialization } from './useChatInitialization';
+export { useCrossTabSync } from './useCrossTabSync';
+export { usePerfMock, usePerfMockEnabled } from './usePerfMock';
 

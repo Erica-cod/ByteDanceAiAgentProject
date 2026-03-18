@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import './ThinkingSection.css';
+import styles from './ThinkingSection.module.css';
 
 export interface ThinkingSectionProps {
   /** 思考内容 */
@@ -75,21 +75,21 @@ export const ThinkingSection: React.FC<ThinkingSectionProps> = ({
   };
   
   return (
-    <div className={`thinking-section ${className}`} ref={contentRef}>
+    <div className={`${styles['thinking-section']} ${className}`} ref={contentRef}>
       <div 
-        className="thinking-section__header"
+        className={styles['thinking-section__header']}
         onClick={handleToggle}
         role="button"
         tabIndex={0}
       >
-        <span className="thinking-section__label">{label}：</span>
-        <span className="thinking-section__toggle">
+        <span className={styles['thinking-section__label']}>{label}：</span>
+        <span className={styles['thinking-section__toggle']}>
           {isExpanded ? '▼' : '▶'}
         </span>
       </div>
       
       {isExpanded && (
-        <div className="thinking-section__content">
+        <div className={styles['thinking-section__content']}>
           {content}
         </div>
       )}

@@ -9,7 +9,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import './AssistantMessage.css';
+import styles from './AssistantMessage.module.css';
 
 export interface AssistantMessageProps {
   /** 思考过程（可选） */
@@ -32,25 +32,25 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`assistant-message ${className}`}>
+    <div className={`${styles['assistant-message']} ${className}`}>
       {thinking && (
-        <div className="assistant-message__thinking">
+        <div className={styles['assistant-message__thinking']}>
           {thinking}
         </div>
       )}
       
-      <div className="assistant-message__content">
+      <div className={styles['assistant-message__content']}>
         {content}
       </div>
       
       {sources && (
-        <div className="assistant-message__sources">
+        <div className={styles['assistant-message__sources']}>
           {sources}
         </div>
       )}
       
       {actions && (
-        <div className="assistant-message__actions">
+        <div className={styles['assistant-message__actions']}>
           {actions}
         </div>
       )}

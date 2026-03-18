@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Conversation } from '@/utils/conversation/conversationAPI';
 import { useDateFormat, useThrottle } from '@/hooks';
 import VirtualList, { VirtualListHandle } from './VirtualList';
-import './ConversationList.css';
+import styles from './ConversationList.module.css';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -18,7 +18,7 @@ interface ConversationListProps {
 
 const ConversationTime: React.FC<{ updatedAt: string }> = ({ updatedAt }) => {
   const formattedDate = useDateFormat(updatedAt);
-  return <span className="conversation-time">{formattedDate}</span>;
+  return <span className={styles['conversation-time']}>{formattedDate}</span>;
 };
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -41,15 +41,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
   const renderConversationItem = (conversation: Conversation) => (
     <div
-      className={`conversation-item ${
-        conversation.conversationId === currentConversationId ? 'active' : ''
+      className={`${styles['conversation-item']} ${
+        conversation.conversationId === currentConversationId ? styles.active : ''
       }`}
       onClick={() => throttledSelectConversation(conversation.conversationId)}
     >
-      <div className="conversation-info">
-        <div className="conversation-title">{conversation.title}</div>
-        <div className="conversation-meta">
-          <span className="message-count">
+      <div className={styles['conversation-info']}>
+        <div className={styles['conversation-title']}>{conversation.title}</div>
+        <div className={styles['conversation-meta']}>
+          <span className={styles['message-count']}>
             <span
               ref={(el) => {
                 if (el && messageCountRefs) {
@@ -65,10 +65,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </div>
       </div>
       {unreadConversationIds.includes(conversation.conversationId) && (
-        <span className="conversation-unread-dot" title="有新消息" />
+        <span className={styles['conversation-unread-dot']} title="有新消息" />
       )}
       <button
-        className="delete-conversation-btn"
+        className={styles['delete-conversation-btn']}
         onClick={(e) => {
           e.stopPropagation();
           if (window.confirm(t('conversation.deleteConfirm'))) {
@@ -83,28 +83,28 @@ const ConversationList: React.FC<ConversationListProps> = ({
   );
 
   const renderEmptyState = () => (
-    <div className="empty-conversations">
+    <div className={styles['empty-conversations']}>
       <p>{t('conversation.noConversations')}</p>
-      <p className="hint">{t('chat.newConversation')}</p>
+      <p className={styles.hint}>{t('chat.newConversation')}</p>
     </div>
   );
 
   const renderLoadingSkeleton = () => (
-    <div className="conversation-list-loading-skeleton" aria-hidden="true">
-      <div className="conversation-list-loading-skeleton__item" />
-      <div className="conversation-list-loading-skeleton__item" />
-      <div className="conversation-list-loading-skeleton__item" />
-      <div className="conversation-list-loading-skeleton__item" />
-      <div className="conversation-list-loading-skeleton__item" />
-      <div className="conversation-list-loading-skeleton__item" />
+    <div className={styles['conversation-list-loading-skeleton']} aria-hidden="true">
+      <div className={styles['conversation-list-loading-skeleton__item']} />
+      <div className={styles['conversation-list-loading-skeleton__item']} />
+      <div className={styles['conversation-list-loading-skeleton__item']} />
+      <div className={styles['conversation-list-loading-skeleton__item']} />
+      <div className={styles['conversation-list-loading-skeleton__item']} />
+      <div className={styles['conversation-list-loading-skeleton__item']} />
     </div>
   );
 
   return (
-    <div className={`conversation-sidebar ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      <div className="sidebar-header">
+    <div className={`${styles['conversation-sidebar']} ${isExpanded ? styles.expanded : styles.collapsed}`}>
+      <div className={styles['sidebar-header']}>
         <button
-          className="toggle-sidebar-btn"
+          className={styles['toggle-sidebar-btn']}
           onClick={() => setIsExpanded(!isExpanded)}
           title={isExpanded ? t('conversation.collapse') : t('conversation.expand')}
         >
@@ -114,7 +114,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           <>
             <h2>{t('chat.conversationList')}</h2>
             <button
-              className="new-conversation-btn"
+              className={styles['new-conversation-btn']}
               onClick={throttledNewConversation}
               disabled={isLoading}
               title={t('chat.newConversation')}
@@ -126,7 +126,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       </div>
 
       {isExpanded && (
-        <div className="conversations-list">
+        <div className={styles['conversations-list']}>
           {isLoading ? (
             renderLoadingSkeleton()
           ) : (

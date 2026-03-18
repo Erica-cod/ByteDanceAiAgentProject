@@ -9,7 +9,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import './MessageItem.css';
+import styles from './MessageItem.module.css';
 
 export interface MessageItemProps {
   /** 消息角色 */
@@ -30,10 +30,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   return (
     <div 
-      className={`message-item message-item--${role} ${className}`}
+      className={`${styles['message-item']} ${styles[`message-item--${role}`]} ${className}`}
       data-role={role}
     >
-      <div className="message-item__content">
+      <div className={styles['message-item__content']}>
         {children}
       </div>
     </div>

@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import './SourceLinks.css';
+import styles from './SourceLinks.module.css';
 
 export interface Source {
   title: string;
@@ -40,29 +40,29 @@ export const SourceLinks: React.FC<SourceLinksProps> = ({
   const hasMore = sources.length > initialShowCount;
   
   return (
-    <div className={`source-links ${className}`}>
-      <div className="source-links__header">
+    <div className={`${styles['source-links']} ${className}`}>
+      <div className={styles['source-links__header']}>
         📎 参考来源 ({sources.length})
       </div>
       
-      <div className="source-links__list">
+      <div className={styles['source-links__list']}>
         {displaySources.map((source, index) => (
           <a
             key={index}
             href={source.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="source-links__item"
+            className={styles['source-links__item']}
           >
-            <span className="source-links__icon">🔗</span>
-            <span className="source-links__title">{source.title}</span>
+            <span className={styles['source-links__icon']}>🔗</span>
+            <span className={styles['source-links__title']}>{source.title}</span>
           </a>
         ))}
       </div>
       
       {hasMore && !showAll && (
         <button
-          className="source-links__toggle"
+          className={styles['source-links__toggle']}
           onClick={() => setShowAll(true)}
         >
           显示更多 ({sources.length - initialShowCount} 个)
@@ -71,7 +71,7 @@ export const SourceLinks: React.FC<SourceLinksProps> = ({
       
       {showAll && hasMore && (
         <button
-          className="source-links__toggle"
+          className={styles['source-links__toggle']}
           onClick={() => setShowAll(false)}
         >
           收起

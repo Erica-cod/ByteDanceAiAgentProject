@@ -13,7 +13,7 @@ import React from 'react';
 import { useProgressiveLoad } from '@/hooks/data/useProgressiveLoad';
 import { ProgressBar, LoadStats, LoadActions } from '@/components/base/ProgressiveLoad';
 import { ChunkRenderer } from './ChunkRenderer';
-import './ProgressiveMessage.css';
+import styles from './ProgressiveMessage.module.css';
 
 export interface ProgressiveMessageProps {
   messageId: string;
@@ -51,9 +51,9 @@ export const ProgressiveMessage: React.FC<ProgressiveMessageProps> = ({
   });
 
   return (
-    <div className="progressive-message-refactored">
+    <div className={styles['progressive-message-refactored']}>
       {/* 分块渲染 */}
-      <div className="progressive-message-refactored__content">
+      <div className={styles['progressive-message-refactored__content']}>
         {contentChunks.map((chunk, i) => (
           <ChunkRenderer
             key={i}
@@ -65,20 +65,20 @@ export const ProgressiveMessage: React.FC<ProgressiveMessageProps> = ({
       </div>
 
       {error && (
-        <div className="progressive-message-refactored__error">
+        <div className={styles['progressive-message-refactored__error']}>
           {error}
         </div>
       )}
 
       {isLoading && (
-        <div className="progressive-message-refactored__loading">
-          <div className="loading-spinner" />
+        <div className={styles['progressive-message-refactored__loading']}>
+          <div className={styles['loading-spinner']} />
           <span>加载中...</span>
         </div>
       )}
 
       {!isFullyLoaded && !isLoading && (
-        <div className="progressive-message-refactored__controls">
+        <div className={styles['progressive-message-refactored__controls']}>
           <ProgressBar progress={progress} />
 
           <LoadStats
@@ -99,7 +99,7 @@ export const ProgressiveMessage: React.FC<ProgressiveMessageProps> = ({
       )}
 
       {isFullyLoaded && loadedLength > initialContent.length && (
-        <div className="progressive-message-refactored__controls">
+        <div className={styles['progressive-message-refactored__controls']}>
           <LoadStats
             loaded={loadedLength}
             total={totalLength}

@@ -14,8 +14,8 @@ import { MessageItemRenderer } from './MessageItemRenderer';
 import type { Message, MessageListHandle } from '@/types/message';
 import type { QueueItem } from '@/stores/queueStore';
 import { useChatStore } from '@/stores';
-import { estimateMessageHeight } from './messageHeightEstimator';
-import './MessageList.css';
+import { estimateMessageHeight } from '@/utils/message/messageHeightEstimator';
+import styles from './MessageList.module.css';
 
 interface MessageListProps {
   messages: Message[];
@@ -58,7 +58,7 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
         <div
           {...rest}
           ref={scrollerRef}
-          className={['message-list-refactored__scroller', className].filter(Boolean).join(' ')}
+          className={[styles['message-list-refactored__scroller'], className].filter(Boolean).join(' ')}
         />
       );
     });
@@ -147,7 +147,7 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
 
       return (
         <div
-          className="message-item-height-anchor"
+          className={styles['message-item-height-anchor']}
           style={{ minHeight }}
           ref={(el) => {
             if (!el) return;
@@ -179,17 +179,17 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
   );
 
   const noRowsRenderer = () => (
-    <div className="message-list-refactored__empty">
+    <div className={styles['message-list-refactored__empty']}>
       <p>开始新的对话吧！</p>
     </div>
   );
 
   return (
-    <div className="message-list-refactored" ref={scrollContainerRef}>
+    <div className={styles['message-list-refactored']} ref={scrollContainerRef}>
       {/* 遮罩 */}
       {isTransitioning && (
         <div
-          className="message-list-refactored__mask"
+          className={styles['message-list-refactored__mask']}
           style={{ opacity: transitionOpacity }}
           onTransitionEnd={(event) => {
             if (event.propertyName !== 'opacity') return;
@@ -202,7 +202,7 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
 
       {/* 加载更多提示 */}
       {(isLoadingMore || hasMoreMessages) && messages.length > 0 && (
-        <div className="message-list-refactored__load-more">
+        <div className={styles['message-list-refactored__load-more']}>
           {isLoadingMore ? '加载中...' : '向上滚动加载更多'}
         </div>
       )}
@@ -213,7 +213,7 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
       ) : (
         <Virtuoso
           ref={virtuosoRef}
-          className="message-list-refactored__virtuoso"
+          className={styles['message-list-refactored__virtuoso']}
           data={messages}
           itemContent={(index) => itemContent(index)}
           computeItemKey={(_, item) => item.id}
@@ -234,7 +234,7 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
             Footer: () => <div ref={thinkingEndRef} />,
             ScrollSeekPlaceholder: ({ height }) => (
               <div
-                className="message-item-height-anchor message-item-seek-placeholder"
+                className={`${styles['message-item-height-anchor']} ${styles['message-item-seek-placeholder']}`}
                 style={{ height, contain: 'strict' }}
               />
             ),
@@ -248,8 +248,8 @@ const MessageListInner = forwardRef<MessageListHandle, MessageListProps>((props,
 
       {/* 正在生成提示 */}
       {isLoading && (
-        <div className="message-list-refactored__loading">
-          <div className="typing-indicator">
+        <div className={styles['message-list-refactored__loading']}>
+          <div className={styles['typing-indicator']}>
             <span></span>
             <span></span>
             <span></span>

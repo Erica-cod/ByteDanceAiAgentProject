@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import './LoadActions.css';
+import styles from './LoadActions.module.css';
 
 export interface LoadActionsProps {
   /** 是否正在加载 */
@@ -42,9 +42,9 @@ export const LoadActions: React.FC<LoadActionsProps> = ({
 }) => {
   if (isFullyLoaded) {
     return (
-      <div className={`load-actions ${className}`}>
+      <div className={`${styles['load-actions']} ${className}`}>
         <button 
-          className="load-actions__button secondary"
+          className={`${styles['load-actions__button']} ${styles.secondary}`}
           onClick={onCollapse}
           disabled={isLoading}
         >
@@ -55,28 +55,28 @@ export const LoadActions: React.FC<LoadActionsProps> = ({
   }
   
   return (
-    <div className={`load-actions ${className}`}>
+    <div className={`${styles['load-actions']} ${className}`}>
       <button 
-        className="load-actions__button primary"
+        className={`${styles['load-actions__button']} ${styles.primary}`}
         onClick={onLoadMore}
         disabled={isLoading}
       >
         加载下一块
         {nextChunkSize && (
-          <span className="load-actions__hint">
+          <span className={styles['load-actions__hint']}>
             +{nextChunkSize.toLocaleString()} 字符
           </span>
         )}
       </button>
       
       <button 
-        className="load-actions__button secondary"
+        className={`${styles['load-actions__button']} ${styles.secondary}`}
         onClick={onLoadAll}
         disabled={isLoading}
       >
         全部展开
         {remainingChunks && (
-          <span className="load-actions__hint">
+          <span className={styles['load-actions__hint']}>
             {remainingChunks} 块
           </span>
         )}

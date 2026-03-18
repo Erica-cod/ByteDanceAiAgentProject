@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import './HeaderControls.css';
+import styles from './HeaderControls.module.css';
 
 export interface HeaderControlsProps {
   /** 当前聊天模式 */
@@ -47,12 +47,12 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   const multiTitle = canUseMultiAgent ? t('settings.multiAgent') : '登录后才能使用多 Agent（演示）';
 
   return (
-    <div className="header-controls">
+    <div className={styles['header-controls']}>
       {/* 模式切换 */}
-      <label className="header-controls__mode-switch">
+      <label className={styles['header-controls__mode-switch']}>
         <span>{t('settings.chatMode')}：</span>
         <button
-          className={`mode-btn ${chatMode === 'single' ? 'active' : ''}`}
+          className={`${styles['mode-btn']} ${chatMode === 'single' ? styles.active : ''}`}
           onClick={() => onModeChange('single')}
           disabled={disabled}
           title={t('settings.singleAgent')}
@@ -60,7 +60,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           {t('settings.singleAgent')}
         </button>
         <button
-          className={`mode-btn ${chatMode === 'multi_agent' ? 'active' : ''}`}
+          className={`${styles['mode-btn']} ${chatMode === 'multi_agent' ? styles.active : ''}`}
           onClick={() => onModeChange('multi_agent')}
           disabled={multiDisabled}
           title={multiTitle}
@@ -73,7 +73,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
       {loggedIn ? (
         <button
           onClick={onLogout}
-          className="header-controls__settings-btn"
+          className={styles['header-controls__settings-btn']}
           disabled={disabled}
           title="退出登录（演示）"
         >
@@ -82,7 +82,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
       ) : (
         <button
           onClick={onDemoLogin}
-          className="header-controls__settings-btn"
+          className={styles['header-controls__settings-btn']}
           disabled={disabled}
           title="演示登录（解锁多 Agent）"
         >
@@ -93,7 +93,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
       {/* 设置按钮 */}
       <button 
         onClick={onSettingsClick} 
-        className="header-controls__settings-btn"
+        className={styles['header-controls__settings-btn']}
         title={t('settings.title')}
       >
         ⚙️

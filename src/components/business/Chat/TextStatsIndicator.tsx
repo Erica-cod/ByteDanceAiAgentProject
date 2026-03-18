@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLongTextDetection } from '@/hooks/interaction/useLongTextDetection';
-import './TextStatsIndicator.css';
+import styles from './TextStatsIndicator.module.css';
 
 interface TextStatsIndicatorProps {
   text: string;
@@ -20,18 +20,18 @@ const TextStatsIndicator: React.FC<TextStatsIndicatorProps> = ({ text, onWarning
   }
 
   return (
-    <div className={`text-stats-indicator ${level !== 'none' ? `warning-${level}` : ''}`}>
-      <div className="stats-info">
-        <span className="stat-item">{stats.chars} 字符</span>
-        <span className="stat-separator">·</span>
-        <span className="stat-item">{stats.lines} 行</span>
+    <div className={`${styles['text-stats-indicator']} ${level !== 'none' ? styles[`warning-${level}`] : ''}`}>
+      <div className={styles['stats-info']}>
+        <span className={styles['stat-item']}>{stats.chars} 字符</span>
+        <span className={styles['stat-separator']}>·</span>
+        <span className={styles['stat-item']}>{stats.lines} 行</span>
       </div>
 
       {level !== 'none' && (
-        <div className="stats-warning" onClick={onWarningClick}>
-          <span className="warning-icon">⚠️</span>
-          <span className="warning-text">{reason}</span>
-          {onWarningClick && <span className="warning-action">点击查看选项</span>}
+        <div className={styles['stats-warning']} onClick={onWarningClick}>
+          <span className={styles['warning-icon']}>⚠️</span>
+          <span className={styles['warning-text']}>{reason}</span>
+          {onWarningClick && <span className={styles['warning-action']}>点击查看选项</span>}
         </div>
       )}
     </div>

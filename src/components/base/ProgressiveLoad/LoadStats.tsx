@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import './LoadStats.css';
+import styles from './LoadStats.module.css';
 
 export interface LoadStatsProps {
   /** 已加载数量 */
@@ -35,19 +35,19 @@ export const LoadStats: React.FC<LoadStatsProps> = ({
   const isComplete = loaded >= total;
   
   return (
-    <div className={`load-stats ${className}`}>
+    <div className={`${styles['load-stats']} ${className}`}>
       {showSuccessIcon && isComplete && (
-        <span className="load-stats__icon success">✅</span>
+        <span className={`${styles['load-stats__icon']} ${styles.success}`}>✅</span>
       )}
       
-      <span className="load-stats__item">
+      <span className={styles['load-stats__item']}>
         已加载: {loaded.toLocaleString()} / {total.toLocaleString()} {unit}
       </span>
       
       {!isComplete && (
         <>
-          <span className="load-stats__separator">•</span>
-          <span className="load-stats__item">
+          <span className={styles['load-stats__separator']}>•</span>
+          <span className={styles['load-stats__item']}>
             剩余: {remaining.toLocaleString()} {unit}
           </span>
         </>

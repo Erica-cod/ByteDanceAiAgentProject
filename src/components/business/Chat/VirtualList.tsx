@@ -3,7 +3,7 @@
  */
 import React, { useImperativeHandle, useRef, useCallback } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import './VirtualList.css';
+import styles from './VirtualList.module.css';
 
 interface VirtualListProps<T> {
   /** 数据列表 */
@@ -71,13 +71,13 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
 
   const Empty = useCallback(() => {
     const content = noItemsRenderer?.();
-    return <div className="virtual-list-empty">{content ?? null}</div>;
+    return <div className={styles['virtual-list-empty']}>{content ?? null}</div>;
   }, [noItemsRenderer]);
 
   const overscanPx = Math.max(200, overscanRowCount * 120);
 
   return (
-    <div className={`virtual-list-container ${className}`} style={{ height: '100%', width: '100%' }}>
+    <div className={`${styles['virtual-list-container']} ${className}`} style={{ height: '100%', width: '100%' }}>
       {items.length === 0 ? (
         <Empty />
       ) : (
@@ -100,7 +100,7 @@ function VirtualListInner<T>(props: VirtualListProps<T>, ref: React.Ref<VirtualL
                       if (typeof forwardedRef === 'function') forwardedRef(el);
                       else if (forwardedRef) (forwardedRef as any).current = el;
                     }}
-                    className={['virtual-list-scroller', cn].filter(Boolean).join(' ')}
+                    className={[styles['virtual-list-scroller'], cn].filter(Boolean).join(' ')}
                   />
                 );
               },

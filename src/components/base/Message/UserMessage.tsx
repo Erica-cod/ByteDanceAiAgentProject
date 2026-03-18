@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import './UserMessage.css';
+import styles from './UserMessage.module.css';
 
 export interface UserMessageProps {
   /** 消息内容 */
@@ -29,13 +29,13 @@ export const UserMessage: React.FC<UserMessageProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`user-message ${className}`}>
-      <div className="user-message__content">
+    <div className={`${styles['user-message']} ${className}`}>
+      <div className={styles['user-message__content']}>
         {content}
       </div>
       
       {isPending && (
-        <div className="user-message__pending">
+        <div className={styles['user-message__pending']}>
           ⏳ 等待发送
           {queuePosition !== undefined && ` (队列位置: ${queuePosition})`}
         </div>

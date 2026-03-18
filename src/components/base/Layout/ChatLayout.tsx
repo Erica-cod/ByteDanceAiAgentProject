@@ -10,7 +10,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import './ChatLayout.css';
+import styles from './ChatLayout.module.css';
 
 export interface ChatLayoutProps {
   /** 头部区域内容 */
@@ -30,16 +30,16 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`chat-layout ${className}`}>
-      <div className="chat-layout__header">
+    <div className={`${styles['chat-layout']} ${className}`}>
+      <div className={styles['chat-layout__header']}>
         {header}
       </div>
       
-      <div className="chat-layout__content">
+      <div className={styles['chat-layout__content']}>
         {content}
       </div>
       
-      <div className="chat-layout__footer">
+      <div className={styles['chat-layout__footer']}>
         {footer}
       </div>
     </div>

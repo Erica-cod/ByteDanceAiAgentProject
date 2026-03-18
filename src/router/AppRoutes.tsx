@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ChatInterface from '../components/business/Chat/ChatInterface';
 
 const ErrorPageLazy = lazy(() =>
-  import('../pages/errors/ErrorPage').then(module => ({ default: module.ErrorPage }))
+  import('@/components/routing/ErrorPage').then(module => ({ default: module.ErrorPage }))
 );
 
 const LoadingFallback = () => (

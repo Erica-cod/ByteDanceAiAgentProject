@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDateFormat } from '@/hooks';
-import './PlanCard.css';
+import styles from './PlanCard.module.css';
 
 interface Task {
   title: string;
@@ -38,42 +38,42 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
 
   const getStatusBadge = (status?: string) => {
     const statusMap = {
-      pending: { label: '待开始', className: 'status-pending' },
-      in_progress: { label: '进行中', className: 'status-progress' },
-      completed: { label: '已完成', className: 'status-completed' },
+      pending: { label: '待开始', cls: styles['status-pending'] },
+      in_progress: { label: '进行中', cls: styles['status-progress'] },
+      completed: { label: '已完成', cls: styles['status-completed'] },
     };
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    return <span className={`task-status ${statusInfo.className}`}>{statusInfo.label}</span>;
+    return <span className={`${styles['task-status']} ${statusInfo.cls}`}>{statusInfo.label}</span>;
   };
 
   if (compact) {
     return (
-      <div className="plan-card-compact">
+      <div className={styles['plan-card-compact']}>
         {index !== undefined && (
-          <div className="plan-compact-index">{index + 1}</div>
+          <div className={styles['plan-compact-index']}>{index + 1}</div>
         )}
 
-        <div className="plan-compact-content">
-          <div className="plan-compact-header">
-            <h4 className="plan-compact-title">{planData.title}</h4>
-            {planId && <span className="plan-compact-id">ID: {planId.substring(0, 8)}...</span>}
+        <div className={styles['plan-compact-content']}>
+          <div className={styles['plan-compact-header']}>
+            <h4 className={styles['plan-compact-title']}>{planData.title}</h4>
+            {planId && <span className={styles['plan-compact-id']}>ID: {planId.substring(0, 8)}...</span>}
           </div>
 
-          <div className="plan-compact-goal">
-            <span className="goal-icon">🎯</span>
+          <div className={styles['plan-compact-goal']}>
+            <span className={styles['goal-icon']}>🎯</span>
             {planData.goal}
           </div>
 
           {planData.tasks && planData.tasks.length > 0 && (
-            <div className="plan-compact-tasks">
-              <div className="compact-tasks-label">📝 任务清单 ({planData.tasks.length})</div>
-              <ul className="compact-tasks-list">
+            <div className={styles['plan-compact-tasks']}>
+              <div className={styles['compact-tasks-label']}>📝 任务清单 ({planData.tasks.length})</div>
+              <ul className={styles['compact-tasks-list']}>
                 {planData.tasks.map((task, idx) => (
-                  <li key={idx} className="compact-task-item">
-                    <span className="compact-task-number">{idx + 1}.</span>
-                    <span className="compact-task-title">{task.title}</span>
+                  <li key={idx} className={styles['compact-task-item']}>
+                    <span className={styles['compact-task-number']}>{idx + 1}.</span>
+                    <span className={styles['compact-task-title']}>{task.title}</span>
                     {task.deadline && (
-                      <span className="compact-task-deadline">
+                      <span className={styles['compact-task-deadline']}>
                         📆 {task.deadline}
                       </span>
                     )}
@@ -83,20 +83,20 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
             </div>
           )}
 
-          <div className="plan-compact-meta">
-            <span className="meta-item">
-              <span className="meta-icon">✓</span>
+          <div className={styles['plan-compact-meta']}>
+            <span className={styles['meta-item']}>
+              <span className={styles['meta-icon']}>✓</span>
               {tasksCount} 个任务
             </span>
             {planData.created_at && (
-              <span className="meta-item">
-                <span className="meta-icon">📅</span>
+              <span className={styles['meta-item']}>
+                <span className={styles['meta-icon']}>📅</span>
                 创建于 <DateDisplay date={planData.created_at} />
               </span>
             )}
             {planData.updated_at && planData.updated_at !== planData.created_at && (
-              <span className="meta-item">
-                <span className="meta-icon">🔄</span>
+              <span className={styles['meta-item']}>
+                <span className={styles['meta-icon']}>🔄</span>
                 更新于 <DateDisplay date={planData.updated_at} />
               </span>
             )}
@@ -107,59 +107,59 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
   }
 
   return (
-    <div className="plan-card">
-      <div className="plan-card-header">
-        <div className="plan-title-section">
-          <h3 className="plan-title">📋 {planData.title}</h3>
-          {planId && <span className="plan-id">ID: {planId.substring(0, 8)}...</span>}
+    <div className={styles['plan-card']}>
+      <div className={styles['plan-card-header']}>
+        <div className={styles['plan-title-section']}>
+          <h3 className={styles['plan-title']}>📋 {planData.title}</h3>
+          {planId && <span className={styles['plan-id']}>ID: {planId.substring(0, 8)}...</span>}
         </div>
-        <div className="plan-meta">
-          <span className="plan-tasks-count">
-            <span className="meta-icon">✓</span>
+        <div className={styles['plan-meta']}>
+          <span className={styles['plan-tasks-count']}>
+            <span className={styles['meta-icon']}>✓</span>
             {tasksCount} 个任务
           </span>
           {planData.created_at && (
-            <span className="plan-date">
-              <span className="meta-icon">📅</span>
+            <span className={styles['plan-date']}>
+              <span className={styles['meta-icon']}>📅</span>
               <DateDisplay date={planData.created_at} />
             </span>
           )}
         </div>
       </div>
 
-      <div className="plan-goal">
-        <div className="goal-label">🎯 目标</div>
-        <div className="goal-content">{planData.goal}</div>
+      <div className={styles['plan-goal']}>
+        <div className={styles['goal-label']}>🎯 目标</div>
+        <div className={styles['goal-content']}>{planData.goal}</div>
       </div>
 
       {planData.tasks && planData.tasks.length > 0 && (
-        <div className="plan-tasks">
-          <div className="tasks-label">📝 任务清单</div>
-          <div className="tasks-list">
+        <div className={styles['plan-tasks']}>
+          <div className={styles['tasks-label']}>📝 任务清单</div>
+          <div className={styles['tasks-list']}>
             {planData.tasks.map((task, index) => (
-              <div key={index} className="task-item">
-                <div className="task-header">
-                  <span className="task-number">{index + 1}</span>
-                  <span className="task-title">{task.title}</span>
+              <div key={index} className={styles['task-item']}>
+                <div className={styles['task-header']}>
+                  <span className={styles['task-number']}>{index + 1}</span>
+                  <span className={styles['task-title']}>{task.title}</span>
                   {task.status && getStatusBadge(task.status)}
                 </div>
-                <div className="task-details">
+                <div className={styles['task-details']}>
                   {task.estimated_hours && (
-                    <span className="task-detail">
-                      <span className="detail-icon">⏱️</span>
+                    <span className={styles['task-detail']}>
+                      <span className={styles['detail-icon']}>⏱️</span>
                       {task.estimated_hours} 小时
                     </span>
                   )}
                   {task.deadline && (
-                    <span className="task-detail">
-                      <span className="detail-icon">📆</span>
+                    <span className={styles['task-detail']}>
+                      <span className={styles['detail-icon']}>📆</span>
                       {task.deadline}
                     </span>
                   )}
                   {task.tags && task.tags.length > 0 && (
-                    <span className="task-tags">
+                    <span className={styles['task-tags']}>
                       {task.tags.map((tag, tagIndex) => (
-                        <span key={tagIndex} className="task-tag">
+                        <span key={tagIndex} className={styles['task-tag']}>
                           {tag}
                         </span>
                       ))}
@@ -173,8 +173,8 @@ const PlanCard: React.FC<PlanCardProps> = ({ planData, compact = false, index })
       )}
 
       {planData.updated_at && (
-        <div className="plan-footer">
-          <span className="update-time">
+        <div className={styles['plan-footer']}>
+          <span className={styles['update-time']}>
             最后更新: <DateDisplay date={planData.updated_at} />
           </span>
         </div>

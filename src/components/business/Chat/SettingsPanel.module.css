@@ -140,7 +140,7 @@
   }
 }
 
-[data-theme="dark"] .settings-panel {
+:global([data-theme="dark"]) .settings-panel {
   --bg-primary: #1f2937;
   --bg-secondary: #111827;
   --bg-hover: #374151;
@@ -150,22 +150,22 @@
   --primary-color: #3b82f6;
 }
 
-[data-theme="dark"] .settings-overlay {
+:global([data-theme="dark"]) .settings-overlay {
   background: rgba(0, 0, 0, 0.7);
 }
 
-[data-theme="dark"] .settings-option {
+:global([data-theme="dark"]) .settings-option {
   background: #374151;
   border-color: #4b5563;
   color: #f9fafb;
 }
 
-[data-theme="dark"] .settings-option:hover {
+:global([data-theme="dark"]) .settings-option:hover {
   background: #4b5563;
   border-color: #3b82f6;
 }
 
-[data-theme="dark"] .settings-option.active {
+:global([data-theme="dark"]) .settings-option.active {
   background: #3b82f6;
   border-color: #3b82f6;
   color: white;
