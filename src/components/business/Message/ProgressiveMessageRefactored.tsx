@@ -1,29 +1,25 @@
 /**
  * ProgressiveMessage - 渐进式消息展示（重构版）
- * 
- * 职责：组合Hook和基础UI组件，提供完整的渐进式消息功能
- * 特点：
- * - 使用useProgressiveLoad管理数据
- * - 使用基础UI组件进行展示
- * - 承载业务规则（消息ID、用户ID等）
+ *
+ * 优化改进：
+ * - 分块渲染：每个 chunk 独立 React.memo，新 chunk 不触发旧 chunk 重新解析
+ * - content-visibility：CSS 层面跳过不可见 chunk 的布局/绘制
+ * - IntersectionObserver：远离视口的 chunk 不挂载 DOM
+ * - Worker 预处理：JSON 过滤 + Markdown 容错在后台线程完成
+ * - 动态 chunkSize：根据 totalLength 自适应块大小
  */
 
 import React from 'react';
 import { useProgressiveLoad } from '../../../hooks/data/useProgressiveLoad';
 import { ProgressBar, LoadStats, LoadActions } from '../../base/ProgressiveLoad';
-import StreamingMarkdown from './StreamingMarkdown';
+import { ChunkRenderer } from './ChunkRenderer';
 import './ProgressiveMessageRefactored.css';
 
 export interface ProgressiveMessageRefactoredProps {
-  /** 消息ID */
   messageId: string;
-  /** 用户ID */
   userId: string;
-  /** 初始内容（预览） */
   initialContent: string;
-  /** 总长度 */
   totalLength: number;
-  /** 分块大小 */
   chunkSize?: number;
 }
 
@@ -34,9 +30,8 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
   totalLength,
   chunkSize = 1000,
 }) => {
-  // 使用Hook管理数据和状态
   const {
-    fullContent,
+    contentChunks,
     loadedLength,
     isLoading,
     progress,
@@ -57,37 +52,41 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
 
   return (
     <div className="progressive-message-refactored">
-      {/* 内容展示 */}
+      {/* 分块渲染 */}
       <div className="progressive-message-refactored__content">
-        <StreamingMarkdown content={fullContent} />
+        {contentChunks.map((chunk, i) => (
+          <ChunkRenderer
+            key={i}
+            chunk={chunk}
+            index={i}
+            isFirstChunk={i === 0}
+          />
+        ))}
       </div>
 
-      {/* 错误提示 */}
       {error && (
         <div className="progressive-message-refactored__error">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
-      {/* 加载指示器 */}
       {isLoading && (
         <div className="progressive-message-refactored__loading">
-          <div className="loading-spinner"></div>
+          <div className="loading-spinner" />
           <span>加载中...</span>
         </div>
       )}
 
-      {/* 控制区域 */}
       {!isFullyLoaded && !isLoading && (
         <div className="progressive-message-refactored__controls">
           <ProgressBar progress={progress} />
-          
+
           <LoadStats
             loaded={loadedLength}
             total={totalLength}
             unit="字符"
           />
-          
+
           <LoadActions
             isLoading={isLoading}
             isFullyLoaded={isFullyLoaded}
@@ -99,7 +98,6 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
         </div>
       )}
 
-      {/* 已全部加载 */}
       {isFullyLoaded && loadedLength > initialContent.length && (
         <div className="progressive-message-refactored__controls">
           <LoadStats
@@ -108,7 +106,7 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
             unit="字符"
             showSuccessIcon
           />
-          
+
           <LoadActions
             isLoading={isLoading}
             isFullyLoaded={isFullyLoaded}
@@ -121,4 +119,3 @@ export const ProgressiveMessageRefactored: React.FC<ProgressiveMessageRefactored
 };
 
 ProgressiveMessageRefactored.displayName = 'ProgressiveMessageRefactored';
-

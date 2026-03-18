@@ -16,6 +16,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { fixIncompleteMarkdown, safeFixMarkdown } from '../../../utils/markdown/markdownFixer';
+import { removeJSONFromContent } from '../../../utils/markdown/jsonFilter';
 import { renderMarkdownFallback } from '../../../utils/markdown/fallbackMarkdownRenderer';
 import PlanCard, { extractPlanData } from './PlanCard';
 import PlanListCard, { extractPlanListData } from './PlanListCard';
@@ -33,120 +34,7 @@ interface StreamingMarkdownProps {
   forceFallback?: boolean;
 }
 
-/**
- * ⚡ 实时隐藏 JSON 流式输出（性能优化 + 用户体验）
- * 
- * 策略：
- * 1. 如果内容以 `{` 开头，立即隐藏（流式阶段）
- * 2. 如果检测到完整 JSON，移除它
- * 3. 避免用户看到 `{ "position": ...` 的流式输出
- */
-function removeJSONFromContent(content: string): string {
-  const trimmedContent = content.trim();
-  
-  //  关键优化：如果内容以 `{` 开头，认为是 JSON metadata 正在流式输出
-  // 直接返回空字符串，避免显示 JSON 字符
-  if (trimmedContent.startsWith('{')) {
-    // 检查是否有 JSON 之外的内容（换行后的文本）
-    const lines = content.split('\n');
-    let jsonEndLineIndex = -1;
-    let braceCount = 0;
-    let inString = false;
-    let escapeNext = false;
-    
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-      const line = lines[lineIdx];
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        
-        if (escapeNext) {
-          escapeNext = false;
-          continue;
-        }
-        
-        if (char === '\\') {
-          escapeNext = true;
-          continue;
-        }
-        
-        if (char === '"') {
-          inString = !inString;
-          continue;
-        }
-        
-        if (!inString) {
-          if (char === '{') braceCount++;
-          if (char === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              jsonEndLineIndex = lineIdx;
-              break;
-            }
-          }
-        }
-      }
-      if (jsonEndLineIndex !== -1) break;
-    }
-    
-    // 如果找到完整 JSON，返回 JSON 后面的内容
-    if (jsonEndLineIndex !== -1 && jsonEndLineIndex < lines.length - 1) {
-      return lines.slice(jsonEndLineIndex + 1).join('\n').trim();
-    }
-    
-    // 如果 JSON 未完成（流式阶段），返回空或等待图标
-    return ''; //  关键：流式阶段不显示任何内容，避免 JSON 字符闪现
-  }
-  
-  // 如果不是以 `{` 开头，检查是否包含嵌入的 JSON
-  const startIndex = trimmedContent.indexOf('{');
-  if (startIndex === -1) {
-    return content; // 没有 JSON，直接返回
-  }
-  
-  // 尝试移除完整的 JSON 对象
-  let braceCount = 0;
-  let jsonEndIndex = -1;
-  let inString = false;
-  let escapeNext = false;
-  
-  for (let i = startIndex; i < trimmedContent.length; i++) {
-    const char = trimmedContent[i];
-    
-    if (escapeNext) {
-      escapeNext = false;
-      continue;
-    }
-    
-    if (char === '\\') {
-      escapeNext = true;
-      continue;
-    }
-    
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-    
-    if (!inString) {
-      if (char === '{') braceCount++;
-      if (char === '}') {
-        braceCount--;
-        if (braceCount === 0) {
-          jsonEndIndex = i + 1;
-          break;
-        }
-      }
-    }
-  }
-  
-  if (jsonEndIndex !== -1) {
-    // 移除 JSON 部分
-    const result = (trimmedContent.substring(0, startIndex) + trimmedContent.substring(jsonEndIndex)).trim();
-    return result;
-  }
-  
-  return content;
-}
+// removeJSONFromContent 已提取到 src/utils/markdown/jsonFilter.ts，由 import 引入
 
 /**
  * 增强版 StreamingMarkdown 组件
