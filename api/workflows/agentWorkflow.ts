@@ -11,7 +11,7 @@ import { StateGraph, END, Annotation } from '@langchain/langgraph';
 import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import { validateToolCall } from '../tools/plugins/toolValidator.js';
 import { searchWeb } from '../tools/plugins/tavilySearch.js';
-import { routePlanningTool } from '../tools/plugins/planningTools.js';
+import { toolExecutor } from '../tools/index.js';
 import { extractToolCall } from '../_clean/shared/utils/json-extractor.js';
 
 /**
@@ -151,7 +151,13 @@ async function toolExecutorNode(state: AgentState): Promise<Partial<AgentState>>
     else if (['create_plan', 'update_plan', 'get_plan', 'list_plans'].includes(tool)) {
       console.log(`📋 [ToolExecutor] 执行计划工具: ${tool}`);
       
-      result = await routePlanningTool(tool, userId, normalizedToolCall);
+      const execContext = {
+        userId,
+        conversationId: '',
+        requestId: `agent_workflow_${Date.now()}`,
+        timestamp: Date.now(),
+      };
+      result = await toolExecutor.execute(tool, normalizedToolCall, execContext);
     }
     else {
       console.warn(`⚠️  [ToolExecutor] 未知工具: ${tool}`);

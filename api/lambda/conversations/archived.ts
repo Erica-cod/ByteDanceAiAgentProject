@@ -1,49 +1,16 @@
 /**
- * Archived Conversations API - 归档对话管理
- * 
- * GET /api/conversations/archived - 获取用户的归档对话列表
+ * Archived Conversations API
+ *
+ * GET  /api/conversations/archived         - 获取用户的归档对话列表
  * POST /api/conversations/archived/restore - 恢复归档的对话
  */
 
 import type { RequestOption } from '../../types/chat.js';
-import { getDatabase } from '../../db/connection.js';
-import type { Conversation } from '../../db/models.js';
-import { getConversationLRUService } from '../../services/conversationLRUService.js';
+import { getContainer } from '../../_clean/di-container.js';
+import { successResponse, errorResponse, errorResponseWithStatus } from '../_utils/response.js';
 import { requireCsrf } from '../_utils/csrf.js';
 
-// ==================== 响应工具函数 ====================
-
-function successResponse(data: any, requestOrigin?: string) {
-  return {
-    statusCode: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': requestOrigin || '*',
-      'Access-Control-Allow-Credentials': 'true',
-    },
-    body: JSON.stringify({
-      success: true,
-      data,
-    }),
-  };
-}
-
-function errorResponse(message: string, requestOrigin?: string) {
-  return {
-    statusCode: 400,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': requestOrigin || '*',
-      'Access-Control-Allow-Credentials': 'true',
-    },
-    body: JSON.stringify({
-      success: false,
-      error: message,
-    }),
-  };
-}
-
-// ==================== API 端点 ====================
+// ==================== GET: 归档列表 ====================
 
 interface GetArchivedQuery {
   userId: string;
@@ -51,9 +18,6 @@ interface GetArchivedQuery {
   skip?: string;
 }
 
-/**
- * GET /api/conversations/archived - 获取归档对话列表
- */
 export async function get({
   query,
   headers,
@@ -66,46 +30,37 @@ export async function get({
     }
 
     const { userId, limit = '20', skip = '0' } = query;
-
     if (!userId) {
       return errorResponse('userId is required', requestOrigin);
     }
 
-    const db = await getDatabase();
-    const collection = db.collection<Conversation>('conversations');
-
     const limitNum = parseInt(limit, 10);
     const skipNum = parseInt(skip, 10);
 
-    // 查询归档对话
-    const conversations = await collection
-      .find({ userId, isArchived: true })
-      .sort({ archivedAt: -1 }) // 最近归档的排前面
-      .limit(limitNum)
-      .skip(skipNum)
-      .toArray();
+    const container = getContainer();
+    const getArchivedUseCase = container.getGetArchivedConversationsUseCase();
+    const result = await getArchivedUseCase.execute(userId, limitNum, skipNum);
 
-    const total = await collection.countDocuments({ userId, isArchived: true });
+    const conversations = result.conversations.map(c => c.toPersistence());
 
-    return successResponse({
-      conversations,
-      total,
-    }, requestOrigin);
+    return successResponse(
+      { conversations, total: result.total },
+      undefined,
+      requestOrigin
+    );
   } catch (error: any) {
     console.error('❌ 获取归档对话失败:', error);
-    const requestOrigin = (error as any).requestOrigin;
-    return errorResponse(error.message || '获取归档对话失败', requestOrigin);
+    return errorResponse(error.message || '获取归档对话失败', headers?.origin);
   }
 }
+
+// ==================== POST: 恢复归档 ====================
 
 interface RestoreArchivedData {
   conversationId: string;
   userId: string;
 }
 
-/**
- * POST /api/conversations/archived/restore - 恢复归档的对话
- */
 export async function post({
   data,
   headers,
@@ -115,15 +70,7 @@ export async function post({
 
     const csrf = await requireCsrf(headers);
     if (csrf.ok === false) {
-      return {
-        statusCode: csrf.status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': requestOrigin || '*',
-          'Access-Control-Allow-Credentials': 'true',
-        },
-        body: JSON.stringify({ success: false, error: csrf.message }),
-      };
+      return errorResponseWithStatus(csrf.message, csrf.status, requestOrigin);
     }
 
     if (!data) {
@@ -131,27 +78,25 @@ export async function post({
     }
 
     const { conversationId, userId } = data;
-
     if (!conversationId || !userId) {
       return errorResponse('conversationId and userId are required', requestOrigin);
     }
 
-    // 使用 LRU 服务恢复对话
-    const lruService = getConversationLRUService();
-    const success = await lruService.restoreArchivedConversation(conversationId, userId);
+    const container = getContainer();
+    const unarchiveUseCase = container.getUnarchiveConversationUseCase();
+    const restored = await unarchiveUseCase.execute(conversationId, userId);
 
-    if (success) {
-      return successResponse({
-        message: '对话恢复成功',
-        conversationId,
-      }, requestOrigin);
+    if (restored) {
+      return successResponse(
+        { message: '对话恢复成功', conversationId },
+        undefined,
+        requestOrigin
+      );
     } else {
       return errorResponse('对话不存在或无法恢复', requestOrigin);
     }
   } catch (error: any) {
     console.error('❌ 恢复归档对话失败:', error);
-    const requestOrigin = (error as any).requestOrigin;
-    return errorResponse(error.message || '恢复归档对话失败', requestOrigin);
+    return errorResponse(error.message || '恢复归档对话失败', headers?.origin);
   }
 }
-

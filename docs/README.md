@@ -75,7 +75,11 @@ docs/
 | `migration/` | 新旧代码映射表、迁移状态分析、Redis→MongoDB 迁移 |
 | `troubleshooting/` | Modern.js 路由 BUG、下划线扫描问题、GitHub 调研 |
 
-根目录保留高级文档：BFF 方案、前端组件重构、Docker 重构等。
+根目录保留高级文档：BFF 方案、前端组件重构、Docker 重构、P0 收敛性重构等。
+
+| 核心文档 | 内容 |
+|---------|------|
+| `P0_CONVERGENCE_REFACTORING.md` | 消除重复实现与架构旁路（计划工具统一、死代码清理、归档 API 接入 CA） |
 
 ---
 

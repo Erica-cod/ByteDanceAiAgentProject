@@ -41,5 +41,32 @@ export interface IConversationRepository {
    * 删除 Conversation（软删除）
    */
   delete(conversationId: string, userId: string): Promise<boolean>;
+
+  /**
+   * 归档 Conversation
+   */
+  archive(conversation: ConversationEntity): Promise<boolean>;
+
+  /**
+   * 取消归档 Conversation
+   */
+  unarchive(conversation: ConversationEntity): Promise<boolean>;
+
+  /**
+   * 查找用户的归档 Conversation（分页）
+   */
+  findArchivedByUserId(
+    userId: string,
+    limit: number,
+    skip: number
+  ): Promise<{
+    conversations: ConversationEntity[];
+    total: number;
+  }>;
+
+  /**
+   * 根据 ID 查找归档的 Conversation
+   */
+  findArchivedById(conversationId: string, userId: string): Promise<ConversationEntity | null>;
 }
 

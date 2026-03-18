@@ -130,5 +130,116 @@ export class ConversationRepository implements IConversationRepository {
 
     return result.modifiedCount > 0;
   }
+
+  /**
+   * 归档 Conversation
+   */
+  async archive(conversation: ConversationEntity): Promise<boolean> {
+    const db = await getDatabase();
+    const collection = db.collection<Conversation>('conversations');
+    const data = conversation.toPersistence();
+
+    const result = await collection.updateOne(
+      { conversationId: data.conversationId, userId: data.userId },
+      {
+        $set: {
+          isArchived: true,
+          isActive: false,
+          archivedAt: data.archivedAt,
+          updatedAt: data.updatedAt,
+        },
+      }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * 取消归档 Conversation
+   */
+  async unarchive(conversation: ConversationEntity): Promise<boolean> {
+    const db = await getDatabase();
+    const collection = db.collection<Conversation>('conversations');
+    const data = conversation.toPersistence();
+
+    const result = await collection.updateOne(
+      { conversationId: data.conversationId, userId: data.userId },
+      {
+        $set: {
+          isArchived: false,
+          isActive: true,
+          updatedAt: data.updatedAt,
+        },
+        $unset: {
+          archivedAt: '',
+        },
+      }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * 查找用户的归档 Conversation（分页）
+   */
+  async findArchivedByUserId(
+    userId: string,
+    limit: number,
+    skip: number
+  ): Promise<{
+    conversations: ConversationEntity[];
+    total: number;
+  }> {
+    const db = await getDatabase();
+    const collection = db.collection<Conversation>('conversations');
+
+    const conversations = await collection
+      .find({ userId, isArchived: true })
+      .sort({ archivedAt: -1 })
+      .limit(limit)
+      .skip(skip)
+      .toArray();
+
+    const total = await collection.countDocuments({ userId, isArchived: true });
+
+    const entities = conversations.map((data: Conversation) =>
+      ConversationEntity.fromPersistence({
+        conversationId: data.conversationId,
+        userId: data.userId,
+        title: data.title,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        messageCount: data.messageCount,
+        isActive: data.isActive,
+        isArchived: (data as any).isArchived ?? false,
+        archivedAt: (data as any).archivedAt,
+      })
+    );
+
+    return { conversations: entities, total };
+  }
+
+  /**
+   * 根据 ID 查找归档的 Conversation
+   */
+  async findArchivedById(conversationId: string, userId: string): Promise<ConversationEntity | null> {
+    const db = await getDatabase();
+    const collection = db.collection<Conversation>('conversations');
+
+    const data = await collection.findOne({ conversationId, userId, isArchived: true });
+    if (!data) return null;
+
+    return ConversationEntity.fromPersistence({
+      conversationId: data.conversationId,
+      userId: data.userId,
+      title: data.title,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      messageCount: data.messageCount,
+      isActive: data.isActive,
+      isArchived: (data as any).isArchived ?? false,
+      archivedAt: (data as any).archivedAt,
+    });
+  }
 }
 

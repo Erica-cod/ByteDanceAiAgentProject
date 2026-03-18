@@ -13,6 +13,9 @@ import { GetConversationsUseCase } from './application/use-cases/conversation/ge
 import { GetConversationUseCase } from './application/use-cases/conversation/get-conversation.use-case.js';
 import { UpdateConversationUseCase } from './application/use-cases/conversation/update-conversation.use-case.js';
 import { DeleteConversationUseCase } from './application/use-cases/conversation/delete-conversation.use-case.js';
+import { ArchiveConversationUseCase } from './application/use-cases/conversation/archive-conversation.use-case.js';
+import { UnarchiveConversationUseCase } from './application/use-cases/conversation/unarchive-conversation.use-case.js';
+import { GetArchivedConversationsUseCase } from './application/use-cases/conversation/get-archived-conversations.use-case.js';
 
 // Import interfaces and implementations - Message
 import { IMessageRepository } from './application/interfaces/repositories/message.repository.interface.js';
@@ -147,6 +150,21 @@ class SimpleContainer {
   getDeleteConversationUseCase(): DeleteConversationUseCase {
     const repo = this.getConversationRepository();
     return new DeleteConversationUseCase(repo);
+  }
+
+  getArchiveConversationUseCase(): ArchiveConversationUseCase {
+    const repo = this.getConversationRepository();
+    return new ArchiveConversationUseCase(repo);
+  }
+
+  getUnarchiveConversationUseCase(): UnarchiveConversationUseCase {
+    const repo = this.getConversationRepository();
+    return new UnarchiveConversationUseCase(repo);
+  }
+
+  getGetArchivedConversationsUseCase(): GetArchivedConversationsUseCase {
+    const repo = this.getConversationRepository();
+    return new GetArchivedConversationsUseCase(repo);
   }
 
   // ==================== Message Module ====================
