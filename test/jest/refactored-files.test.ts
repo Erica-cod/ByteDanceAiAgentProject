@@ -27,7 +27,6 @@ describe('refactored files existence', () => {
       { path: 'api/types/chat.ts', description: 'Chat API 类型定义' },
       { path: 'api/config/systemPrompt.ts', description: 'System Prompt 配置' },
       { path: 'api/handlers/sseStreamWriter.ts', description: 'SSE 流写入工具' },
-      { path: 'api/handlers/workflowProcessor.ts', description: '工作流处理器' },
       { path: 'api/handlers/singleAgentHandler.ts', description: '单 Agent 处理器' },
       { path: 'api/handlers/multiAgentHandler.ts', description: '多 Agent 处理器' },
       { path: 'api/lambda/chat.ts', description: 'Chat API 入口' },
