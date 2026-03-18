@@ -23,6 +23,14 @@ import {
 import { randomUUID } from 'crypto';
 
 /**
+ * 缓存命中等级：
+ * - L1: 高相似度精确命中（>=0.98），直接返回
+ * - L2: 中等相似度命中（>=0.88），返回缓存内容作为参考，可用本地模型改写生成变体
+ * - L3: 未命中（<0.88），走正常模型调用
+ */
+export type CacheHitLevel = 'L1' | 'L2' | 'L3';
+
+/**
  * 缓存的响应
  */
 export interface CachedResponse {
@@ -30,8 +38,9 @@ export interface CachedResponse {
   content: string;
   thinking?: string;
   metadata?: any;
-  similarity?: number;  // 相似度分数
-  hitCount?: number;    // 缓存命中次数
+  similarity?: number;
+  hitCount?: number;
+  hitLevel: CacheHitLevel;
 }
 
 /**
@@ -60,6 +69,16 @@ export class RequestCacheService {
    * @param options - 查找选项
    * @returns 缓存的响应，如果没有找到返回 null
    */
+  /**
+   * 三级缓存阈值（可通过环境变量覆盖）
+   */
+  private getThresholds() {
+    return {
+      L1: parseFloat(process.env.CACHE_L1_THRESHOLD || '0.98'),
+      L2: parseFloat(process.env.CACHE_L2_THRESHOLD || '0.88'),
+    };
+  }
+
   async findCachedResponse(
     requestText: string,
     userId: string,
@@ -77,11 +96,9 @@ export class RequestCacheService {
     try {
       console.log(` [Cache Service] 查找缓存: "${requestText.slice(0, 50)}..."`);
 
-      // 1. 计算请求的 embedding
       const requestEmbedding = await this.embeddingService.getEmbedding(requestText);
       console.log(` [Cache Service] Embedding 计算完成 (维度: ${requestEmbedding.length})`);
 
-      // 2. 从 Redis 获取该用户的所有缓存记录
       const client = getRedisClient();
       const caches = await getEmbeddingCacheByUser(
         client,
@@ -97,14 +114,19 @@ export class RequestCacheService {
 
       console.log(` [Cache Service] 找到 ${caches.length} 条候选缓存`);
 
-      // 3. 计算每个缓存的相似度，找到最相似的
-      const similarityThreshold = options?.similarityThreshold || 0.95;
+      // 找到相似度最高的缓存记录
       let bestMatch: { cache: EmbeddingCacheRecord; similarity: number } | null = null;
+      const thresholds = this.getThresholds();
+
+      // 兼容旧调用方的 similarityThreshold（如果传了就用旧逻辑的最低阈值）
+      const minThreshold = options?.similarityThreshold
+        ? Math.min(options.similarityThreshold, thresholds.L2)
+        : thresholds.L2;
 
       for (const cache of caches) {
         const similarity = cosineSimilarity(requestEmbedding, cache.requestEmbedding);
 
-        if (similarity >= similarityThreshold) {
+        if (similarity >= minThreshold) {
           if (!bestMatch || similarity > bestMatch.similarity) {
             bestMatch = { cache, similarity };
           }
@@ -112,25 +134,40 @@ export class RequestCacheService {
       }
 
       if (!bestMatch) {
-        console.log(' [Cache Service] 没有找到足够相似的缓存');
+        console.log(' [Cache Service] 没有找到足够相似的缓存 (L3 未命中)');
         return null;
       }
 
-      // 4. 更新命中次数
+      // 判定缓存命中等级
+      let hitLevel: CacheHitLevel;
+      const sim = bestMatch.similarity;
+      const hitCount = bestMatch.cache.hitCount;
+
+      if (sim >= thresholds.L1 && hitCount < 3) {
+        // L1: 高相似度且未被反复命中（反复命中的降级到 L2 提供变体）
+        hitLevel = 'L1';
+      } else if (sim >= thresholds.L2) {
+        hitLevel = 'L2';
+      } else {
+        return null; // 不应到达，但保险起见
+      }
+
       await incrementEmbeddingCacheHitCount(client, bestMatch.cache.cacheId);
 
       console.log(
-        ` [Cache Service] 找到缓存命中! ` +
-        `相似度: ${(bestMatch.similarity * 100).toFixed(2)}%, ` +
+        ` [Cache Service] 缓存命中! ` +
+        `等级: ${hitLevel}, ` +
+        `相似度: ${(sim * 100).toFixed(2)}%, ` +
         `cacheId: ${bestMatch.cache.cacheId}, ` +
-        `命中次数: ${bestMatch.cache.hitCount + 1}`
+        `命中次数: ${hitCount + 1}`
       );
 
       return {
         cacheId: bestMatch.cache.cacheId,
         content: bestMatch.cache.response,
-        similarity: bestMatch.similarity,
-        hitCount: bestMatch.cache.hitCount + 1, // 返回更新后的命中次数
+        similarity: sim,
+        hitCount: hitCount + 1,
+        hitLevel,
       };
     } catch (error: any) {
       console.error(' [Cache Service] 查找缓存失败:', error);

@@ -28,7 +28,8 @@ import { acquireSSESlot } from '../_clean/infrastructure/streaming/sse-limiter.j
 import { getContainer } from '../_clean/di-container.js';
 import { getRecommendedConfig } from '../config/memoryConfig.js';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
-import { callLocalModel, callVolcengineModel } from '../_clean/infrastructure/llm/model-service.js';
+import { callLocalModel, callVolcengineModel, callRemoteLiteModel } from '../_clean/infrastructure/llm/model-service.js';
+import { classifyRequest } from '../_clean/infrastructure/llm/request-classifier.js';
 import { handleMultiAgentMode } from '../handlers/multiAgentHandler.js';
 import { handleVolcanoStream, handleLocalStream } from '../handlers/singleAgentHandler.js';
 import { handleResumeRequest } from '../handlers/resumeHandler.js';
@@ -389,8 +390,11 @@ export async function post({
       console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
       console.log(`📊 记忆统计: ${contextResult.stats.uniqueMessages} 条唯一消息, 预估 ${contextResult.stats.estimatedTokens} tokens`);
 
-      const tools = toolRegistry.getAllSchemas();
-      console.log(`🔧 传递 ${tools.length} 个工具定义给模型`);
+      // 本地模型用全量工具定义（不消耗远程 token），远程模型做工具瘦身
+      const tools = modelType === 'volcano'
+        ? toolRegistry.getRelevantSchemas(message)
+        : toolRegistry.getAllSchemas();
+      console.log(`🔧 传递 ${tools.length} 个工具定义给模型 (${modelType === 'volcano' ? '已瘦身' : '全量'})`);
 
       if (modelType === 'local') {
         console.log('开始调用本地模型...');
@@ -409,18 +413,57 @@ export async function post({
       } else if (modelType === 'volcano') {
         const remoteProvider = getRegistry().get('remote');
         const remoteAvailable = remoteProvider ? await remoteProvider.isAvailable() : false;
-        console.log('==========================================');
-        console.log('🌋 开始调用火山引擎豆包模型...');
-        console.log('🔑 远程 Provider 状态:', remoteAvailable ? '已配置' : '未配置');
-        console.log('🎯 目标模型:', remoteProvider?.getModelName() || 'N/A');
-        console.log('==========================================');
         
         if (!remoteAvailable) {
           console.error('❌ 远程模型 API 未配置！');
           return errorResponse('远程模型 API 未配置，请设置 ARK_API_KEY 环境变量', requestOrigin);
         }
 
-        const stream = await callVolcengineModel(messages, { tools });
+        // ==================== 智能路由：分类器决定实际模型 ====================
+        const classification = classifyRequest(messages);
+        console.log('==========================================');
+        console.log('🌋 火山引擎智能路由');
+        console.log(`📊 分类结果: ${classification.level} (置信度 ${classification.confidence.toFixed(2)}, 原因: ${classification.reason})`);
+        console.log(`🎯 建议 Tier: ${classification.suggestedTier}`);
+
+        // 是否启用 local-first cascade（可通过环境变量关闭）
+        const enableLocalFirst = process.env.ENABLE_LOCAL_FIRST !== 'false';
+
+        if (enableLocalFirst && classification.level === 'simple' && classification.confidence >= 0.8) {
+          // 简单请求：尝试本地模型处理（零远程 token 消耗）
+          console.log('🏠 [LocalFirst] 简单请求，尝试本地模型处理');
+          try {
+            const localProvider = getRegistry().get('local');
+            if (localProvider && await localProvider.isAvailable()) {
+              const stream = await callLocalModel(messages, { tools });
+              handoffToStream = true;
+              console.log('✅ [LocalFirst] 使用本地模型处理简单请求');
+              return handleLocalStream(
+                stream,
+                conversationId,
+                userId,
+                'local',
+                messages,
+                clientAssistantMessageId,
+                slot.release,
+                message
+              );
+            }
+          } catch (localErr) {
+            console.warn('⚠️  [LocalFirst] 本地模型不可用，fallback 到远程 lite:', localErr);
+          }
+        }
+
+        // 根据分类结果选择远程模型
+        let stream;
+        if (classification.suggestedTier === 1) {
+          console.log('🎯 使用 remote-lite 模型');
+          stream = await callRemoteLiteModel(messages, { tools });
+        } else {
+          console.log('🎯 使用标准远程模型:', remoteProvider?.getModelName());
+          stream = await callVolcengineModel(messages, { tools });
+        }
+        console.log('==========================================');
         console.log('✅ 已收到远程模型的流式响应');
         
         handoffToStream = true;

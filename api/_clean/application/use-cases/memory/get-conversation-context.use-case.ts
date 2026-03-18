@@ -14,6 +14,7 @@ import {
   MemoryConfig, 
   ChatMessage 
 } from '../../../domain/entities/conversation-memory.entity.js';
+import { compressContext } from '../../../infrastructure/llm/context-compressor.js';
 
 export interface GetConversationContextInput {
   conversationId: string;
@@ -21,6 +22,8 @@ export interface GetConversationContextInput {
   currentMessage: string;
   systemPrompt: string;
   config?: Partial<MemoryConfig>;
+  /** 是否启用上下文压缩（默认对远程模型启用） */
+  enableCompression?: boolean;
 }
 
 export interface GetConversationContextOutput {
@@ -100,7 +103,20 @@ export class GetConversationContextUseCase {
     );
 
     // 步骤 3: 构建对话上下文
-    const context = memoryWithMessages.buildContext(currentMessage, systemPrompt);
+    let context = memoryWithMessages.buildContext(currentMessage, systemPrompt);
+
+    // 步骤 3.5: 可选 - 上下文压缩（将早期历史摘要化，降低远程模型 token 消耗）
+    const shouldCompress = input.enableCompression !== false && context.length > 8;
+    if (shouldCompress) {
+      console.log('📦 [GetConversationContext] 启用上下文压缩...');
+      const systemMsg = context[0]; // system prompt
+      const currentMsg = context[context.length - 1]; // 当前用户消息
+      const historyMsgs = context.slice(1, -1); // 中间的历史消息
+
+      const compressed = await compressContext(historyMsgs, 4, conversationId);
+      context = [systemMsg, ...compressed, currentMsg];
+      console.log(`📦 [GetConversationContext] 压缩后上下文: ${context.length} 条消息`);
+    }
 
     // 步骤 4: 获取统计信息
     const stats = memoryWithMessages.getStats();

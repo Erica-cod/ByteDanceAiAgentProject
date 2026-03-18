@@ -31,6 +31,12 @@
  *
  *   vramGB:              预估显存占用（GB），仅本地模型有意义
  *
+ *   costTier:            成本等级（仅远程模型）
+ *     1 = lite（最便宜），2 = standard，3 = premium（最贵）
+ *
+ *   capabilityTier:      能力等级（仅远程模型）
+ *     1 = 基础对话/简单任务，2 = 通用任务，3 = 复杂推理/分析
+ *
  *   description:         模型的简短描述
  */
 
@@ -108,6 +114,8 @@ export const MODEL_CONFIGS = {
     supportsTools: true,
     thinkingMode: 'none' as const,
     toolCallsInStream: false,
+    costTier: 3 as const,
+    capabilityTier: 3 as const,
     description: '豆包 1.5 思维版 - 推荐远程模型',
   },
 
@@ -117,6 +125,8 @@ export const MODEL_CONFIGS = {
     supportsTools: true,
     thinkingMode: 'none' as const,
     toolCallsInStream: false,
+    costTier: 2 as const,
+    capabilityTier: 2 as const,
     description: '豆包 Pro 32K - 长上下文',
   },
 
@@ -126,6 +136,24 @@ export const MODEL_CONFIGS = {
     supportsTools: true,
     thinkingMode: 'none' as const,
     toolCallsInStream: false,
+    costTier: 1 as const,
+    capabilityTier: 1 as const,
     description: '豆包 Lite 32K - 轻量快速',
   },
 };
+
+export type ModelConfigKey = keyof typeof MODEL_CONFIGS;
+export type RemoteModelKey = {
+  [K in ModelConfigKey]: (typeof MODEL_CONFIGS)[K]['provider'] extends 'openai-compatible' ? K : never
+}[ModelConfigKey];
+
+/**
+ * 按能力等级获取远程模型配置。
+ * capabilityTier: 1=lite, 2=standard, 3=premium
+ */
+export function getRemoteModelByTier(tier: 1 | 2 | 3) {
+  const entries = Object.entries(MODEL_CONFIGS).filter(
+    ([, cfg]) => cfg.provider === 'openai-compatible' && 'capabilityTier' in cfg && (cfg as any).capabilityTier === tier
+  );
+  return entries.length > 0 ? entries[0][1] : null;
+}

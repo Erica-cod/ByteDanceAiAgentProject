@@ -71,6 +71,10 @@ export async function handleVolcanoStream(
   let accumulatedText = '';
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
+
+  // token 用量追踪（从流式响应最后一个 chunk 的 usage 字段获取）
+  let tokenUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null = null;
+  const streamStartTime = Date.now();
   
   // 累积 tool_calls（流式模式下分批返回）
   let accumulatedToolCalls: Map<number, { name?: string; arguments: string }> = new Map();
@@ -115,6 +119,15 @@ export async function handleVolcanoStream(
 
         try {
           const jsonData = JSON.parse(data);
+
+          // 捕获 usage（通常在最后一个 chunk 中随 finish_reason 一起返回）
+          if (jsonData.usage) {
+            tokenUsage = {
+              prompt_tokens: jsonData.usage.prompt_tokens || 0,
+              completion_tokens: jsonData.usage.completion_tokens || 0,
+              total_tokens: jsonData.usage.total_tokens || 0,
+            };
+          }
           
           // 火山引擎格式: choices[0].delta
           const choice = jsonData.choices?.[0];
@@ -288,12 +301,31 @@ export async function handleVolcanoStream(
               }
             }
 
+            // 上报 token 用量
+            const durationMs = Date.now() - streamStartTime;
+            try {
+              const recordMetric = container.getRecordMetricUseCase();
+              await recordMetric.execute({
+                type: 'llm_request',
+                durationMs,
+                tokensUsed: tokenUsage?.total_tokens || 0,
+              });
+              if (tokenUsage) {
+                console.log(`📊 [Token] 用量: prompt=${tokenUsage.prompt_tokens}, completion=${tokenUsage.completion_tokens}, total=${tokenUsage.total_tokens}, duration=${durationMs}ms`);
+              } else {
+                console.log(`📊 [Token] 未获取到 usage 字段, duration=${durationMs}ms`);
+              }
+            } catch (metricsErr) {
+              console.warn('⚠️  [Token] 上报 metrics 失败:', metricsErr);
+            }
+
             // 发送完成信号
             if (!sseWriter.isClosed()) {
               await controlledWriter.sendDirect({
                 done: true,
                 assistantMessageId: clientAssistantMessageId,
                 sources: searchSources,
+                tokenUsage: tokenUsage || undefined,
               });
             }
           }
@@ -382,6 +414,7 @@ export async function handleLocalStream(
   let searchSources: Array<{title: string; url: string}> | undefined;
   let messageSaved = false;
   let lastThinkingSendTime = 0;
+  const localStreamStartTime = Date.now();
 
   const messageId = clientAssistantMessageId || `temp_${Date.now()}`;
   const container = getContainer();
@@ -535,6 +568,21 @@ export async function handleLocalStream(
             } catch (error) {
               console.error('❌ [Ollama] 保存消息失败:', error);
             }
+          }
+
+          // 上报本地模型请求 metrics（Ollama 不返回 token 计数，用字符数估算）
+          const localDurationMs = Date.now() - localStreamStartTime;
+          const estimatedTokens = Math.ceil((finalContent.length + finalThinking.length) / 3);
+          try {
+            const recordMetric = container.getRecordMetricUseCase();
+            await recordMetric.execute({
+              type: 'llm_request',
+              durationMs: localDurationMs,
+              tokensUsed: estimatedTokens,
+            });
+            console.log(`📊 [Ollama Token] 估算: ~${estimatedTokens} tokens, duration=${localDurationMs}ms`);
+          } catch (metricsErr) {
+            console.warn('⚠️  [Ollama Token] 上报 metrics 失败:', metricsErr);
           }
 
           if (!sseWriter.isClosed()) {

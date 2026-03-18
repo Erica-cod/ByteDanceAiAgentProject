@@ -117,6 +117,55 @@ export class ToolRegistry {
   }
 
   /**
+   * 根据用户消息内容筛选可能相关的工具 schema。
+   * 通过关键词匹配判断哪些工具类别可能被用到，减少发给模型的 token。
+   * 如果无法判断，返回全部（安全 fallback）。
+   */
+  getRelevantSchemas(userMessage: string): Array<{ type: 'function'; function: FunctionSchema }> {
+    const text = userMessage.toLowerCase();
+    const matched = new Set<string>();
+
+    // 时间类关键词
+    if (/时间|日期|几点|星期|周几|今天|明天|昨天|后天|时区|日历|多少天|多久/.test(text)) {
+      matched.add('get_current_time');
+      matched.add('calculate_date');
+      matched.add('parse_natural_date');
+      matched.add('compare_dates');
+    }
+
+    // 搜索类关键词
+    if (/搜索|查找|查询|最新|新闻|网上|互联网|百度|谷歌|google|search|实时/.test(text)) {
+      matched.add('search_web');
+    }
+
+    // 计划类关键词
+    if (/计划|任务|学习计划|项目计划|制定|安排|进度|plan|todo|待办/.test(text)) {
+      matched.add('create_plan');
+      matched.add('update_plan');
+      matched.add('get_plan');
+      matched.add('list_plans');
+    }
+
+    // 无法确定相关性 → 返回全部（保守策略）
+    if (matched.size === 0) {
+      return this.getAllSchemas();
+    }
+
+    const allEnabled = Array.from(this.tools.values())
+      .filter(plugin => plugin.metadata.enabled !== false);
+
+    const relevant = allEnabled
+      .filter(plugin => matched.has(plugin.schema.name))
+      .map(plugin => ({
+        type: 'function' as const,
+        function: plugin.schema,
+      }));
+
+    console.log(`🔧 [ToolRegistry] 工具瘦身: ${allEnabled.length} → ${relevant.length} (匹配: ${Array.from(matched).join(', ')})`);
+    return relevant;
+  }
+
+  /**
    * 根据标签筛选工具
    */
   getByTags(tags: string[]): ToolPlugin[] {

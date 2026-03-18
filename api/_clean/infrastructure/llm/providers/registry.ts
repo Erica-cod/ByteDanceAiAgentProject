@@ -124,6 +124,20 @@ export function initializeRegistry(): LLMProviderRegistry {
       id: 'remote',
     });
     registry.register('remote', provider, 'remote');
+
+    // 注册 lite 远程模型（用于简单请求的低成本路由）
+    const liteModel = process.env.ARK_LITE_MODEL || 'doubao-lite-32k';
+    const liteCatalog = findModelConfig(liteModel);
+    const liteProvider = new OpenAICompatibleProvider({
+      provider: 'openai-compatible',
+      modelName: liteModel,
+      supportsTools: liteCatalog?.supportsTools ?? true,
+      description: liteCatalog?.description || `远程轻量模型: ${liteModel}`,
+      apiUrl: process.env.ARK_API_URL,
+      apiKey: arkApiKey,
+      id: 'remote-lite',
+    });
+    registry.register('remote-lite', liteProvider);
   } else {
     console.warn('⚠️  [Registry] ARK_API_KEY 未配置，远程 Provider 不可用');
   }
