@@ -1,7 +1,9 @@
 /**
- * 计划管理工具 - 为 AI Agent 提供计划 CRUD 能力
- * 
- * 🆕 使用 Clean Architecture - Plan Module
+ * @deprecated 请使用 plan-tools.plugin.ts + toolExecutor.execute() 替代
+ *
+ * 旧版计划管理工具，已被插件化版本取代。
+ * 插件版本自动集成限流、熔断、缓存能力。
+ * 此文件保留供参考，将在后续版本中移除。
  */
 
 import { getContainer } from '../../_clean/di-container.js';

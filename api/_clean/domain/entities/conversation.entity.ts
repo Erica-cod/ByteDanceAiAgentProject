@@ -16,6 +16,8 @@ const ConversationSchema = z.object({
   updatedAt: z.date(),
   messageCount: z.number().int().min(0),
   isActive: z.boolean(),
+  isArchived: z.boolean(),
+  archivedAt: z.date().optional(),
 });
 
 /**
@@ -29,9 +31,10 @@ export class ConversationEntity {
     public readonly createdAt: Date,
     public updatedAt: Date,
     public messageCount: number,
-    public isActive: boolean
+    public isActive: boolean,
+    public isArchived: boolean = false,
+    public archivedAt?: Date
   ) {
-    // 验证数据
     ConversationSchema.parse({
       conversationId,
       userId,
@@ -40,6 +43,8 @@ export class ConversationEntity {
       updatedAt,
       messageCount,
       isActive,
+      isArchived,
+      archivedAt,
     });
   }
 
@@ -59,7 +64,8 @@ export class ConversationEntity {
       now,
       now,
       0,
-      true
+      true,
+      false
     );
   }
 
@@ -74,6 +80,8 @@ export class ConversationEntity {
     updatedAt: Date;
     messageCount: number;
     isActive: boolean;
+    isArchived?: boolean;
+    archivedAt?: Date;
   }): ConversationEntity {
     return new ConversationEntity(
       data.conversationId,
@@ -82,7 +90,9 @@ export class ConversationEntity {
       data.createdAt,
       data.updatedAt,
       data.messageCount,
-      data.isActive
+      data.isActive,
+      data.isArchived ?? false,
+      data.archivedAt
     );
   }
 
@@ -98,6 +108,8 @@ export class ConversationEntity {
       updatedAt: this.updatedAt,
       messageCount: this.messageCount,
       isActive: this.isActive,
+      isArchived: this.isArchived,
+      archivedAt: this.archivedAt,
     };
   }
 
@@ -128,6 +140,28 @@ export class ConversationEntity {
    */
   markAsInactive(): void {
     this.isActive = false;
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * 业务规则：归档对话
+   */
+  archive(): void {
+    if (this.isArchived) return;
+    this.isArchived = true;
+    this.isActive = false;
+    this.archivedAt = new Date();
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * 业务规则：取消归档（恢复对话）
+   */
+  unarchive(): void {
+    if (!this.isArchived) return;
+    this.isArchived = false;
+    this.isActive = true;
+    this.archivedAt = undefined;
     this.updatedAt = new Date();
   }
 

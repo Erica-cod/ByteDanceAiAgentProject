@@ -6,7 +6,7 @@
 
 import { validateToolCall } from '../tools/plugins/toolValidator.js';
 import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/plugins/tavilySearch.js';
-import { routePlanningTool } from '../tools/plugins/planningTools.js';
+import { toolExecutor } from '../tools/index.js';
 import { extractToolCall } from '../_clean/shared/utils/json-extractor.js';
 
 /**
@@ -146,10 +146,16 @@ export async function processSingleToolCall(
     else if (['create_plan', 'update_plan', 'get_plan', 'list_plans'].includes(tool)) {
       console.log(`📋 [Workflow] 执行计划工具: ${tool}`);
       
-      const result = await routePlanningTool(tool, userId, normalizedToolCall);
+      const execContext = {
+        userId,
+        conversationId: '',
+        requestId: `workflow_${Date.now()}`,
+        timestamp: Date.now(),
+      };
+      const result = await toolExecutor.execute(tool, normalizedToolCall, execContext);
       
       if (result.success) {
-        resultText = `<tool_result>\n${result.message}\n\n详细数据:\n${JSON.stringify(result.data, null, 2)}\n</tool_result>`;
+        resultText = `<tool_result>\n${result.message || '执行成功'}\n\n详细数据:\n${JSON.stringify(result.data, null, 2)}\n</tool_result>`;
         console.log(`✅ [Workflow] 计划工具执行成功`);
       } else {
         resultText = `<tool_error>计划工具执行失败: ${result.error}</tool_error>`;
