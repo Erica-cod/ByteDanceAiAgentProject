@@ -4,9 +4,9 @@
  * 提供简单的接口供 chat.ts 使用，实现多轮工具调用
  */
 
-import { validateToolCall } from '../tools/toolValidator.js';
-import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/tavilySearch.js';
-import { routePlanningTool } from '../tools/planningTools.js';
+import { validateToolCall } from '../tools/plugins/toolValidator.js';
+import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../tools/plugins/tavilySearch.js';
+import { routePlanningTool } from '../tools/plugins/planningTools.js';
 import { extractToolCall } from '../_clean/shared/utils/json-extractor.js';
 
 /**

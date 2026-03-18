@@ -18,7 +18,7 @@ import {
   isWeekday,
   addWorkdays,
   type DateOffset,
-} from '../timeTools.js';
+} from './timeTools.js';
 import type { ToolPlugin } from '../core/types.js';
 
 // ============ 获取当前时间工具 ============

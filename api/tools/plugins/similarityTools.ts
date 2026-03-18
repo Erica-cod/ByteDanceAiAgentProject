@@ -10,13 +10,13 @@
  * ✅ 已重构：使用共享的 embedding 服务和相似度计算工具
  */
 
-import { embeddingService } from '../_clean/infrastructure/llm/embedding.service.js';
+import { embeddingService } from '../../_clean/infrastructure/llm/embedding.service.js';
 import { 
   cosineSimilarity, 
   calculateSimilarityMatrix,
   simpleTextSimilarity,
   simpleComparePositions
-} from '../_clean/shared/utils/similarity-calculator.js';
+} from '../../_clean/shared/utils/similarity-calculator.js';
 
 /**
  * 向量接口

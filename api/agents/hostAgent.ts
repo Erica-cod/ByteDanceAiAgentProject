@@ -9,7 +9,7 @@
  */
 
 import { BaseAgent, type AgentOutput, type PositionSummary, type AgentConfig } from './baseAgent.js';
-import { comparePositions, simpleComparePositions, compareSelfSimilarity, type SimilarityResult } from '../tools/similarityTools.js';
+import { comparePositions, simpleComparePositions, compareSelfSimilarity, type SimilarityResult } from '../tools/plugins/similarityTools.js';
 
 /**
  * Host 决策类型

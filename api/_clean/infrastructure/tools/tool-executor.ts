@@ -3,9 +3,9 @@
  * 统一处理工具调用和结果返回
  */
 
-import { validateToolCall } from '../../../tools/toolValidator.js';
-import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../../../tools/tavilySearch.js';
-import { routePlanningTool } from '../../../tools/planningTools.js';
+import { validateToolCall } from '../../../tools/plugins/toolValidator.js';
+import { searchWeb, formatSearchResultsForAI, type SearchOptions } from '../../../tools/plugins/tavilySearch.js';
+import { routePlanningTool } from '../../../tools/plugins/planningTools.js';
 
 /**
  * 执行工具调用

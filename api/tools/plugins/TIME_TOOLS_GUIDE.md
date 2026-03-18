@@ -2,7 +2,7 @@
 
 ## 📋 迁移概述
 
-时间工具已成功从 `api/tools/timeTools.ts` 迁移到 v2 插件系统，提供了 4 个独立的时间工具插件。
+时间工具已成功从 `api/tools/plugins/timeTools.ts` 迁移到 v2 插件系统，提供了 4 个独立的时间工具插件。
 
 ---
 
@@ -325,7 +325,7 @@ for (const toolCall of toolCalls) {
 
 ```typescript
 // ❌ 旧代码
-import { getNow, calculateDate } from './api/tools/timeTools.js';
+import { getNow, calculateDate } from './api/tools/plugins/timeTools.js';
 
 const now = getNow('Asia/Shanghai');
 const futureDate = calculateDate(new Date(), { days: 3 });

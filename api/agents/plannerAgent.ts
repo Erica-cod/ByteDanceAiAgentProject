@@ -8,7 +8,7 @@
  */
 
 import { BaseAgent, type AgentOutput, type PositionSummary, type AgentConfig } from './baseAgent.js';
-import { getNow, calculateDate, parseNaturalDate } from '../tools/timeTools.js';
+import { getNow, calculateDate, parseNaturalDate } from '../tools/plugins/timeTools.js';
 
 /**
  * 计划阶段

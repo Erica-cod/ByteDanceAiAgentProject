@@ -4,8 +4,8 @@
  * 🆕 使用 Clean Architecture - Plan Module
  */
 
-import { getContainer } from '../_clean/di-container.js';
-import type { Task } from '../_clean/domain/entities/plan.entity.js';
+import { getContainer } from '../../_clean/di-container.js';
+import type { Task } from '../../_clean/domain/entities/plan.entity.js';
 
 /**
  * 工具调用结果接口

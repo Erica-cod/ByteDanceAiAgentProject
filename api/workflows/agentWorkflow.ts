@@ -9,9 +9,9 @@
 
 import { StateGraph, END, Annotation } from '@langchain/langgraph';
 import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
-import { validateToolCall } from '../tools/toolValidator.js';
-import { searchWeb } from '../tools/tavilySearch.js';
-import { routePlanningTool } from '../tools/planningTools.js';
+import { validateToolCall } from '../tools/plugins/toolValidator.js';
+import { searchWeb } from '../tools/plugins/tavilySearch.js';
+import { routePlanningTool } from '../tools/plugins/planningTools.js';
 import { extractToolCall } from '../_clean/shared/utils/json-extractor.js';
 
 /**
