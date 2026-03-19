@@ -3,9 +3,11 @@
  */
 
 import type { RoundData } from './message';
+import type { MonitorInstance } from 'ai-stream-monitor';
 
 export interface UseSSEStreamOptions {
   onConversationCreated?: (convId: string) => void;
+  monitor?: MonitorInstance | null;
 }
 
 export interface StreamState {

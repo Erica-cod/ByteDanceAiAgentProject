@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useChatStore, useUIStore } from '@/stores';
 import { useSSEStream } from './useSSEStream';
+import { useMonitor } from 'ai-stream-monitor/react';
 import type { MessageListHandle } from '@/types/message';
 import { crossTabTabId, publishConversationSendReleased } from '@/utils/events/crossTabChannel';
 import {
@@ -23,9 +24,11 @@ export function useMessageSender(options: UseMessageSenderOptions = {}) {
   const saveToCache = useChatStore((s) => s.saveToCache);
 
   const setLoading = useUIStore((s) => s.setLoading);
+  const monitor = useMonitor();
 
   const { sendMessage: sendSSEMessage, createAbortController, abort } = useSSEStream({
     onConversationCreated: options.onConversationCreated,
+    monitor,
   });
   const activeLockRef = useRef<ConversationSendLock | null>(null);
   const lockHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);

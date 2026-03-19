@@ -13,6 +13,7 @@ import { handleMessageUpload } from './upload';
 import { buildSSERequestBody } from './request-builder';
 import { dispatchSSEEvent } from './event-dispatcher';
 import type { UseSSEStreamOptions, StreamState, StreamResult } from './types';
+import type { StreamTrace } from 'ai-stream-monitor';
 import { fetchWithCsrf } from '@/utils/auth/fetchWithCsrf';
 import { publishConversationUpdated } from '@/utils/events/crossTabChannel';
 import { MAX_RECONNECT_ATTEMPTS, BASE_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS } from '@/constants';
@@ -135,6 +136,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     assistantMessageId: string,
     requestBody: Record<string, unknown>,
     streamConversationIdRef: { current: string | null },
+    trace?: StreamTrace | null,
   ): Promise<StreamResult> => {
     const signal = abortControllerRef.current?.signal;
     const response = await fetchWithCsrf('/api/chat', {
@@ -144,7 +146,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       signal,
     });
 
-    // 429：排队
     if (response.status === 429) {
       const retryAfter = response.headers.get('Retry-After');
       const retryAfterSec = retryAfter ? Number.parseInt(retryAfter, 10) : 1;
@@ -183,6 +184,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     const decoder = new TextDecoder();
     let buffer = '';
     let isDone = false;
+    let firstChunkFired = false;
+    let inThinkingPhase = false;
+    let inGeneratingPhase = false;
     const applyUpdate = makeApplyAssistantUpdate(assistantMessageId, streamConversationIdRef);
     const dispatchCtx = { chatMode, assistantMessageId, updateMessage };
 
@@ -210,7 +214,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 `chatMode: ${chatMode}`);
             }
 
-            // init：同步 conversationId
             if (parsed.type === 'init' && parsed.conversationId) {
               streamConversationIdRef.current = parsed.conversationId;
               if (!conversationId) {
@@ -224,15 +227,37 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
               continue;
             }
 
-            // 分发到 chunking / multi-agent 处理器
             if (dispatchSSEEvent(parsed, state, dispatchCtx)) continue;
 
-            // 单 Agent 模式：流式内容/思考
+            // StreamTrace: 首个 token
+            if (!firstChunkFired && (parsed.content || parsed.thinking)) {
+              firstChunkFired = true;
+              trace?.onFirstChunk();
+            }
+
+            // StreamTrace: thinking 阶段
             if (parsed.thinking !== undefined && parsed.thinking !== null) {
+              if (!inThinkingPhase) {
+                inThinkingPhase = true;
+                trace?.onPhase('thinking', 'start');
+              }
               state.currentThinking = parsed.thinking;
             }
             if (parsed.content !== undefined && parsed.content !== null) {
+              if (inThinkingPhase) {
+                inThinkingPhase = false;
+                trace?.onPhase('thinking', 'end');
+              }
+              if (!inGeneratingPhase) {
+                inGeneratingPhase = true;
+                trace?.onPhase('generating', 'start');
+              }
               state.currentContent = parsed.content;
+            }
+
+            // StreamTrace: tool call
+            if (parsed.toolCall) {
+              trace?.onToolCall(parsed.toolCall.tool || 'unknown', parsed.toolCall);
             }
 
             if (chatMode === 'single') {
@@ -255,6 +280,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       return { completed: false, aborted: false };
     }
 
+    if (inThinkingPhase) trace?.onPhase('thinking', 'end');
+    if (inGeneratingPhase) trace?.onPhase('generating', 'end');
+
     return { completed: isDone, aborted: false };
   };
 
@@ -266,6 +294,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     messageCountRefs?: React.MutableRefObject<Map<string, HTMLElement>>,
   ) => {
     const streamConversationIdRef = { current: conversationId };
+
+    const trace = options.monitor?.createStreamTrace({
+      messageId: assistantMessageId,
+      model: modelType,
+    }) ?? null;
 
     try {
       const uploadPayload = await handleMessageUpload(messageText, userId, {
@@ -295,10 +328,11 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         queueToken, messageText, completedRounds: state.completedRounds,
       });
 
-      // 断线重连
+      trace?.start();
+
       let attempt = 0;
       while (true) {
-        const result = await runStreamOnce(state, assistantMessageId, requestBody, streamConversationIdRef);
+        const result = await runStreamOnce(state, assistantMessageId, requestBody, streamConversationIdRef, trace);
         if (result.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
         if (result.completed) break;
 
@@ -313,7 +347,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         attempt += 1;
       }
 
-      // 流式完成
+      trace?.complete();
+
       flushMessageUpdate();
       if (streamConversationIdRef.current) {
         const pending = streamBufferRef.current.get(streamConversationIdRef.current);
@@ -338,6 +373,12 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
           .catch((error: unknown) => console.error('更新消息计数失败:', error));
       }
     } catch (error: any) {
+      if (error.name === 'AbortError') {
+        trace?.abort();
+      } else {
+        trace?.error(error);
+      }
+
       flushMessageUpdate();
       if (streamConversationIdRef.current) {
         const pending = streamBufferRef.current.get(streamConversationIdRef.current);
@@ -357,7 +398,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
   }, [
     chatMode, conversationId, deviceId, flushMessageUpdate,
     markMessageFailed, markMessageSuccess, modelType,
-    notifyConversationUpdated, options.onConversationCreated,
+    notifyConversationUpdated, options.monitor,
+    options.onConversationCreated,
     queueToken, saveToCache, scheduleMessageUpdate,
     setConversationId, setQueueToken, updateMessage, userId,
   ]);
