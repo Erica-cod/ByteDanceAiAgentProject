@@ -146,19 +146,19 @@ export function recordEvent(event: MonitorEvent): void {
         streamTPS.observe({ app_id: appId, model: m, provider: p }, d.tps);
       }
       const usage = d.tokenUsage as Record<string, number> | undefined;
-      if (usage) {
-        if (typeof usage.promptTokens === 'number') {
-          streamTokens.inc(
-            { app_id: appId, model: m, provider: p, token_type: 'prompt' },
-            usage.promptTokens,
-          );
-        }
-        if (typeof usage.completionTokens === 'number') {
-          streamTokens.inc(
-            { app_id: appId, model: m, provider: p, token_type: 'completion' },
-            usage.completionTokens,
-          );
-        }
+      const promptTokens = usage?.promptTokens ?? d.promptTokens;
+      const completionTokens = usage?.completionTokens ?? d.completionTokens;
+      if (typeof promptTokens === 'number') {
+        streamTokens.inc(
+          { app_id: appId, model: m, provider: p, token_type: 'prompt' },
+          promptTokens,
+        );
+      }
+      if (typeof completionTokens === 'number') {
+        streamTokens.inc(
+          { app_id: appId, model: m, provider: p, token_type: 'completion' },
+          completionTokens,
+        );
       }
       break;
     }

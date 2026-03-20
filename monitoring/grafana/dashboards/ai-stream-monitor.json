@@ -97,14 +97,19 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(ai_monitor_stream_tps_bucket{app_id=~\"$app_id\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(increase(ai_monitor_stream_tps_bucket{app_id=~\"$app_id\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ai_monitor_stream_tps_bucket{app_id=~\"$app_id\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(increase(ai_monitor_stream_tps_bucket{app_id=~\"$app_id\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
+        },
+        {
+          "expr": "ai_monitor_stream_tps_sum{app_id=~\"$app_id\"} / ai_monitor_stream_tps_count{app_id=~\"$app_id\"}",
+          "legendFormat": "avg",
+          "refId": "C"
         }
       ]
     },
@@ -140,7 +145,7 @@
       "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "targets": [
         {
-          "expr": "sum(increase(ai_monitor_stream_errors_total{app_id=~\"$app_id\"}[$__range])) or vector(0)",
+          "expr": "round(sum(increase(ai_monitor_stream_errors_total{app_id=~\"$app_id\"}[$__range]))) or vector(0)",
           "legendFormat": "errors",
           "refId": "A"
         }
@@ -159,7 +164,7 @@
       "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "targets": [
         {
-          "expr": "sum(increase(ai_monitor_stream_stalls_total{app_id=~\"$app_id\"}[$__range])) or vector(0)",
+          "expr": "round(sum(increase(ai_monitor_stream_stalls_total{app_id=~\"$app_id\"}[$__range]))) or vector(0)",
           "legendFormat": "stalls",
           "refId": "A"
         }
@@ -181,7 +186,7 @@
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
       "targets": [
         {
-          "expr": "sum(increase(ai_monitor_stream_tokens_total{app_id=~\"$app_id\"}[$__rate_interval])) by (model, token_type)",
+          "expr": "round(sum(increase(ai_monitor_stream_tokens_total{app_id=~\"$app_id\"}[5m])) by (model, token_type))",
           "legendFormat": "{{ model }} ({{ token_type }})",
           "refId": "A"
         }
