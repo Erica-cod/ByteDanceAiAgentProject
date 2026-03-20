@@ -227,9 +227,27 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
               continue;
             }
 
+            // StreamTrace: 多 Agent / Chunking 事件也需要追踪
+            if (trace && parsed.type) {
+              if (parsed.type === 'agent_start') {
+                trace.onPhase(`agent:${parsed.agent || 'unknown'}`, 'start');
+              } else if (parsed.type === 'agent_chunk' && !firstChunkFired) {
+                firstChunkFired = true;
+                trace.onFirstChunk();
+              } else if (parsed.type === 'agent_complete') {
+                trace.onPhase(`agent:${parsed.agent || 'unknown'}`, 'end');
+              } else if (parsed.type === 'host_decision') {
+                trace.onPhase(`round:${parsed.round ?? state.completedRounds + 1}`, 'end');
+              } else if (parsed.type === 'agent_output' && parsed.toolCalls) {
+                for (const tc of parsed.toolCalls) {
+                  trace.onToolCall(tc.name || tc.tool || 'unknown', tc);
+                }
+              }
+            }
+
             if (dispatchSSEEvent(parsed, state, dispatchCtx)) continue;
 
-            // StreamTrace: 首个 token
+            // StreamTrace: 首个 token（单 Agent）
             if (!firstChunkFired && (parsed.content || parsed.thinking)) {
               firstChunkFired = true;
               trace?.onFirstChunk();
