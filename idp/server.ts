@@ -34,6 +34,21 @@ const redirectUris = (process.env.IDP_REDIRECT_URIS || 'http://localhost:8080/ap
   .map(s => s.trim())
   .filter(Boolean);
 
+const UNSAFE_DEFAULTS = ['dev_secret_change_me', 'changeme', 'dev_cookie_key_1_change_me', 'dev_cookie_key_2_change_me'];
+if (process.env.NODE_ENV === 'production') {
+  const violations: string[] = [];
+  if (UNSAFE_DEFAULTS.includes(clientSecret)) violations.push('IDP_CLIENT_SECRET');
+  const ck1 = process.env.IDP_COOKIE_KEY_1 || 'dev_cookie_key_1_change_me';
+  const ck2 = process.env.IDP_COOKIE_KEY_2 || 'dev_cookie_key_2_change_me';
+  if (UNSAFE_DEFAULTS.includes(ck1)) violations.push('IDP_COOKIE_KEY_1');
+  if (UNSAFE_DEFAULTS.includes(ck2)) violations.push('IDP_COOKIE_KEY_2');
+  if (violations.length > 0) {
+    throw new Error(
+      `[安全] 生产环境禁止使用默认密钥！请通过环境变量配置: ${violations.join(', ')}`,
+    );
+  }
+}
+
 const redis = createRedisClient();
 await redis.connect();
 

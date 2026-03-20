@@ -50,6 +50,10 @@ const DEFAULT_INTERNAL_ISSUER = process.env.OIDC_INTERNAL_ISSUER || DEFAULT_ISSU
 const DEFAULT_CLIENT_ID = process.env.OIDC_CLIENT_ID || 'ai-agent-bff';
 const DEFAULT_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || 'dev_secret_change_me';
 const DEFAULT_REDIRECT_URI = process.env.OIDC_REDIRECT_URI || 'http://localhost:8080/api/auth/callback';
+
+if (process.env.NODE_ENV === 'production' && ['dev_secret_change_me', 'changeme'].includes(DEFAULT_CLIENT_SECRET)) {
+  throw new Error('[安全] 生产环境禁止使用默认 OIDC_CLIENT_SECRET，请通过环境变量配置安全密钥');
+}
 const FORCE_PROMPT_LOGIN = process.env.OIDC_FORCE_PROMPT_LOGIN === 'true';
 
 const LOGIN_STATE_TTL_SEC = 10 * 60; // 10分钟

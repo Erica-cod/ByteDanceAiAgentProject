@@ -202,9 +202,7 @@ async function saveTokenData(tokenData: DeviceTokenData): Promise<void> {
     const encrypted = await encryptData(tokenData);
     localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(encrypted));
   } catch (error) {
-    console.error('❌ 保存 Token 失败:', error);
-    // 降级：明文存储
-    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokenData));
+    console.error('❌ 保存 Token 失败（加密不可用，跳过持久化）:', error);
   }
 }
 

@@ -19,3 +19,10 @@ deploy/.env
 secrets/
 credentials/
 
+# IDE 配置
+.idea/
+
+# 性能测试结果（体积大，不需要版本控制）
+bench-results/
+test/bench-results/
+

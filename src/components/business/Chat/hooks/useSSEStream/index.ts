@@ -155,7 +155,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
 
       if (newQueueToken) {
         setQueueToken(newQueueToken);
-        console.log(`收到队列 token: ${newQueueToken}，位置: ${queuePosition || '未知'}，预估等待: ${estimatedWait || '未知'}秒`);
       }
       if (queuePosition) {
         updateMessage(assistantMessageId, {
