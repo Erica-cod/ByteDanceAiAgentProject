@@ -11,6 +11,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { parseCookies, isHttps } from './common.js';
 
 export type DemoAuthUser = {
   userId: string;
@@ -27,7 +28,6 @@ type SessionRecord = {
 const COOKIE_NAME = 'demo_sid';
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000; // 7 天
 
-// 进程内会话存储（演示版）
 const sessions = new Map<string, SessionRecord>();
 
 function now() {
@@ -39,27 +39,6 @@ function cleanupExpiredSessions() {
   for (const [sid, rec] of sessions.entries()) {
     if (rec.expiresAt <= ts) sessions.delete(sid);
   }
-}
-
-export function parseCookies(cookieHeader?: string): Record<string, string> {
-  if (!cookieHeader) return {};
-  const out: Record<string, string> = {};
-  const parts = cookieHeader.split(';');
-  for (const p of parts) {
-    const idx = p.indexOf('=');
-    if (idx === -1) continue;
-    const k = p.slice(0, idx).trim();
-    const v = p.slice(idx + 1).trim();
-    if (!k) continue;
-    out[k] = decodeURIComponent(v);
-  }
-  return out;
-}
-
-function isHttps(headers?: Record<string, any>) {
-  const proto = String(headers?.['x-forwarded-proto'] || headers?.['X-Forwarded-Proto'] || '').toLowerCase();
-  if (proto) return proto === 'https';
-  return process.env.NODE_ENV === 'production';
 }
 
 export function buildSetSessionCookie(sid: string, headers?: Record<string, any>): string {

@@ -9,6 +9,7 @@
 import { getContainer } from '../_clean/di-container.js';
 import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
 import { requireCsrf } from './_utils/csrf.js';
+import { getBffSessionFromHeaders } from './_utils/bffOidcAuth.js';
 
 // ✅ Clean Architecture: 启动定期清理
 const container = getContainer();
@@ -86,26 +87,34 @@ export async function post(req: RequestOption<TrackDeviceRequest>) {
 
 /**
  * GET /api/device/stats
- * 获取设备统计信息（调试/监控用）
+ * 获取设备统计信息（需要登录）
  */
 export async function get(req: RequestOption) {
   const requestOrigin = req.headers?.origin;
-  
+
+  const session = await getBffSessionFromHeaders(req.headers);
+  if (!session) {
+    return createJsonResponse(
+      { success: false, error: '需要登录后才能查看设备统计' },
+      403,
+      requestOrigin
+    );
+  }
+
   try {
-    // ✅ Clean Architecture
     const container = getContainer();
     const getDeviceStatsUseCase = container.getGetDeviceStatsUseCase();
     const stats = await getDeviceStatsUseCase.execute();
-    
+
     return createJsonResponse(
       { success: true, data: stats },
       200,
       requestOrigin
     );
   } catch (error: any) {
-    console.error('❌ Get device stats API error:', error);
+    console.error('[Device] 获取设备统计失败:', error);
     return createJsonResponse(
-      { success: false, error: error.message || 'Failed to get device stats' },
+      { success: false, error: '获取设备统计失败' },
       500,
       requestOrigin
     );

@@ -17,7 +17,12 @@ if (isDocker) {
   process.exit(0);
 }
 
-const PORT = process.env.PORT || 8080;
+const rawPort = process.env.PORT || '8080';
+const PORT = Number.parseInt(rawPort, 10);
+if (!Number.isFinite(PORT) || PORT < 1 || PORT > 65535) {
+  console.error(`无效的端口号: ${rawPort}`);
+  process.exit(1);
+}
 const isWindows = platform() === 'win32';
 
 console.log(`\n🔍 检查端口 ${PORT} 是否被占用...`);

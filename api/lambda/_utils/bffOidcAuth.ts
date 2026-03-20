@@ -10,6 +10,7 @@ import { randomBytes, createHash, randomUUID } from 'crypto';
 import type Redis from 'ioredis';
 import { getRedisClient } from '../../_clean/infrastructure/cache/redis-client.js';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { parseCookies, isHttps, base64url } from './common.js';
 
 export type BffUser = {
   sub: string;
@@ -59,23 +60,9 @@ const FORCE_PROMPT_LOGIN = process.env.OIDC_FORCE_PROMPT_LOGIN === 'true';
 const LOGIN_STATE_TTL_SEC = 10 * 60; // 10分钟
 const SESSION_TTL_SEC = 7 * 24 * 3600; // 7天
 
-function base64url(input: Buffer) {
-  return input
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
 function sha256Base64url(input: string) {
   const hash = createHash('sha256').update(input).digest();
   return base64url(hash);
-}
-
-function isHttps(headers?: Record<string, any>) {
-  const proto = String(headers?.['x-forwarded-proto'] || headers?.['X-Forwarded-Proto'] || '').toLowerCase();
-  if (proto) return proto === 'https';
-  return process.env.NODE_ENV === 'production';
 }
 
 function cookieName(headers?: Record<string, any>) {
@@ -109,20 +96,7 @@ export function buildClearBffSessionCookie(headers?: Record<string, any>) {
   return attrs.join('; ');
 }
 
-export function parseCookies(cookieHeader?: string): Record<string, string> {
-  if (!cookieHeader) return {};
-  const out: Record<string, string> = {};
-  const parts = cookieHeader.split(';');
-  for (const p of parts) {
-    const idx = p.indexOf('=');
-    if (idx === -1) continue;
-    const k = p.slice(0, idx).trim();
-    const v = p.slice(idx + 1).trim();
-    if (!k) continue;
-    out[k] = decodeURIComponent(v);
-  }
-  return out;
-}
+export { parseCookies } from './common.js';
 
 function redis(): Redis {
   return getRedisClient();

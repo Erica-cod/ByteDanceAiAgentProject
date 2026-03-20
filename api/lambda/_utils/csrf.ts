@@ -16,7 +16,7 @@ import '../../config/env.js';
 import { randomBytes } from 'crypto';
 import type Redis from 'ioredis';
 import { getRedisClient } from '../../_clean/infrastructure/cache/redis-client.js';
-import { parseCookies } from './bffOidcAuth.js';
+import { parseCookies, isHttps, base64url } from './common.js';
 
 const CSRF_TTL_SEC = 12 * 60 * 60; // 12小时（可按需调整）
 
@@ -26,20 +26,6 @@ export type CsrfCheckResult = CsrfCheckOk | CsrfCheckFail;
 
 function redis(): Redis {
   return getRedisClient();
-}
-
-function base64url(input: Buffer) {
-  return input
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-function isHttps(headers?: Record<string, any>) {
-  const proto = String(headers?.['x-forwarded-proto'] || headers?.['X-Forwarded-Proto'] || '').toLowerCase();
-  if (proto) return proto === 'https';
-  return process.env.NODE_ENV === 'production';
 }
 
 function csrfCookieName(headers?: Record<string, any>) {

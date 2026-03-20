@@ -214,8 +214,7 @@ export async function post({
       }
     }
   } catch (error: any) {
-    console.error('处理聊天请求失败:', error);
-    const origin = (error as any).requestOrigin;
-    return errorResponse(error.message || '服务器内部错误', origin);
+    console.error('[Chat] 处理聊天请求失败:', error);
+    return errorResponse('服务器内部错误，请稍后重试');
   }
 }

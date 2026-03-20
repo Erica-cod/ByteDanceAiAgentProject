@@ -68,28 +68,3 @@ export function messageResponse(message: string, requestOrigin?: string): Respon
   return createJsonResponse(body, 200, requestOrigin);
 }
 
-/**
- * 旧版本的响应格式（保持向后兼容）
- * 注意：这些不包含 CORS 头，建议迁移到新版本
- */
-export function successResponseLegacy<T>(data: T, message?: string): ApiResponse<T> {
-  return {
-    success: true,
-    data,
-    ...(message && { message }),
-  };
-}
-
-export function errorResponseLegacy(error: string): ApiResponse {
-  return {
-    success: false,
-    error,
-  };
-}
-
-export function messageResponseLegacy(message: string): ApiResponse {
-  return {
-    success: true,
-    message,
-  };
-}

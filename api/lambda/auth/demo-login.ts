@@ -9,6 +9,8 @@
 import type { RequestOption } from '../../types/chat.js';
 import { getCorsHeaders, handleOptionsRequest } from '../_utils/cors.js';
 import { createDemoSession, buildSetSessionCookie } from '../_utils/demoAuth.js';
+import { enforceAuthRateLimit } from '../_utils/authRateLimit.js';
+import { verifyOriginOrReferer } from '../_utils/csrf.js';
 
 type DemoLoginBody = { username?: string };
 
@@ -20,6 +22,21 @@ export async function options({ headers }: RequestOption<any, any>) {
 export async function post({ data, headers }: RequestOption<any, DemoLoginBody>) {
   const requestOrigin = headers?.origin;
   const corsHeaders = getCorsHeaders(requestOrigin);
+
+  const originCheck = verifyOriginOrReferer(headers);
+  if (!originCheck.ok) {
+    return new Response(
+      JSON.stringify({ success: false, error: originCheck.message }),
+      { status: originCheck.status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders } },
+    );
+  }
+
+  const limitResp = await enforceAuthRateLimit({
+    endpoint: 'auth_login',
+    headers,
+    requestOrigin,
+  });
+  if (limitResp) return limitResp;
 
   const username = (data?.username || '').trim();
   const session = createDemoSession(username);
