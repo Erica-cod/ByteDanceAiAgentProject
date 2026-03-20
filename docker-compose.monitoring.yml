@@ -1,0 +1,48 @@
+services:
+  # Prometheus — 时序指标存储 & 抓取（开发模式，抓取宿主机 app）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-ai-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-dev-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # Grafana — 可视化仪表盘
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-ai-monitor
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-dev-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus-dev-data:
+    driver: local
+  grafana-dev-data:
+    driver: local
