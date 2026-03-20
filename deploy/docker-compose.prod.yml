@@ -49,7 +49,7 @@ services:
 
   idp:
     build:
-      context: .
+      context: ..
       dockerfile: dockerfiles/idp.Dockerfile
     image: ${IDP_IMAGE:-bytedance-idp:latest}
     container_name: idp-ai-agent
@@ -57,7 +57,7 @@ services:
     networks:
       - app-net
     env_file:
-      - ./deploy/.env
+      - ./.env
     environment:
       - NODE_ENV=production
       - IDP_PORT=${IDP_PORT}
@@ -78,7 +78,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ..
       dockerfile: dockerfiles/app.Dockerfile
     image: ${APP_IMAGE:-bytedance-ai-agent:latest}
     container_name: bytedance-ai-agent
@@ -86,7 +86,7 @@ services:
     networks:
       - app-net
     env_file:
-      - ./deploy/.env
+      - ./.env
     environment:
       - NODE_ENV=production
       - PORT=8080

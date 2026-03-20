@@ -17,7 +17,7 @@ const isDocker = existsSync('/.dockerenv') || existsSync('/run/.containerenv');
 
 function runCleanPort(port) {
   if (isDocker) return;
-  spawnSync(process.execPath, ['scripts/clean-port.js'], {
+  spawnSync(process.execPath, ['scripts/dev/clean-port.js'], {
     stdio: 'inherit',
     env: { ...process.env, PORT: String(port) },
   });

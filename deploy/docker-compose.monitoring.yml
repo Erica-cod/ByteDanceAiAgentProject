@@ -6,7 +6,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-dev-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -24,8 +24,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-dev-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}

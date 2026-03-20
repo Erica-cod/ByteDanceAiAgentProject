@@ -1,11 +1,11 @@
 # ⚠️ 废弃警告：此 Dockerfile 已被拆分为多个独立文件
-# 
+#
 # 新的 Dockerfile 位置：
 # - dockerfiles/app.Dockerfile (主应用服务)
 # - dockerfiles/idp.Dockerfile (IDP 认证服务)
 #
-# 此文件保留仅用于向后兼容，建议使用新的 Dockerfile。
-# 详见：DOCKER_MIGRATION_GUIDE.md
+# 此文件已移至 deploy/Dockerfile.legacy，仅保留作为历史参考。
+# 详见：docs/10-Deployment/docker/DOCKER_MIGRATION_GUIDE.md
 #
 # ============================================================
 

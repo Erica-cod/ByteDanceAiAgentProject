@@ -74,13 +74,13 @@ if ($appExists) {
 # 4. 构建新镜像
 Write-Host ""
 Write-Host "🔨 [4/5] 构建 Docker 镜像..." -ForegroundColor Yellow
-docker compose build --no-cache
+docker compose -f "$PSScriptRoot/docker-compose.yml" build --no-cache
 Write-Host "   ✅ 镜像构建完成" -ForegroundColor Green
 
 # 5. 启动应用容器
 Write-Host ""
 Write-Host "🚀 [5/5] 启动应用容器..." -ForegroundColor Yellow
-docker compose up -d
+docker compose -f "$PSScriptRoot/docker-compose.yml" up -d
 
 # 6. 等待健康检查
 Write-Host ""
@@ -90,7 +90,7 @@ Start-Sleep -Seconds 10
 # 7. 显示容器状态
 Write-Host ""
 Write-Host "📊 容器状态：" -ForegroundColor Cyan
-docker compose ps
+docker compose -f "$PSScriptRoot/docker-compose.yml" ps
 
 # 8. 验证网络连接
 Write-Host ""
@@ -117,8 +117,8 @@ Write-Host "🌐 访问地址: http://localhost:8080" -ForegroundColor Green
 Write-Host ""
 Write-Host "📝 常用命令：" -ForegroundColor Yellow
 Write-Host "   查看日志: docker logs -f bytedance-ai-agent"
-Write-Host "   停止服务: docker compose down"
-Write-Host "   重启服务: docker compose restart"
+Write-Host "   停止服务: docker compose -f deploy/docker-compose.yml down"
+Write-Host "   重启服务: docker compose -f deploy/docker-compose.yml restart"
 Write-Host "   进入容器: docker exec -it bytedance-ai-agent sh"
 Write-Host ""
 
