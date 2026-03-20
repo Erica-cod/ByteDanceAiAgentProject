@@ -88,6 +88,7 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
     for await (const chunk of currentStream) {
       if (sseWriter.isClosed()) {
         console.log('⚠️ 客户端已断开连接，停止处理流');
+        if (onFinally) onFinally();
         return;
       }
 

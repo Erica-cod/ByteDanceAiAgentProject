@@ -236,7 +236,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   firstChunkFired = true;
                   trace.onFirstChunk();
                 }
-                trace.onToken();
               } else if (parsed.type === 'agent_complete') {
                 trace.onPhase(`agent:${parsed.agent || 'unknown'}`, 'end');
               } else if (parsed.type === 'host_decision') {
@@ -263,7 +262,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 trace?.onPhase('thinking', 'start');
               }
               state.currentThinking = parsed.thinking;
-              trace?.onToken();
             }
             if (parsed.content !== undefined && parsed.content !== null) {
               if (inThinkingPhase) {
@@ -275,7 +273,6 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 trace?.onPhase('generating', 'start');
               }
               state.currentContent = parsed.content;
-              trace?.onToken();
             }
 
             // StreamTrace: tool call
