@@ -30,6 +30,7 @@ export interface StreamResult {
   completed: boolean;
   aborted: boolean;
   retryAfterMs?: number;
+  chunkCount?: number;
 }
 
 export interface UploadPayload {

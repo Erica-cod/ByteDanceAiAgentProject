@@ -187,6 +187,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     let firstChunkFired = false;
     let inThinkingPhase = false;
     let inGeneratingPhase = false;
+    let chunkCount = 0;
     const applyUpdate = makeApplyAssistantUpdate(assistantMessageId, streamConversationIdRef);
     const dispatchCtx = { chatMode, assistantMessageId, updateMessage };
 
@@ -236,6 +237,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                   firstChunkFired = true;
                   trace.onFirstChunk();
                 }
+                chunkCount++;
               } else if (parsed.type === 'agent_complete') {
                 trace.onPhase(`agent:${parsed.agent || 'unknown'}`, 'end');
               } else if (parsed.type === 'host_decision') {
@@ -262,6 +264,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 trace?.onPhase('thinking', 'start');
               }
               state.currentThinking = parsed.thinking;
+              chunkCount++;
             }
             if (parsed.content !== undefined && parsed.content !== null) {
               if (inThinkingPhase) {
@@ -273,6 +276,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
                 trace?.onPhase('generating', 'start');
               }
               state.currentContent = parsed.content;
+              chunkCount++;
             }
 
             // StreamTrace: tool call
@@ -303,7 +307,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
     if (inThinkingPhase) trace?.onPhase('thinking', 'end');
     if (inGeneratingPhase) trace?.onPhase('generating', 'end');
 
-    return { completed: isDone, aborted: false };
+    return { completed: isDone, aborted: false, chunkCount };
   };
 
   // ===== 发送消息（含重连） =====
@@ -351,8 +355,10 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
       trace?.start();
 
       let attempt = 0;
+      let totalChunks = 0;
       while (true) {
         const result = await runStreamOnce(state, assistantMessageId, requestBody, streamConversationIdRef, trace);
+        totalChunks += result.chunkCount ?? 0;
         if (result.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
         if (result.completed) break;
 
@@ -367,7 +373,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}) {
         attempt += 1;
       }
 
-      trace?.complete();
+      trace?.complete(totalChunks > 0 ? { completionTokens: totalChunks, estimatedTokens: true } : undefined);
 
       flushMessageUpdate();
       if (streamConversationIdRef.current) {
