@@ -140,6 +140,45 @@ services:
       retries: 3
       start_period: 40s
 
+  # Prometheus — 时序指标存储 & 抓取
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-ai-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    restart: unless-stopped
+    networks:
+      - shared-network
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # Grafana — 可视化仪表盘
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-ai-monitor
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - shared-network
+    depends_on:
+      - prometheus
+
 networks:
   shared-network:
     external: true
@@ -149,10 +188,16 @@ networks:
   # - Ollama runs on host machine (accessed via host.docker.internal)
   # - MongoDB runs in this compose file (mongodb-global container)
   # - shared-network is created externally
+  # - Prometheus scrapes app:8080/api/metrics-prometheus
+  # - Grafana UI available at http://localhost:3000 (admin/admin)
 
 volumes:
   mongodb-data:
     driver: local
   redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local
 
