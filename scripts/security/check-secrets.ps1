@@ -118,13 +118,13 @@ if (-not $foundPassword) {
 }
 Write-Host ""
 
-# Check 5: docker-compose.yml
+# Check 5: deploy/docker-compose.yml
 Write-Host "[5/6] Checking Docker Compose configuration..." -ForegroundColor Yellow
-if (Test-Path "docker-compose.yml") {
+if (Test-Path "deploy/docker-compose.yml") {
     try {
-        $content = Get-Content "docker-compose.yml" -ErrorAction Stop | Out-String
+        $content = Get-Content "deploy/docker-compose.yml" -ErrorAction Stop | Out-String
         if ($content -match "TAVILY_API_KEY=tvly-|ARK_API_KEY=[0-9a-f]{8}-|REDIS_PASSWORD=[^`$\s]{8,}") {
-            Write-Host "  ERROR: Found hardcoded secrets in docker-compose.yml" -ForegroundColor Red
+            Write-Host "  ERROR: Found hardcoded secrets in deploy/docker-compose.yml" -ForegroundColor Red
             $ERRORS++
         }
         else {
@@ -132,33 +132,37 @@ if (Test-Path "docker-compose.yml") {
         }
     }
     catch {
-        Write-Host "  ERROR: Cannot read docker-compose.yml" -ForegroundColor Red
+        Write-Host "  ERROR: Cannot read deploy/docker-compose.yml" -ForegroundColor Red
     }
 }
 else {
-    Write-Host "  SKIP: docker-compose.yml not found" -ForegroundColor Yellow
+    Write-Host "  SKIP: deploy/docker-compose.yml not found" -ForegroundColor Yellow
 }
 Write-Host ""
 
-# Check 6: Dockerfile
+# Check 6: dockerfiles/
 Write-Host "[6/6] Checking Dockerfile configuration..." -ForegroundColor Yellow
-if (Test-Path "Dockerfile") {
-    try {
-        $content = Get-Content "Dockerfile" -ErrorAction Stop | Out-String
-        if ($content -match "ENV (TAVILY_API_KEY|ARK_API_KEY|REDIS_PASSWORD)=[^\s#]+") {
-            Write-Host "  ERROR: Found hardcoded secrets in Dockerfile" -ForegroundColor Red
-            $ERRORS++
+$dockerfiles = @("dockerfiles/app.Dockerfile", "dockerfiles/idp.Dockerfile")
+$dfChecked = $false
+foreach ($df in $dockerfiles) {
+    if (Test-Path $df) {
+        $dfChecked = $true
+        try {
+            $content = Get-Content $df -ErrorAction Stop | Out-String
+            if ($content -match "ENV (TAVILY_API_KEY|ARK_API_KEY|REDIS_PASSWORD)=[^\s#]+") {
+                Write-Host "  ERROR: Found hardcoded secrets in $df" -ForegroundColor Red
+                $ERRORS++
+            }
         }
-        else {
-            Write-Host "  PASS" -ForegroundColor Green
+        catch {
+            Write-Host "  ERROR: Cannot read $df" -ForegroundColor Red
         }
-    }
-    catch {
-        Write-Host "  ERROR: Cannot read Dockerfile" -ForegroundColor Red
     }
 }
-else {
-    Write-Host "  SKIP: Dockerfile not found" -ForegroundColor Yellow
+if (-not $dfChecked) {
+    Write-Host "  SKIP: No Dockerfiles found" -ForegroundColor Yellow
+} elseif ($ERRORS -eq 0) {
+    Write-Host "  PASS" -ForegroundColor Green
 }
 Write-Host ""
 

@@ -49,7 +49,7 @@ pipeline {
             steps {
                 echo 'Building Docker image...'
                 sh """
-                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker build -f dockerfiles/app.Dockerfile -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
                 """
             }
@@ -97,7 +97,7 @@ pipeline {
             steps {
                 echo '🛑 Stopping old container if exists...'
                 sh """
-                    docker compose down || true
+                    docker compose -f deploy/docker-compose.yml down || true
                     docker stop ${APP_NAME} || true
                     docker rm ${APP_NAME} || true
                 """
@@ -108,8 +108,7 @@ pipeline {
             steps {
                 echo '🚀 Deploying new container with docker-compose...'
                 sh """
-                    # 使用 docker-compose 启动，确保使用正确的网络配置
-                    docker compose up -d
+                    docker compose -f deploy/docker-compose.yml up -d
                     
                     echo "⏳ Waiting for container to start..."
                     sleep 10
@@ -160,7 +159,7 @@ pipeline {
         failure {
             echo '❌ Pipeline failed! Rolling back...'
             sh """
-                docker compose down || true
+                docker compose -f deploy/docker-compose.yml down || true
                 docker stop ${APP_NAME} || true
                 docker rm ${APP_NAME} || true
             """

@@ -45,8 +45,9 @@ PROGRESS.md
 RESUME_PROJECT_DESCRIPTION.md
 
 # Docker related (不需要在镜像中)
-docker-compose*.yml
-Dockerfile
+deploy/docker-compose*.yml
+deploy/nginx.conf
+deploy/Dockerfile.legacy
 dockerfiles/
 
 # Deployment

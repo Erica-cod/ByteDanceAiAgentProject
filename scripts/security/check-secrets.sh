@@ -112,31 +112,36 @@ else
 fi
 echo ""
 
-# 检查 5: 检查 docker-compose.yml 中的硬编码值
+# 检查 5: 检查 deploy/docker-compose.yml 中的硬编码值
 echo "📋 检查 5: 检查 Docker Compose 配置..."
-if [ -f "docker-compose.yml" ]; then
-    if grep -E "TAVILY_API_KEY=tvly-|ARK_API_KEY=[0-9a-f]{8}-|REDIS_PASSWORD=.{8,}" docker-compose.yml >/dev/null 2>&1; then
-        echo -e "${RED}❌ 错误：docker-compose.yml 中发现硬编码的敏感信息！${NC}"
+if [ -f "deploy/docker-compose.yml" ]; then
+    if grep -E "TAVILY_API_KEY=tvly-|ARK_API_KEY=[0-9a-f]{8}-|REDIS_PASSWORD=.{8,}" deploy/docker-compose.yml >/dev/null 2>&1; then
+        echo -e "${RED}❌ 错误：deploy/docker-compose.yml 中发现硬编码的敏感信息！${NC}"
         ((ERRORS++))
     else
         echo -e "${GREEN}✓ 通过${NC}"
     fi
 else
-    echo -e "${YELLOW}⚠️  docker-compose.yml 不存在${NC}"
+    echo -e "${YELLOW}⚠️  deploy/docker-compose.yml 不存在${NC}"
 fi
 echo ""
 
-# 检查 6: 检查 Dockerfile 中的硬编码值
+# 检查 6: 检查 Dockerfiles 中的硬编码值
 echo "📋 检查 6: 检查 Dockerfile 配置..."
-if [ -f "Dockerfile" ]; then
-    if grep -E "ENV (TAVILY_API_KEY|ARK_API_KEY|REDIS_PASSWORD)=.+" Dockerfile >/dev/null 2>&1; then
-        echo -e "${RED}❌ 错误：Dockerfile 中发现硬编码的敏感信息！${NC}"
-        ((ERRORS++))
-    else
-        echo -e "${GREEN}✓ 通过${NC}"
+DF_CHECKED=0
+for df in dockerfiles/app.Dockerfile dockerfiles/idp.Dockerfile; do
+    if [ -f "$df" ]; then
+        DF_CHECKED=1
+        if grep -E "ENV (TAVILY_API_KEY|ARK_API_KEY|REDIS_PASSWORD)=.+" "$df" >/dev/null 2>&1; then
+            echo -e "${RED}❌ 错误：$df 中发现硬编码的敏感信息！${NC}"
+            ((ERRORS++))
+        fi
     fi
-else
-    echo -e "${YELLOW}⚠️  Dockerfile 不存在${NC}"
+done
+if [ "$DF_CHECKED" -eq 0 ]; then
+    echo -e "${YELLOW}⚠️  未找到 Dockerfile${NC}"
+elif [ "$ERRORS" -eq 0 ]; then
+    echo -e "${GREEN}✓ 通过${NC}"
 fi
 echo ""
 

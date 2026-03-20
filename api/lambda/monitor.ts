@@ -8,6 +8,7 @@
 
 import { createJsonResponse, handleOptionsRequest } from './_utils/cors.js';
 import { recordEvent } from './_utils/prometheusMetrics.js';
+import { verifyOriginOrReferer } from './_utils/csrf.js';
 
 export async function options({ headers }: any) {
   return handleOptionsRequest(headers?.origin);
@@ -15,6 +16,11 @@ export async function options({ headers }: any) {
 
 export async function post({ data, headers }: any) {
   const origin = headers?.origin;
+
+  const originCheck = verifyOriginOrReferer(headers);
+  if (!originCheck.ok) {
+    return createJsonResponse({ error: originCheck.message }, originCheck.status, origin);
+  }
 
   try {
     const events: unknown[] = data;
@@ -25,7 +31,6 @@ export async function post({ data, headers }: any) {
 
     for (const evt of events) {
       const e = evt as Record<string, any>;
-      console.log(`[Monitor] ${e.type}`, JSON.stringify(e.data ?? {}));
 
       try {
         recordEvent(e as { type: string; data: Record<string, any>; context: Record<string, any> });

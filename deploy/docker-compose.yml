@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro  # nginx.conf 已与本文件同目录
     restart: unless-stopped
     networks:
       - shared-network
@@ -62,13 +62,13 @@ services:
   # IDP (Identity Provider) Service
   idp:
     build:
-      context: .
+      context: ..
       dockerfile: dockerfiles/idp.Dockerfile
     container_name: idp-ai-agent
     expose:
       - "9000"
     env_file:
-      - .env.local
+      - ../.env.local
     environment:
       - NODE_ENV=production
       - IDP_PORT=9000
@@ -96,13 +96,13 @@ services:
   # Modern.js Application
   app:
     build:
-      context: .
+      context: ..
       dockerfile: dockerfiles/app.Dockerfile
     container_name: bytedance-ai-agent
     expose:
       - "8080"
     env_file:
-      - .env.local
+      - ../.env.local
     environment:
       - NODE_ENV=production
       - PORT=8080
@@ -147,7 +147,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -166,8 +166,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
