@@ -36,6 +36,14 @@ export interface MultiAgentSession {
     outputs: AgentOutput[];
   }>;
   consensus_trend: number[];
+  next_agents: string[];
+  host_state: {
+    consensus_trend: number[];
+    high_risk_trend: number[];
+    coverage_trend: number[];
+    stagnation_rounds: number;
+  };
+  termination_reason?: string;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +58,13 @@ export interface OrchestratorConfig {
   resumeFromRound?: number;  // ✅ 从指定轮次恢复（用于断点续传）
   initialState?: Partial<MultiAgentSession>;  // ✅ 初始状态（用于恢复）
   connectionChecker?: () => boolean; // ✅ 连接状态检查器（检测SSE连接是否断开）
+  /** 测试或定制场景可替换具体Agent实现。 */
+  agentOverrides?: Partial<{
+    planner: PlannerAgent;
+    critic: CriticAgent;
+    reporter: ReporterAgent;
+    host: HostAgent;
+  }>;
 }
 
 /**
@@ -80,10 +95,10 @@ export class MultiAgentOrchestrator {
   constructor(config: OrchestratorConfig, callbacks: OrchestratorCallbacks = {}) {
     this.connectionChecker = config.connectionChecker;
     // 初始化所有Agent
-    this.planner = new PlannerAgent();
-    this.critic = new CriticAgent();
-    this.reporter = new ReporterAgent();
-    this.host = new HostAgent();
+    this.planner = config.agentOverrides?.planner ?? new PlannerAgent();
+    this.critic = config.agentOverrides?.critic ?? new CriticAgent();
+    this.reporter = config.agentOverrides?.reporter ?? new ReporterAgent();
+    this.host = config.agentOverrides?.host ?? new HostAgent();
 
     this.callbacks = callbacks;
 
@@ -105,6 +120,14 @@ export class MultiAgentOrchestrator {
         },
         history: config.initialState.history || [],
         consensus_trend: config.initialState.consensus_trend || [],
+        next_agents: config.initialState.next_agents || ['planner', 'critic'],
+        host_state: config.initialState.host_state || {
+          consensus_trend: config.initialState.consensus_trend || [],
+          high_risk_trend: [],
+          coverage_trend: [],
+          stagnation_rounds: 0,
+        },
+        termination_reason: config.initialState.termination_reason,
         created_at: config.initialState.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -125,6 +148,13 @@ export class MultiAgentOrchestrator {
         },
         history: [],
         consensus_trend: [],
+        next_agents: ['planner', 'critic'],
+        host_state: {
+          consensus_trend: [],
+          high_risk_trend: [],
+          coverage_trend: [],
+          stagnation_rounds: 0,
+        },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -166,52 +196,69 @@ export class MultiAgentOrchestrator {
 
         this.session.current_round = round;
         const roundOutputs: AgentOutput[] = [];
-
-        // 1. Planner生成计划（流式）
-        console.log(`\n📋 [Orchestrator] Planner 生成计划...`);
-        this.session.agents.planner.status = 'running';
-        
-        // ✅ 生成前检查连接
-        if (this.connectionChecker && !this.connectionChecker()) {
-          console.warn(`⚠️  [Orchestrator] 连接断开，跳过Planner生成`);
-          break;
-        }
-        
-        const plannerContext = this.buildPlannerContext(round);
-        const plannerOutput = await this.generateWithStreaming(
-          this.planner,
-          'planner',
-          userQuery,
-          plannerContext,
-          round
+        const scheduledAgents = this.getScheduledDiscussionAgents(round);
+        console.log(
+          `🧭 [Orchestrator] 本轮调度: ${scheduledAgents.join(' → ')}`
         );
-        
-        this.session.agents.planner.status = 'completed';
-        this.session.agents.planner.last_output = plannerOutput;
-        roundOutputs.push(plannerOutput);
 
-        // 2. Critic批评计划（流式）
-        console.log(`\n🔍 [Orchestrator] Critic 批评计划...`);
-        this.session.agents.critic.status = 'running';
-        
-        // ✅ 生成前检查连接
-        if (this.connectionChecker && !this.connectionChecker()) {
-          console.warn(`⚠️  [Orchestrator] 连接断开，跳过Critic生成`);
-          break;
+        let plannerOutput = this.session.agents.planner.last_output;
+        let criticOutput = this.session.agents.critic.last_output;
+
+        // 1. 仅当Host调度Planner时生成/修订计划。
+        if (scheduledAgents.includes('planner')) {
+          console.log(`\n📋 [Orchestrator] Planner 生成计划...`);
+          this.session.agents.planner.status = 'running';
+
+          if (this.connectionChecker && !this.connectionChecker()) {
+            console.warn(`⚠️  [Orchestrator] 连接断开，跳过Planner生成`);
+            break;
+          }
+
+          const plannerContext = this.buildPlannerContext(round);
+          plannerOutput = await this.generateWithStreaming(
+            this.planner,
+            'planner',
+            userQuery,
+            plannerContext,
+            round
+          );
+
+          this.session.agents.planner.status = 'completed';
+          this.session.agents.planner.last_output = plannerOutput;
+          roundOutputs.push(plannerOutput);
         }
-        
-        const criticContext = this.buildCriticContext(round, plannerOutput);
-        const criticOutput = await this.generateWithStreaming(
-          this.critic,
-          'critic',
-          userQuery,
-          criticContext,
-          round
-        );
-        
-        this.session.agents.critic.status = 'completed';
-        this.session.agents.critic.last_output = criticOutput;
-        roundOutputs.push(criticOutput);
+
+        // 2. 仅当Host调度Critic时执行验证/压力测试。
+        if (scheduledAgents.includes('critic')) {
+          if (!plannerOutput) {
+            throw new Error('Critic执行前缺少可评审的Planner输出');
+          }
+
+          console.log(`\n🔍 [Orchestrator] Critic 评审计划...`);
+          this.session.agents.critic.status = 'running';
+
+          if (this.connectionChecker && !this.connectionChecker()) {
+            console.warn(`⚠️  [Orchestrator] 连接断开，跳过Critic生成`);
+            break;
+          }
+
+          const criticContext = this.buildCriticContext(round, plannerOutput);
+          criticOutput = await this.generateWithStreaming(
+            this.critic,
+            'critic',
+            userQuery,
+            criticContext,
+            round
+          );
+
+          this.session.agents.critic.status = 'completed';
+          this.session.agents.critic.last_output = criticOutput;
+          roundOutputs.push(criticOutput);
+        }
+
+        if (!plannerOutput || !criticOutput) {
+          throw new Error('Host决策前缺少Planner或Critic的有效输出');
+        }
 
         // 3. Host分析并决策（流式）
         console.log(`\n🎯 [Orchestrator] Host 分析决策...`);
@@ -223,7 +270,12 @@ export class MultiAgentOrchestrator {
           break;
         }
         
-        const hostContext = this.buildHostContext(round, plannerOutput, criticOutput);
+        const hostContext = this.buildHostContext(
+          round,
+          plannerOutput,
+          criticOutput,
+          scheduledAgents
+        );
         const hostOutput = await this.generateWithStreaming(
           this.host,
           'host',
@@ -241,6 +293,12 @@ export class MultiAgentOrchestrator {
 
         // 更新共识趋势
         this.session.consensus_trend.push(hostAnalysis.consensus_level);
+        this.session.host_state = {
+          consensus_trend: hostAnalysis.trend,
+          high_risk_trend: hostAnalysis.high_risk_trend,
+          coverage_trend: hostAnalysis.coverage_trend,
+          stagnation_rounds: hostAnalysis.stagnation_rounds,
+        };
 
         if (this.callbacks.onHostDecision) {
           await this.callbacks.onHostDecision(hostDecision, hostAnalysis);
@@ -259,19 +317,24 @@ export class MultiAgentOrchestrator {
         // 4. 根据Host决策判断是否继续
         console.log(`\n🤔 [Orchestrator] Host决策: ${hostDecision.action}`);
 
-        if (hostDecision.action === 'converge' || hostDecision.action === 'terminate') {
+        if (
+          hostDecision.action === 'finalize' ||
+          hostDecision.action === 'terminate'
+        ) {
           console.log(`✅ [Orchestrator] 讨论结束，准备生成报告...`);
-          this.session.status = hostDecision.action === 'converge' ? 'converged' : 'terminated';
+          this.session.status =
+            hostDecision.action === 'finalize' ? 'converged' : 'terminated';
+          this.session.termination_reason = hostDecision.reason;
+          this.session.next_agents = ['reporter'];
           break;
         }
 
-        // 如果是强制反方，下一轮只让Critic发言
-        if (hostDecision.action === 'force_opposition') {
-          console.log(`⚠️ [Orchestrator] 强制反方模式，下一轮仅Critic发言`);
-          // 下一轮的context会包含force_opposition标志
-        }
+        // Host的next_agents现在是下一轮真实执行指令。
+        this.session.next_agents = this.normalizeNextAgents(hostDecision);
 
-        console.log(`🔄 [Orchestrator] 继续下一轮讨论...`);
+        console.log(
+          `🔄 [Orchestrator] 下一轮执行: ${this.session.next_agents.join(' → ')}`
+        );
       }
 
       // 5. 生成最终报告（流式）
@@ -362,12 +425,14 @@ export class MultiAgentOrchestrator {
       planner_output: plannerOutput,
     };
 
-    // 如果Host要求强制反方
+    // challenge 表示压力测试；verify 表示验证上一轮修订。
     if (this.session.agents.host.last_output) {
       const hostDecision: HostDecision = this.session.agents.host.last_output.metadata.decision;
-      if (hostDecision.action === 'force_opposition') {
+      if (hostDecision.action === 'challenge') {
         context.force_opposition = true;
       }
+      context.review_mode =
+        hostDecision.action === 'challenge' ? 'challenge' : 'verify';
       if (hostDecision.constraints) {
         context.host_instructions = this.formatHostInstructions(hostDecision);
       }
@@ -382,13 +447,16 @@ export class MultiAgentOrchestrator {
   private buildHostContext(
     round: number,
     plannerOutput: AgentOutput,
-    criticOutput: AgentOutput
+    criticOutput: AgentOutput,
+    executedAgents: string[]
   ): any {
     const context: any = {
       round,
       max_rounds: this.session.max_rounds,
       planner_output: plannerOutput,
       critic_output: criticOutput,
+      executed_agents: executedAgents,
+      host_state: this.session.host_state,
     };
 
     // 添加上一轮的输出（用于自相似度检测）
@@ -397,10 +465,10 @@ export class MultiAgentOrchestrator {
       const previousPlanner = previousRound.outputs.find(o => o.agent_id === 'planner');
       const previousCritic = previousRound.outputs.find(o => o.agent_id === 'critic');
 
-      if (previousPlanner) {
+      if (previousPlanner && executedAgents.includes('planner')) {
         context.planner_previous_output = previousPlanner;
       }
-      if (previousCritic) {
+      if (previousCritic && executedAgents.includes('critic')) {
         context.critic_previous_output = previousCritic;
       }
     }
@@ -432,7 +500,10 @@ export class MultiAgentOrchestrator {
         level: this.getConsensusLevel(hostAnalysis.consensus_level),
         trend: hostAnalysis.trend,
       };
+      context.unresolved_high_risks =
+        hostAnalysis.unresolved_high_risks ?? [];
     }
+    context.termination_reason = this.session.termination_reason;
 
     return context;
   }
@@ -459,6 +530,43 @@ export class MultiAgentOrchestrator {
     }
 
     return instructions;
+  }
+
+  /**
+   * 第一轮固定建立初始方案和评审；之后严格执行Host返回的next_agents。
+   */
+  private getScheduledDiscussionAgents(
+    round: number
+  ): Array<'planner' | 'critic'> {
+    if (round === 1 && this.session.history.length === 0) {
+      return ['planner', 'critic'];
+    }
+
+    const scheduled = this.session.next_agents.filter(
+      (agent): agent is 'planner' | 'critic' =>
+        agent === 'planner' || agent === 'critic'
+    );
+    return scheduled.length > 0 ? scheduled : ['critic'];
+  }
+
+  private normalizeNextAgents(
+    decision: HostDecision
+  ): Array<'planner' | 'critic'> {
+    const scheduled = decision.next_agents.filter(
+      (agent): agent is 'planner' | 'critic' =>
+        agent === 'planner' || agent === 'critic'
+    );
+    if (scheduled.length > 0) return [...new Set(scheduled)];
+
+    switch (decision.action) {
+      case 'revise':
+        return ['planner'];
+      case 'challenge':
+      case 'verify':
+        return ['critic'];
+      default:
+        return [];
+    }
   }
 
   /**
@@ -541,6 +649,13 @@ export class MultiAgentOrchestrator {
     const restoredSession = JSON.parse(serializedState) as MultiAgentSession;
     this.session = {
       ...restoredSession,
+      next_agents: restoredSession.next_agents || ['planner', 'critic'],
+      host_state: restoredSession.host_state || {
+        consensus_trend: restoredSession.consensus_trend || [],
+        high_risk_trend: [],
+        coverage_trend: [],
+        stagnation_rounds: 0,
+      },
       updated_at: new Date().toISOString(), // 更新时间戳
     };
     console.log(`✅ [Orchestrator] 已从保存状态恢复 (第 ${this.session.current_round} 轮)`);
@@ -570,6 +685,13 @@ export class MultiAgentOrchestrator {
       },
       history: [],
       consensus_trend: [],
+      next_agents: ['planner', 'critic'],
+      host_state: {
+        consensus_trend: [],
+        high_risk_trend: [],
+        coverage_trend: [],
+        stagnation_rounds: 0,
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

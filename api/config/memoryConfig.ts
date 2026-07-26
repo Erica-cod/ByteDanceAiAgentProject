@@ -54,26 +54,20 @@ export interface MemoryConfig {
    */
   keywordMatchCount: number;
 
-  // ============= 阶段 2 配置（预留）=============
-  
   /**
-   * 是否启用向量检索（阶段 2）
-   * 
-   * 启用后将使用语义相似度检索
-   * 需要先实现 VectorMemoryService
+   * 是否启用混合召回。Embedding 或 Atlas Search 不可用时自动降级。
    */
+  enableHybridRetrieval?: boolean;
   enableVectorRetrieval?: boolean;
-  
-  /**
-   * 向量检索数量（阶段 2）
-   * 
-   * 建议值：5-10
-   */
   vectorRetrievalCount?: number;
-  
-  /**
-   * Embedding 模型配置（阶段 2）
-   */
+  lexicalCandidateCount?: number;
+  vectorCandidateCount?: number;
+  hybridMatchCount?: number;
+  recencyHalfLifeDays?: number;
+  relevanceWeight?: number;
+  recencyWeight?: number;
+  importanceWeight?: number;
+
   embeddingModel?: {
     provider: 'ollama' | 'openai' | 'local';
     model: string;
@@ -91,9 +85,16 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   enableKeywordMatch: true,
   keywordMatchCount: 3,
   
-  // 阶段 2 配置（暂未实现）
-  enableVectorRetrieval: false,
+  enableHybridRetrieval: true,
+  enableVectorRetrieval: true,
   vectorRetrievalCount: 5,
+  lexicalCandidateCount: 20,
+  vectorCandidateCount: 20,
+  hybridMatchCount: 5,
+  recencyHalfLifeDays: 30,
+  relevanceWeight: 0.7,
+  recencyWeight: 0.1,
+  importanceWeight: 0.2,
   embeddingModel: {
     provider: 'ollama',
     model: 'nomic-embed-text',

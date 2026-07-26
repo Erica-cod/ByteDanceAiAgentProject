@@ -34,6 +34,7 @@ export interface GetConversationContextOutput {
     relevantMessages: number;
     uniqueMessages: number;
     estimatedTokens: number;
+    retrievalMode: 'hybrid' | 'keyword' | 'recent_only';
   };
 }
 
@@ -72,13 +73,48 @@ export class GetConversationContextUseCase {
     );
     console.log(`✅ 获取到 ${recentMessages.length} 条最近消息`);
 
-    // 步骤 2: 可选 - 关键词匹配增强
+    // 步骤 2: 混合召回；不可用或无结果时降级为关键词匹配
     let relevantMessages: typeof recentMessages = [];
-    if (memoryEntity.config.enableKeywordMatch && recentMessages.length > 0) {
+    let retrievalMode: GetConversationContextOutput['stats']['retrievalMode'] =
+      'recent_only';
+    const recentIds = new Set(recentMessages.map(message => message.messageId));
+
+    if (
+      memoryEntity.config.enableHybridRetrieval &&
+      this.memoryRepository.findHybridRelevantMessages
+    ) {
+      relevantMessages =
+        await this.memoryRepository.findHybridRelevantMessages({
+          conversationId,
+          userId,
+          query: currentMessage,
+          excludeMessageIds: recentIds,
+          limit: memoryEntity.config.hybridMatchCount,
+          lexicalCandidateCount: memoryEntity.config.lexicalCandidateCount,
+          vectorCandidateCount: memoryEntity.config.vectorCandidateCount,
+          recencyHalfLifeDays: memoryEntity.config.recencyHalfLifeDays,
+          weights: {
+            relevance: memoryEntity.config.relevanceWeight,
+            recency: memoryEntity.config.recencyWeight,
+            importance: memoryEntity.config.importanceWeight,
+          },
+        });
+      if (relevantMessages.length > 0) {
+        retrievalMode = 'hybrid';
+        console.log(
+          `🔎 通过混合召回找到 ${relevantMessages.length} 条相关历史消息`
+        );
+      }
+    }
+
+    if (
+      relevantMessages.length === 0 &&
+      memoryEntity.config.enableKeywordMatch &&
+      recentMessages.length > 0
+    ) {
       const keywords = ConversationMemoryEntity.extractKeywords(currentMessage);
       
       if (keywords.length > 0) {
-        const recentIds = new Set(recentMessages.map(m => m.messageId));
         relevantMessages = await this.memoryRepository.findRelevantMessages(
           conversationId,
           userId,
@@ -88,6 +124,7 @@ export class GetConversationContextUseCase {
         );
         
         if (relevantMessages.length > 0) {
+          retrievalMode = 'keyword';
           console.log(`🔍 通过关键词匹配找到 ${relevantMessages.length} 条相关历史消息`);
         }
       }
@@ -129,6 +166,7 @@ export class GetConversationContextUseCase {
       stats: {
         ...stats,
         estimatedTokens,
+        retrievalMode,
       },
     };
   }

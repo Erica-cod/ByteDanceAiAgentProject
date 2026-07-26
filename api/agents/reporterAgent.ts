@@ -147,6 +147,21 @@ export class ReporterAgent extends BaseAgent {
         );
       }
 
+      if (context.termination_reason) {
+        contextMessages.push(`讨论结束原因：\n${context.termination_reason}`);
+      }
+      if (
+        Array.isArray(context.unresolved_high_risks) &&
+        context.unresolved_high_risks.length > 0
+      ) {
+        contextMessages.push(
+          `必须在报告中明确披露的未解决高风险：\n` +
+          context.unresolved_high_risks
+            .map((risk: string) => `- ${risk}`)
+            .join('\n')
+        );
+      }
+
       // 构建消息并调用模型
       const messages = this.buildMessages(
         '请生成一份完整的最终报告，总结讨论过程并呈现最终计划。',
