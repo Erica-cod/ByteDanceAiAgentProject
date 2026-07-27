@@ -5,7 +5,7 @@
  */
 
 import { connectToDatabase } from '../../../db/connection.js';
-import type { Collection } from 'mongodb';
+import type { Collection, UpdateFilter } from 'mongodb';
 import type {
   ConversationTokenState,
   MemoryItem,
@@ -15,6 +15,7 @@ import type {
 import {
   IMemoryRepository,
   type HybridMemorySearchInput,
+  type UnifiedMemorySearchInput,
 } from '../../application/interfaces/repositories/memory.repository.interface.js';
 import { 
   HistoricalMessage,
@@ -27,6 +28,10 @@ import {
   type RankableMemoryItem,
 } from '../../domain/services/hybrid-memory-ranking.js';
 import { estimateTextTokens } from '../../domain/services/token-budget.js';
+import {
+  scoreUnifiedCandidates,
+  type MemoryScoringCandidate,
+} from '../../domain/services/memory-candidate-scoring.js';
 
 /**
  * MongoDB 记忆仓储实现
@@ -120,67 +125,10 @@ export class MongoMemoryRepository implements IMemoryRepository {
   ): Promise<HistoricalMessage[]> {
     const db = await connectToDatabase();
     const collection = db.collection<MemoryItem>('memory_items');
+    const { items, queryEmbedding } =
+      await this.collectHybridCandidates(collection, input);
 
-    let queryEmbedding: number[] | undefined;
-    if (this.embeddings.isConfigured()) {
-      try {
-        queryEmbedding = await this.embeddings.getEmbedding(input.query);
-      } catch (error) {
-        console.warn('⚠️ [Memory] 查询Embedding失败，降级为全文检索:', error);
-      }
-    }
-
-    const scopedFilter = {
-      userId: input.userId,
-      conversationId: input.conversationId,
-      status: 'active' as const,
-      messageId: { $nin: [...input.excludeMessageIds] },
-    };
-
-    const candidateMap = new Map<string, MemoryItem>();
-    const addCandidates = (items: MemoryItem[]) => {
-      for (const item of items) {
-        if (!input.excludeMessageIds.has(item.messageId)) {
-          candidateMap.set(item.memoryId, item);
-        }
-      }
-    };
-
-    const [atlasLexical, atlasVector] = await Promise.all([
-      this.findAtlasLexicalCandidates(collection, input),
-      queryEmbedding
-        ? this.findAtlasVectorCandidates(collection, input, queryEmbedding)
-        : Promise.resolve([]),
-    ]);
-    addCandidates(atlasLexical);
-    addCandidates(atlasVector);
-
-    // 没有配置 Atlas，或 Atlas 暂时不可用时的有界降级。
-    const configuredFallbackLimit = Number(
-      process.env.MEMORY_FALLBACK_CANDIDATE_LIMIT ?? 500
-    );
-    const needsFallbackCandidates =
-      candidateMap.size === 0 ||
-      !process.env.MEMORY_TEXT_SEARCH_INDEX ||
-      (Boolean(queryEmbedding) && !process.env.MEMORY_VECTOR_SEARCH_INDEX);
-    if (needsFallbackCandidates) {
-      const fallbackLimit = Math.max(
-        Number.isFinite(configuredFallbackLimit)
-          ? configuredFallbackLimit
-          : 500,
-        input.lexicalCandidateCount,
-        input.vectorCandidateCount
-      );
-      addCandidates(
-        await collection
-          .find(scopedFilter)
-          .sort({ occurredAt: -1 })
-          .limit(fallbackLimit)
-          .toArray()
-      );
-    }
-
-    const rankableItems: RankableMemoryItem[] = [...candidateMap.values()].map(
+    const rankableItems: RankableMemoryItem[] = items.map(
       item => ({
         memoryId: item.memoryId,
         messageId: item.messageId,
@@ -199,7 +147,7 @@ export class MongoMemoryRepository implements IMemoryRepository {
     });
 
     const itemById = new Map(
-      [...candidateMap.values()].map(item => [item.memoryId, item])
+      items.map(item => [item.memoryId, item])
     );
     return ranked.map(item => {
       const source = itemById.get(item.memoryId)!;
@@ -211,8 +159,123 @@ export class MongoMemoryRepository implements IMemoryRepository {
         source: 'memory_chunk' as const,
         relevanceScore: item.finalScore,
         estimatedTokens: estimateTextTokens(source.text),
+        sourceMessageIds: [source.messageId],
       };
     });
+  }
+
+  /**
+   * 统一候选池：原文切片和长期摘要共享一次 query embedding、
+   * 同一 BM25 + Embedding + RRF 相关性空间和同一效用公式。
+   */
+  async findUnifiedRelevantMemories(
+    input: UnifiedMemorySearchInput
+  ): Promise<HistoricalMessage[]> {
+    const db = await connectToDatabase();
+    const rawCollection = db.collection<MemoryItem>('memory_items');
+    const summaryCollection =
+      db.collection<MemorySummary>('memory_summaries');
+    const [{ items, queryEmbedding }, summaries] = await Promise.all([
+      this.collectHybridCandidates(rawCollection, input),
+      summaryCollection
+        .find({
+          conversationId: input.conversationId,
+          userId: input.userId,
+          status: 'active',
+        })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .toArray(),
+    ]);
+
+    const messageByCandidateId =
+      new Map<string, HistoricalMessage>();
+    const candidates: MemoryScoringCandidate[] = [];
+
+    for (const item of items) {
+      const candidateId = `raw:${item.memoryId}`;
+      const sourceMessage: HistoricalMessage = {
+        messageId: candidateId,
+        role: item.role === 'system' ? 'assistant' : item.role,
+        content: item.text,
+        timestamp: new Date(item.occurredAt),
+        source: 'memory_chunk',
+        estimatedTokens: estimateTextTokens(item.text),
+        sourceMessageIds: [item.messageId],
+      };
+      messageByCandidateId.set(candidateId, sourceMessage);
+      candidates.push({
+        id: candidateId,
+        kind: 'raw',
+        content: item.text,
+        occurredAt: new Date(item.occurredAt),
+        importance: item.importance,
+        sourceMessageIds: [item.messageId],
+        embedding: item.embedding,
+        estimatedTokens: sourceMessage.estimatedTokens,
+      });
+    }
+
+    for (const summary of summaries) {
+      // A summary fully covered by the recent window would duplicate a
+      // mandatory item. Partially overlapping summaries remain eligible and
+      // are penalized later through sourceMessageIds.
+      if (
+        summary.sourceMessageIds.length > 0 &&
+        summary.sourceMessageIds.every(messageId =>
+          input.excludeMessageIds.has(messageId)
+        )
+      ) {
+        continue;
+      }
+      const candidateId = `summary:${summary.summaryId}`;
+      const content = formatMemorySummary(summary);
+      const sourceMessage: HistoricalMessage = {
+        messageId: candidateId,
+        role: 'assistant',
+        content,
+        timestamp: new Date(summary.createdAt),
+        source: 'summary',
+        estimatedTokens:
+          summary.summaryTokenCount || estimateTextTokens(content),
+        sourceMessageIds: summary.sourceMessageIds,
+      };
+      messageByCandidateId.set(candidateId, sourceMessage);
+      candidates.push({
+        id: candidateId,
+        kind: 'summary',
+        content,
+        occurredAt: new Date(summary.createdAt),
+        importance:
+          summary.importance ?? calculateSummaryImportance(summary),
+        sourceMessageIds: summary.sourceMessageIds,
+        embedding: summary.embedding,
+        estimatedTokens: sourceMessage.estimatedTokens,
+      });
+    }
+
+    return scoreUnifiedCandidates(
+      input.query,
+      queryEmbedding,
+      candidates,
+      new Date(),
+      {
+        recencyHalfLifeDays: input.recencyHalfLifeDays,
+        weights: input.weights,
+      }
+    )
+      .filter(candidate => candidate.utility > 0)
+      .sort(
+        (left, right) =>
+          right.packingScore - left.packingScore ||
+          right.utility - left.utility
+      )
+      .slice(0, Math.max(0, input.combinedCandidateLimit))
+      .map(candidate => ({
+        ...messageByCandidateId.get(candidate.id)!,
+        relevanceScore: candidate.utility,
+        estimatedTokens: candidate.estimatedTokens,
+      }));
   }
 
   async replaceMemoryItemsForMessage(
@@ -482,30 +545,79 @@ export class MongoMemoryRepository implements IMemoryRepository {
   async saveMemorySummary(summary: MemorySummary): Promise<void> {
     const db = await connectToDatabase();
     const collection = db.collection<MemorySummary>('memory_summaries');
+    const content = formatMemorySummary(summary);
+    const enrichedSummary: MemorySummary = {
+      ...summary,
+      importance:
+        summary.importance ?? calculateSummaryImportance(summary),
+      embeddingStatus: this.embeddings.isConfigured()
+        ? 'failed'
+        : 'unavailable',
+      embeddingVersion: 'v1',
+    };
+
+    if (this.embeddings.isConfigured()) {
+      try {
+        enrichedSummary.embedding =
+          await this.embeddings.getEmbedding(content);
+        enrichedSummary.embeddingModel = this.embeddings.getModel();
+        enrichedSummary.embeddingStatus = 'ready';
+      } catch (error) {
+        // A summary remains useful to lexical retrieval when embedding fails.
+        console.warn(
+          '⚠️ [Memory] 摘要Embedding失败，保留全文检索降级:',
+          error
+        );
+      }
+    }
 
     await collection.updateMany(
       {
-        conversationId: summary.conversationId,
-        userId: summary.userId,
-        sourceMessageIds: { $in: summary.sourceMessageIds },
-        summaryId: { $ne: summary.summaryId },
+        conversationId: enrichedSummary.conversationId,
+        userId: enrichedSummary.userId,
+        sourceMessageIds: { $in: enrichedSummary.sourceMessageIds },
+        summaryId: { $ne: enrichedSummary.summaryId },
         status: 'active',
       },
       {
         $set: {
           status: 'superseded',
-          updatedAt: summary.updatedAt,
+          updatedAt: enrichedSummary.updatedAt,
         },
       }
     );
 
-    const { createdAt, ...mutableFields } = summary;
-    await collection.updateOne(
-      { summaryId: summary.summaryId },
-      {
-        $set: mutableFields,
-        $setOnInsert: { createdAt },
+    const {
+      createdAt,
+      embedding,
+      embeddingModel,
+      ...mutableFields
+    } = enrichedSummary;
+    const update: UpdateFilter<MemorySummary> = {
+      $set: {
+        ...mutableFields,
+        ...(enrichedSummary.embeddingStatus === 'ready' &&
+        embedding &&
+        embedding.length > 0
+          ? { embedding, embeddingModel }
+          : {}),
       },
+      $setOnInsert: { createdAt },
+    };
+    if (
+      enrichedSummary.embeddingStatus !== 'ready' ||
+      !embedding ||
+      embedding.length === 0
+    ) {
+      // Never leave an older embedding attached to newer summary text.
+      update.$unset = {
+        embedding: '',
+        embeddingModel: '',
+      };
+    }
+    await collection.updateOne(
+      { summaryId: enrichedSummary.summaryId },
+      update,
       { upsert: true }
     );
   }
@@ -582,6 +694,85 @@ export class MongoMemoryRepository implements IMemoryRepository {
       role: msg.role === 'system' ? 'assistant' : msg.role,
       content: msg.content,
       timestamp: new Date(msg.timestamp),
+    };
+  }
+
+  private async collectHybridCandidates(
+    collection: Collection<MemoryItem>,
+    input: HybridMemorySearchInput
+  ): Promise<{
+    items: MemoryItem[];
+    queryEmbedding?: number[];
+  }> {
+    let queryEmbedding: number[] | undefined;
+    if (this.embeddings.isConfigured()) {
+      try {
+        queryEmbedding = await this.embeddings.getEmbedding(input.query);
+      } catch (error) {
+        console.warn(
+          '⚠️ [Memory] 查询Embedding失败，降级为全文检索:',
+          error
+        );
+      }
+    }
+
+    const scopedFilter = {
+      userId: input.userId,
+      conversationId: input.conversationId,
+      status: 'active' as const,
+      messageId: { $nin: [...input.excludeMessageIds] },
+    };
+    const candidateMap = new Map<string, MemoryItem>();
+    const addCandidates = (items: MemoryItem[]) => {
+      for (const item of items) {
+        if (!input.excludeMessageIds.has(item.messageId)) {
+          candidateMap.set(item.memoryId, item);
+        }
+      }
+    };
+
+    const [atlasLexical, atlasVector] = await Promise.all([
+      this.findAtlasLexicalCandidates(collection, input),
+      queryEmbedding
+        ? this.findAtlasVectorCandidates(
+            collection,
+            input,
+            queryEmbedding
+          )
+        : Promise.resolve([]),
+    ]);
+    addCandidates(atlasLexical);
+    addCandidates(atlasVector);
+
+    // 没有配置 Atlas，或 Atlas 暂时不可用时的有界降级。
+    const configuredFallbackLimit = Number(
+      process.env.MEMORY_FALLBACK_CANDIDATE_LIMIT ?? 500
+    );
+    const needsFallbackCandidates =
+      candidateMap.size === 0 ||
+      !process.env.MEMORY_TEXT_SEARCH_INDEX ||
+      (Boolean(queryEmbedding) &&
+        !process.env.MEMORY_VECTOR_SEARCH_INDEX);
+    if (needsFallbackCandidates) {
+      const fallbackLimit = Math.max(
+        Number.isFinite(configuredFallbackLimit)
+          ? configuredFallbackLimit
+          : 500,
+        input.lexicalCandidateCount,
+        input.vectorCandidateCount
+      );
+      addCandidates(
+        await collection
+          .find(scopedFilter)
+          .sort({ occurredAt: -1 })
+          .limit(fallbackLimit)
+          .toArray()
+      );
+    }
+
+    return {
+      items: [...candidateMap.values()],
+      queryEmbedding,
     };
   }
 
@@ -668,5 +859,22 @@ function formatMemorySummary(summary: MemorySummary): string {
     sections.push(`约束：${summary.constraints.join('；')}`);
   }
   return sections.join('\n');
+}
+
+function calculateSummaryImportance(
+  summary: MemorySummary
+): number {
+  const structuredFacts =
+    summary.goals.length +
+    summary.preferences.length +
+    summary.constraints.length;
+  const sourceCoverage = Math.min(
+    0.2,
+    summary.sourceMessageIds.length * 0.025
+  );
+  return Math.min(
+    1,
+    0.55 + Math.min(0.25, structuredFacts * 0.05) + sourceCoverage
+  );
 }
 

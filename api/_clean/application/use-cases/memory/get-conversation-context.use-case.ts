@@ -11,9 +11,12 @@ import {
   estimateJsonTokens,
   estimateMessagesTokens,
   estimateTextTokens,
-  packHistoryWithinBudget,
 } from '../../../domain/services/token-budget.js';
 import type { CompressionStatus } from '../../../../db/models.js';
+import {
+  selectMemoryCandidates,
+  type ScoredMemoryCandidate,
+} from '../../../domain/services/memory-candidate-scoring.js';
 
 export interface GetConversationContextInput {
   conversationId: string;
@@ -87,43 +90,63 @@ export class GetConversationContextUseCase {
         input.conversationId,
         input.userId
       ) ?? Promise.resolve(null);
-    const summariesPromise =
-      this.memoryRepository.findRelevantMemorySummaries?.(
-        input.conversationId,
-        input.userId,
-        input.currentMessage,
-        4
-      ) ?? Promise.resolve([]);
-
     let retrievalMode: GetConversationContextOutput['stats']['retrievalMode'] =
       'recent_only';
     let relevantMessages: HistoricalMessage[] = [];
+    let summaries: HistoricalMessage[] = [];
+    let usedUnifiedScoring = false;
+    const hybridSearchInput = {
+      conversationId: input.conversationId,
+      userId: input.userId,
+      query: input.currentMessage,
+      excludeMessageIds: recentIds,
+      limit: config.hybridMatchCount,
+      lexicalCandidateCount: config.lexicalCandidateCount,
+      vectorCandidateCount: config.vectorCandidateCount,
+      recencyHalfLifeDays: config.recencyHalfLifeDays,
+      weights: {
+        relevance: config.relevanceWeight,
+        recency: config.recencyWeight,
+        importance: config.importanceWeight,
+      },
+    };
+
     if (
+      config.enableUnifiedMemoryScoring &&
+      config.enableHybridRetrieval &&
+      this.memoryRepository.findUnifiedRelevantMemories
+    ) {
+      const unifiedCandidates =
+        await this.memoryRepository.findUnifiedRelevantMemories({
+          ...hybridSearchInput,
+          combinedCandidateLimit: Math.max(
+            12,
+            config.hybridMatchCount * 4
+          ),
+        });
+      summaries = unifiedCandidates.filter(
+        message => message.source === 'summary'
+      );
+      relevantMessages = unifiedCandidates.filter(
+        message => message.source !== 'summary'
+      );
+      usedUnifiedScoring = true;
+      if (unifiedCandidates.length > 0) retrievalMode = 'hybrid';
+    } else if (
       config.enableHybridRetrieval &&
       this.memoryRepository.findHybridRelevantMessages
     ) {
       relevantMessages =
-        await this.memoryRepository.findHybridRelevantMessages({
-          conversationId: input.conversationId,
-          userId: input.userId,
-          query: input.currentMessage,
-          excludeMessageIds: recentIds,
-          limit: config.hybridMatchCount,
-          lexicalCandidateCount: config.lexicalCandidateCount,
-          vectorCandidateCount: config.vectorCandidateCount,
-          recencyHalfLifeDays: config.recencyHalfLifeDays,
-          weights: {
-            relevance: config.relevanceWeight,
-            recency: config.recencyWeight,
-            importance: config.importanceWeight,
-          },
-        });
+        await this.memoryRepository.findHybridRelevantMessages(
+          hybridSearchInput
+        );
       if (relevantMessages.length > 0) retrievalMode = 'hybrid';
     }
 
     // Raw messages are the fallback when embedding or summary generation fails.
     if (
       relevantMessages.length === 0 &&
+      summaries.length === 0 &&
       config.enableKeywordMatch
     ) {
       const keywords = ConversationMemoryEntity.extractKeywords(
@@ -142,10 +165,19 @@ export class GetConversationContextUseCase {
       }
     }
 
-    const [tokenState, summaries] = await Promise.all([
-      tokenStatePromise,
-      summariesPromise,
-    ]);
+    if (
+      !usedUnifiedScoring &&
+      this.memoryRepository.findRelevantMemorySummaries
+    ) {
+      summaries =
+        await this.memoryRepository.findRelevantMemorySummaries(
+          input.conversationId,
+          input.userId,
+          input.currentMessage,
+          4
+        );
+    }
+    const tokenState = await tokenStatePromise;
     const compressionStatus: CompressionStatus =
       tokenState?.compressionStatus ?? 'idle';
     const { inputBudgetTokens } = calculateInputBudget({
@@ -207,29 +239,58 @@ export class GetConversationContextUseCase {
       olderRecent,
       temporarySummary,
     });
-    const packed = packHistoryWithinBudget(
-      mandatoryRecent.map((message, index) => ({
-        id: `recent:${message.messageId}:${index}`,
-        value: message,
-        content: message.content,
-        score: 10,
-        occurredAt: message.timestamp,
-      })),
-      candidateMessages.map((message, index) => ({
-        id: `${message.source || 'raw'}:${message.messageId}:${index}`,
-        value: message,
-        content: message.content,
-        score: scoreMemoryCandidate(message),
-        occurredAt: message.timestamp,
-      })),
-      historyBudget
+    const mandatoryTokens = mandatoryRecent.reduce(
+      (total, message) =>
+        total +
+        (message.estimatedTokens ??
+          estimateTextTokens(message.content)),
+      0
     );
-
-    const mandatoryIdSet = new Set(
+    const optionalBudget = Math.max(
+      0,
+      historyBudget - mandatoryTokens
+    );
+    const candidateById = new Map<string, HistoricalMessage>();
+    const scoredCandidates: ScoredMemoryCandidate[] =
+      candidateMessages.map((message, index) => {
+        const id = `${message.source || 'raw'}:${message.messageId}:${index}`;
+        const estimatedTokens =
+          message.estimatedTokens ??
+          estimateTextTokens(message.content);
+        const utility =
+          usedUnifiedScoring &&
+          message.relevanceScore !== undefined
+            ? message.relevanceScore
+            : scoreMemoryCandidate(message);
+        candidateById.set(id, message);
+        return {
+          id,
+          kind:
+            message.source === 'summary' ||
+            message.source === 'temporary_summary'
+              ? 'summary'
+              : 'raw',
+          content: message.content,
+          occurredAt: message.timestamp,
+          importance: 0,
+          sourceMessageIds:
+            message.sourceMessageIds ?? [message.messageId],
+          estimatedTokens,
+          retrievalRelevance:
+            message.relevanceScore ?? utility,
+          utility,
+          packingScore:
+            utility / Math.max(1, estimatedTokens) ** 0.7,
+        };
+      });
+    const selection = selectMemoryCandidates(
+      scoredCandidates,
+      optionalBudget,
+      usedUnifiedScoring ? 'unified' : 'split_baseline',
       mandatoryRecent.map(message => message.messageId)
     );
-    const selectedLongTerm = packed.selected
-      .filter(message => !mandatoryIdSet.has(message.messageId))
+    const selectedLongTerm = selection.selected
+      .map(candidate => candidateById.get(candidate.id)!)
       .sort(
         (left, right) =>
           left.timestamp.getTime() - right.timestamp.getTime()
@@ -264,8 +325,9 @@ export class GetConversationContextUseCase {
         retrievalMode,
         compressionStatus,
         inputBudgetTokens,
-        selectedHistoryTokens: packed.usedTokens,
-        droppedHistoryItems: packed.droppedIds.length,
+        selectedHistoryTokens:
+          mandatoryTokens + selection.usedTokens,
+        droppedHistoryItems: selection.dropped.length,
         usedTemporaryCompression,
       },
     };

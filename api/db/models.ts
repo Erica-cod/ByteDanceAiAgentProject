@@ -93,6 +93,11 @@ export interface MemorySummary {
   sourceToMessageId: string;
   sourceTokenCount: number;
   summaryTokenCount: number;
+  embedding?: number[];
+  embeddingModel?: string;
+  embeddingVersion?: string;
+  embeddingStatus?: 'ready' | 'unavailable' | 'failed';
+  importance?: number;
   model: string;
   version: string;
   status: 'active' | 'superseded' | 'deleted';
