@@ -44,6 +44,11 @@ export interface MultiAgentSession {
     stagnation_rounds: number;
   };
   termination_reason?: string;
+  token_usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -128,6 +133,11 @@ export class MultiAgentOrchestrator {
           stagnation_rounds: 0,
         },
         termination_reason: config.initialState.termination_reason,
+        token_usage: config.initialState.token_usage || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        },
         created_at: config.initialState.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -154,6 +164,11 @@ export class MultiAgentOrchestrator {
           high_risk_trend: [],
           coverage_trend: [],
           stagnation_rounds: 0,
+        },
+        token_usage: {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -611,6 +626,22 @@ export class MultiAgentOrchestrator {
     try {
       // 调用原有的generate方法（它内部会调用我们修改后的callModel）
       const output = await agent.generate(userQuery, context, round);
+      const usage = agent.consumeTokenUsage?.();
+      if (usage) {
+        output.metadata = {
+          ...(output.metadata || {}),
+          tokenUsage: usage,
+        };
+        const sessionUsage = this.session.token_usage || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        };
+        sessionUsage.prompt_tokens += usage.prompt_tokens;
+        sessionUsage.completion_tokens += usage.completion_tokens;
+        sessionUsage.total_tokens += usage.total_tokens;
+        this.session.token_usage = sessionUsage;
+      }
       
       // 通知完成
       if (this.callbacks.onAgentComplete) {

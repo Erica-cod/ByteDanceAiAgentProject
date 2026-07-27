@@ -75,6 +75,56 @@ export interface MemoryItem {
   updatedAt: Date;
 }
 
+/**
+ * 从一段原始消息派生出的长期摘要。
+ * 摘要只用于加速与压缩；sourceMessageIds 始终指向 messages 事实源。
+ */
+export interface MemorySummary {
+  _id?: string;
+  summaryId: string;
+  conversationId: string;
+  userId: string;
+  summary: string;
+  goals: string[];
+  preferences: string[];
+  constraints: string[];
+  sourceMessageIds: string[];
+  sourceFromMessageId: string;
+  sourceToMessageId: string;
+  sourceTokenCount: number;
+  summaryTokenCount: number;
+  model: string;
+  version: string;
+  status: 'active' | 'superseded' | 'deleted';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CompressionStatus = 'idle' | 'running' | 'failed';
+
+/**
+ * 会话 token 双账本：
+ * - lifetimeBillableTokens 用于成本统计；
+ * - lastInputTokens / unsummarizedTokens 用于上下文压力和摘要触发。
+ */
+export interface ConversationTokenState {
+  _id?: string;
+  conversationId: string;
+  userId: string;
+  lastInputTokens: number;
+  lifetimeBillableTokens: number;
+  unsummarizedTokens: number;
+  summarizedThroughMessageId?: string;
+  compressionStatus: CompressionStatus;
+  compressionStartedAt?: Date;
+  compressionRetryAt?: Date;
+  compressionFailureCount: number;
+  lastCompressionError?: string;
+  lastUsageSource: 'provider' | 'estimated';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Request/Response types
 export interface CreateConversationRequest {
   userId: string;

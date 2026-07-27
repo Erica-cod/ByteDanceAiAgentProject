@@ -42,6 +42,20 @@ export interface VolcengineStreamChunk {
     };
     finish_reason: string | null;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface VolcengineStreamEvent {
+  content?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 /**
@@ -88,6 +102,7 @@ export class VolcengineService {
       model: this.model,
       messages: messages,
       stream: true,
+      stream_options: { include_usage: true },
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 2000,
       top_p: options?.topP ?? 0.95,
@@ -147,6 +162,10 @@ export class VolcengineService {
    * @returns 解析后的内容，如果没有内容返回 null
    */
   parseStreamLine(line: string): string | null {
+    return this.parseStreamEvent(line)?.content || null;
+  }
+
+  parseStreamEvent(line: string): VolcengineStreamEvent | null {
     // 跳过空行
     if (!line.trim()) {
       return null;
@@ -170,8 +189,30 @@ export class VolcengineService {
           if (choice.delta && choice.delta.content) {
             const content = choice.delta.content;
             console.log('📨 火山引擎增量内容:', content);
-            return content;
+            return {
+              content,
+              usage: data.usage
+                ? {
+                    prompt_tokens:
+                      Number(data.usage.prompt_tokens) || 0,
+                    completion_tokens:
+                      Number(data.usage.completion_tokens) || 0,
+                    total_tokens:
+                      Number(data.usage.total_tokens) || 0,
+                  }
+                : undefined,
+            };
           }
+        }
+        if (data.usage) {
+          return {
+            usage: {
+              prompt_tokens: Number(data.usage.prompt_tokens) || 0,
+              completion_tokens:
+                Number(data.usage.completion_tokens) || 0,
+              total_tokens: Number(data.usage.total_tokens) || 0,
+            },
+          };
         }
       } catch (error) {
         console.error('解析火山引擎流式数据失败:', error, 'Line:', line);

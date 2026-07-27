@@ -5,7 +5,20 @@
  */
 
 import { HistoricalMessage, MemoryConfig } from '../../../domain/entities/conversation-memory.entity.js';
-import type { MemoryItem } from '../../../../db/models.js';
+import type {
+  ConversationTokenState,
+  MemoryItem,
+  MemorySummary,
+} from '../../../../db/models.js';
+
+export interface RecordConversationTokenUsageInput {
+  conversationId: string;
+  userId: string;
+  inputTokens: number;
+  totalTokens: number;
+  unsummarizedTokenDelta: number;
+  source: 'provider' | 'estimated';
+}
 
 export interface HybridMemorySearchInput {
   conversationId: string;
@@ -75,6 +88,57 @@ export interface IMemoryRepository {
     userId: string,
     items: MemoryItem[]
   ): Promise<void>;
+
+  getConversationTokenState?(
+    conversationId: string,
+    userId: string
+  ): Promise<ConversationTokenState | null>;
+
+  recordConversationTokenUsage?(
+    input: RecordConversationTokenUsageInput
+  ): Promise<ConversationTokenState>;
+
+  claimConversationCompression?(
+    conversationId: string,
+    userId: string,
+    now: Date
+  ): Promise<boolean>;
+
+  completeConversationCompression?(
+    conversationId: string,
+    userId: string,
+    processedTokens: number,
+    summarizedThroughMessageId: string
+  ): Promise<void>;
+
+  failConversationCompression?(
+    conversationId: string,
+    userId: string,
+    error: string,
+    retryAt: Date
+  ): Promise<void>;
+
+  releaseConversationCompression?(
+    conversationId: string,
+    userId: string
+  ): Promise<void>;
+
+  getMessagesForSummary?(
+    conversationId: string,
+    userId: string,
+    afterMessageId: string | undefined,
+    keepRecentCount: number,
+    maxMessages: number
+  ): Promise<HistoricalMessage[]>;
+
+  saveMemorySummary?(summary: MemorySummary): Promise<void>;
+
+  findRelevantMemorySummaries?(
+    conversationId: string,
+    userId: string,
+    query: string,
+    limit: number
+  ): Promise<HistoricalMessage[]>;
 
   /**
    * 获取对话的总消息数

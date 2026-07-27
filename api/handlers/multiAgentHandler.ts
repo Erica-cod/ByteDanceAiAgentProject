@@ -32,6 +32,7 @@ export async function handleMultiAgentMode(
   onFinally?: () => void,
   resumeFromRound?: number // 断点续传：从指定轮次恢复
 ): Promise<Response> {
+  const multiAgentStartTime = Date.now();
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   
@@ -213,6 +214,9 @@ export async function handleMultiAgentMode(
                 const container = getContainer();
                 const createMessageUseCase = container.getCreateMessageUseCase();
                 const updateConversationUseCase = container.getUpdateConversationUseCase();
+                const reporterUsage =
+                  reporterOutput.metadata?.tokenUsage;
+                const sessionUsage = session.token_usage;
                 
                 await createMessageUseCase.execute(
                   conversationId,
@@ -221,8 +225,39 @@ export async function handleMultiAgentMode(
                   reporterOutput.content,
                   clientAssistantMessageId,
                   'volcano',
-                  undefined
+                  undefined,
+                  undefined,
+                  {
+                    tokens: sessionUsage?.total_tokens,
+                    duration: Date.now() - multiAgentStartTime,
+                  }
                 );
+                const maintenance =
+                  container.getConversationMemoryMaintenanceService();
+                void maintenance.recordTurnAndSchedule({
+                  conversationId,
+                  userId,
+                  requestText: userQuery,
+                  responseText: reporterOutput.content,
+                  usage: sessionUsage
+                    ? {
+                        prompt_tokens:
+                          reporterUsage?.prompt_tokens ??
+                          sessionUsage.prompt_tokens,
+                        completion_tokens:
+                          sessionUsage.completion_tokens,
+                        total_tokens: sessionUsage.total_tokens,
+                      }
+                    : undefined,
+                  estimatedInputTokens: Math.ceil(
+                    userQuery.length / 3
+                  ),
+                }).catch(error => {
+                  console.warn(
+                    '[MemorySummary] failed to record multi-agent turn',
+                    error
+                  );
+                });
                 
                 const conversation = await container.getGetConversationUseCase().execute(conversationId, userId);
                 if (conversation) {

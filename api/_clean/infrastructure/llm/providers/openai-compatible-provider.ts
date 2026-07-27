@@ -42,6 +42,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       model: this.modelName,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: true,
+      stream_options: { include_usage: true },
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 4000,
       top_p: options?.topP ?? 0.95,

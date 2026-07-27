@@ -32,6 +32,10 @@ export async function handleSingleAgent(opts: {
   const memoryConfig = getRecommendedConfig(modelType);
   const container = getContainer();
   const getConversationContextUseCase = container.getGetConversationContextUseCase();
+  const tools =
+    modelType === 'volcano'
+      ? toolRegistry.getRelevantSchemas(message)
+      : toolRegistry.getAllSchemas();
 
   console.log(`🧠 记忆配置: 窗口=${memoryConfig.windowSize}轮, Token限制=${memoryConfig.maxTokens}`);
 
@@ -41,16 +45,13 @@ export async function handleSingleAgent(opts: {
     currentMessage: message,
     systemPrompt: SYSTEM_PROMPT,
     config: memoryConfig,
+    tools,
   });
 
   const messages = contextResult.context;
   console.log(`📚 已加载对话上下文，包含 ${messages.length} 条消息`);
   console.log(`📊 记忆统计: ${contextResult.stats.uniqueMessages} 条唯一消息, 预估 ${contextResult.stats.estimatedTokens} tokens`);
 
-  const tools =
-    modelType === 'volcano'
-      ? toolRegistry.getRelevantSchemas(message)
-      : toolRegistry.getAllSchemas();
   console.log(`🔧 传递 ${tools.length} 个工具定义给模型 (${modelType === 'volcano' ? '已瘦身' : '全量'})`);
 
   // ==================== 本地模型 ====================
@@ -59,7 +60,9 @@ export async function handleSingleAgent(opts: {
     const stream = await callLocalModel(messages, { tools });
     return handleLocalStream(
       stream, conversationId, userId, modelType,
-      messages, clientAssistantMessageId, release, message
+      messages, clientAssistantMessageId, release, message,
+      contextResult.stats.estimatedTokens,
+      contextResult.stats.inputBudgetTokens
     );
   }
 
@@ -86,7 +89,9 @@ export async function handleSingleAgent(opts: {
         console.log('✅ [LocalFirst] 使用本地模型处理简单请求');
         return handleLocalStream(
           stream, conversationId, userId, 'local',
-          messages, clientAssistantMessageId, release, message
+          messages, clientAssistantMessageId, release, message,
+          contextResult.stats.estimatedTokens,
+          contextResult.stats.inputBudgetTokens
         );
       }
     } catch (localErr) {
@@ -107,6 +112,8 @@ export async function handleSingleAgent(opts: {
 
   return handleVolcanoStream(
     stream, conversationId, userId, modelType,
-    messages, clientAssistantMessageId, release, message
+    messages, clientAssistantMessageId, release, message,
+    contextResult.stats.estimatedTokens,
+    contextResult.stats.inputBudgetTokens
   );
 }

@@ -48,7 +48,8 @@ const CACHE_PREFIX = 'chat_cache_v2:';  // 新前缀（区分加密版本）
 const LEGACY_PREFIX_V1 = 'chat_cache_v1:';
 const LEGACY_PREFIX_OLD = 'chat_';
 
-const MAX_MESSAGES_TO_KEEP = 500;
+// 10 rounds = 20 raw messages. MongoDB remains the full history source.
+const MAX_MESSAGES_TO_KEEP = 20;
 const MAX_UNSYNCED_TO_KEEP = 50;
 
 // 全局开关：是否启用加密（默认开启）
@@ -97,7 +98,7 @@ export async function readConversationCache(conversationId: string): Promise<Cac
           try {
             const decrypted = await decryptData<CacheEnvelopeV2>(v2);
             if (Array.isArray(decrypted.messages)) {
-              return decrypted.messages;
+              return trimMessages(decrypted.messages);
             }
           } catch (error) {
             console.warn('⚠️ 解密失败（可能在不同设备），清除缓存', error);
@@ -108,7 +109,7 @@ export async function readConversationCache(conversationId: string): Promise<Cac
         } else {
           // 未加密的 V2 数据（向后兼容）
           if (Array.isArray(v2.messages)) {
-            return v2.messages;
+            return trimMessages(v2.messages);
           }
         }
       }
@@ -120,7 +121,7 @@ export async function readConversationCache(conversationId: string): Promise<Cac
     );
     if (v1?.version === 1 && Array.isArray(v1.messages)) {
       console.log('📦 读取到 V1 缓存，将在下次写入时升级到 V2');
-      return v1.messages;
+      return trimMessages(v1.messages);
     }
     
     // 3️⃣ 尝试读取旧版本（最早的格式）
@@ -129,7 +130,7 @@ export async function readConversationCache(conversationId: string): Promise<Cac
     );
     if (Array.isArray(legacy)) {
       console.log('📦 读取到旧版本缓存，将在下次写入时升级到 V2');
-      return legacy
+      return trimMessages(legacy
         .map((m) => ({
           id: String(m.id ?? ''),
           clientMessageId: m.clientMessageId,
@@ -140,7 +141,7 @@ export async function readConversationCache(conversationId: string): Promise<Cac
           timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
           pendingSync: m.pendingSync,
         }))
-        .filter((m) => m.id && (m.role === 'user' || m.role === 'assistant'));
+        .filter((m) => m.id && (m.role === 'user' || m.role === 'assistant')));
     }
     
     return [];
@@ -233,17 +234,19 @@ function trimMessages(
   maxMessages: number = MAX_MESSAGES_TO_KEEP,
   maxUnsynced: number = MAX_UNSYNCED_TO_KEEP
 ) {
-  if (messages.length <= maxMessages && countUnsynced(messages) <= maxUnsynced) {
-    return messages;
-  }
-  
+  if (messages.length <= maxMessages) return messages;
+
+  // The normal cache is only the last 10 rounds. Older pending messages are
+  // retained temporarily so an offline refresh cannot destroy unsynced input.
   const recent = messages.slice(-maxMessages);
-  const unsynced = recent.filter((m) => m.pendingSync);
-  
-  if (unsynced.length <= maxUnsynced) return recent;
-  
-  const keepUnsyncedIds = new Set(unsynced.slice(-maxUnsynced).map((m) => m.id));
-  return recent.filter((m) => !m.pendingSync || keepUnsyncedIds.has(m.id));
+  const recentIds = new Set(recent.map(message => message.id));
+  const pendingOutsideWindow = messages
+    .filter(message => message.pendingSync && !recentIds.has(message.id))
+    .slice(-maxUnsynced);
+
+  return [...pendingOutsideWindow, ...recent].sort(
+    (left, right) => left.timestamp - right.timestamp
+  );
 }
 
 function countUnsynced(messages: CachedMessage[]) {

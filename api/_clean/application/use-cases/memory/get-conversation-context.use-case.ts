@@ -1,20 +1,19 @@
-/**
- * 获取对话上下文 Use Case
- * 
- * 业务逻辑：
- * 1. 获取最近的消息（滑动窗口）
- * 2. 可选：查找相关历史消息（关键词匹配）
- * 3. 构建完整对话上下文（系统提示词 + 历史 + 当前消息）
- * 4. Token 限制截断
- */
-
-import { IMemoryRepository } from '../../interfaces/repositories/memory.repository.interface.js';
-import { 
-  ConversationMemoryEntity, 
-  MemoryConfig, 
-  ChatMessage 
+import type { IMemoryRepository } from '../../interfaces/repositories/memory.repository.interface.js';
+import {
+  ConversationMemoryEntity,
+  type ChatMessage,
+  type HistoricalMessage,
+  type MemoryConfig,
 } from '../../../domain/entities/conversation-memory.entity.js';
 import { compressContext } from '../../../infrastructure/llm/context-compressor.js';
+import {
+  calculateInputBudget,
+  estimateJsonTokens,
+  estimateMessagesTokens,
+  estimateTextTokens,
+  packHistoryWithinBudget,
+} from '../../../domain/services/token-budget.js';
+import type { CompressionStatus } from '../../../../db/models.js';
 
 export interface GetConversationContextInput {
   conversationId: string;
@@ -22,8 +21,8 @@ export interface GetConversationContextInput {
   currentMessage: string;
   systemPrompt: string;
   config?: Partial<MemoryConfig>;
-  /** 是否启用上下文压缩（默认对远程模型启用） */
   enableCompression?: boolean;
+  tools?: unknown[];
 }
 
 export interface GetConversationContextOutput {
@@ -35,148 +34,329 @@ export interface GetConversationContextOutput {
     uniqueMessages: number;
     estimatedTokens: number;
     retrievalMode: 'hybrid' | 'keyword' | 'recent_only';
+    compressionStatus: CompressionStatus;
+    inputBudgetTokens: number;
+    selectedHistoryTokens: number;
+    droppedHistoryItems: number;
+    usedTemporaryCompression: boolean;
   };
 }
 
 /**
- * 获取对话上下文 Use Case
+ * Builds a context in priority order:
+ * system/current/tool overhead -> last two complete turns -> persisted summary
+ * and retrieved memory ranked by relevance/token -> stop at the budget.
+ *
+ * Persisted summaries are derived data only. Running/failed jobs always retain
+ * a raw-message retrieval path.
  */
 export class GetConversationContextUseCase {
   constructor(
     private readonly memoryRepository: IMemoryRepository
   ) {}
 
-  async execute(input: GetConversationContextInput): Promise<GetConversationContextOutput> {
-    const {
-      conversationId,
-      userId,
-      currentMessage,
-      systemPrompt,
-      config
-    } = input;
-
-    console.log('🧠 [GetConversationContext] 开始获取对话上下文');
-
-    // 创建记忆实体（包含配置）
-    const memoryEntity = ConversationMemoryEntity.create(
-      conversationId,
-      userId,
-      config
+  async execute(
+    input: GetConversationContextInput
+  ): Promise<GetConversationContextOutput> {
+    const memory = ConversationMemoryEntity.create(
+      input.conversationId,
+      input.userId,
+      input.config
     );
-
-    // 步骤 1: 获取最近的消息（滑动窗口）
-    const windowSize = memoryEntity.config.windowSize * 2; // 一轮包括用户+助手
+    const config = memory.config;
     const recentMessages = await this.memoryRepository.getRecentMessages(
-      conversationId,
-      userId,
-      windowSize
+      input.conversationId,
+      input.userId,
+      config.windowSize * 2
     );
-    console.log(`✅ 获取到 ${recentMessages.length} 条最近消息`);
 
-    // 步骤 2: 混合召回；不可用或无结果时降级为关键词匹配
-    let relevantMessages: typeof recentMessages = [];
+    // chat entry persists the current user message before context building.
+    const history = removeDuplicatedCurrentMessage(
+      recentMessages,
+      input.currentMessage
+    );
+    const mandatoryCount = config.completeRecentRounds * 2;
+    const mandatoryRecent = history.slice(-mandatoryCount);
+    const olderRecent = history.slice(0, -mandatoryCount);
+    const recentIds = new Set(
+      history.map(message => message.messageId)
+    );
+
+    const tokenStatePromise =
+      this.memoryRepository.getConversationTokenState?.(
+        input.conversationId,
+        input.userId
+      ) ?? Promise.resolve(null);
+    const summariesPromise =
+      this.memoryRepository.findRelevantMemorySummaries?.(
+        input.conversationId,
+        input.userId,
+        input.currentMessage,
+        4
+      ) ?? Promise.resolve([]);
+
     let retrievalMode: GetConversationContextOutput['stats']['retrievalMode'] =
       'recent_only';
-    const recentIds = new Set(recentMessages.map(message => message.messageId));
-
+    let relevantMessages: HistoricalMessage[] = [];
     if (
-      memoryEntity.config.enableHybridRetrieval &&
+      config.enableHybridRetrieval &&
       this.memoryRepository.findHybridRelevantMessages
     ) {
       relevantMessages =
         await this.memoryRepository.findHybridRelevantMessages({
-          conversationId,
-          userId,
-          query: currentMessage,
+          conversationId: input.conversationId,
+          userId: input.userId,
+          query: input.currentMessage,
           excludeMessageIds: recentIds,
-          limit: memoryEntity.config.hybridMatchCount,
-          lexicalCandidateCount: memoryEntity.config.lexicalCandidateCount,
-          vectorCandidateCount: memoryEntity.config.vectorCandidateCount,
-          recencyHalfLifeDays: memoryEntity.config.recencyHalfLifeDays,
+          limit: config.hybridMatchCount,
+          lexicalCandidateCount: config.lexicalCandidateCount,
+          vectorCandidateCount: config.vectorCandidateCount,
+          recencyHalfLifeDays: config.recencyHalfLifeDays,
           weights: {
-            relevance: memoryEntity.config.relevanceWeight,
-            recency: memoryEntity.config.recencyWeight,
-            importance: memoryEntity.config.importanceWeight,
+            relevance: config.relevanceWeight,
+            recency: config.recencyWeight,
+            importance: config.importanceWeight,
           },
         });
-      if (relevantMessages.length > 0) {
-        retrievalMode = 'hybrid';
-        console.log(
-          `🔎 通过混合召回找到 ${relevantMessages.length} 条相关历史消息`
-        );
-      }
+      if (relevantMessages.length > 0) retrievalMode = 'hybrid';
     }
 
+    // Raw messages are the fallback when embedding or summary generation fails.
     if (
       relevantMessages.length === 0 &&
-      memoryEntity.config.enableKeywordMatch &&
-      recentMessages.length > 0
+      config.enableKeywordMatch
     ) {
-      const keywords = ConversationMemoryEntity.extractKeywords(currentMessage);
-      
+      const keywords = ConversationMemoryEntity.extractKeywords(
+        input.currentMessage
+      );
       if (keywords.length > 0) {
-        relevantMessages = await this.memoryRepository.findRelevantMessages(
-          conversationId,
-          userId,
-          keywords,
-          recentIds,
-          memoryEntity.config.keywordMatchCount
-        );
-        
-        if (relevantMessages.length > 0) {
-          retrievalMode = 'keyword';
-          console.log(`🔍 通过关键词匹配找到 ${relevantMessages.length} 条相关历史消息`);
-        }
+        relevantMessages =
+          await this.memoryRepository.findRelevantMessages(
+            input.conversationId,
+            input.userId,
+            keywords,
+            recentIds,
+            config.keywordMatchCount
+          );
+        if (relevantMessages.length > 0) retrievalMode = 'keyword';
       }
     }
 
-    // 重建实体（包含获取的消息）
-    const memoryWithMessages = ConversationMemoryEntity.fromData(
-      conversationId,
-      userId,
-      memoryEntity.config,
-      recentMessages,
-      relevantMessages
-    );
+    const [tokenState, summaries] = await Promise.all([
+      tokenStatePromise,
+      summariesPromise,
+    ]);
+    const compressionStatus: CompressionStatus =
+      tokenState?.compressionStatus ?? 'idle';
+    const { inputBudgetTokens } = calculateInputBudget({
+      contextWindowTokens: config.contextWindowTokens,
+      outputReserveTokens: config.outputReserveTokens,
+      safetyMarginRatio: config.safetyMarginRatio,
+    });
+    const fixedTokens =
+      estimateMessagesTokens([
+        { role: 'system', content: input.systemPrompt },
+        { role: 'user', content: input.currentMessage },
+      ]) + estimateJsonTokens(input.tools);
+    const historyBudget = Math.max(0, inputBudgetTokens - fixedTokens);
 
-    // 步骤 3: 构建对话上下文
-    let context = memoryWithMessages.buildContext(currentMessage, systemPrompt);
+    let usedTemporaryCompression = false;
+    let temporarySummary: HistoricalMessage[] = [];
+    const underPressure =
+      (tokenState?.lastInputTokens ?? 0) >=
+      Math.floor(inputBudgetTokens * 0.65);
 
-    // 步骤 3.5: 可选 - 上下文压缩（将早期历史摘要化，降低远程模型 token 消耗）
-    const shouldCompress = input.enableCompression !== false && context.length > 8;
-    if (shouldCompress) {
-      console.log('📦 [GetConversationContext] 启用上下文压缩...');
-      const systemMsg = context[0]; // system prompt
-      const currentMsg = context[context.length - 1]; // 当前用户消息
-      const historyMsgs = context.slice(1, -1); // 中间的历史消息
-
-      const compressed = await compressContext(historyMsgs, 4, conversationId);
-      context = [systemMsg, ...compressed, currentMsg];
-      console.log(`📦 [GetConversationContext] 压缩后上下文: ${context.length} 条消息`);
+    if (
+      compressionStatus === 'running' &&
+      summaries.length === 0 &&
+      olderRecent.length >= 2 &&
+      underPressure &&
+      input.enableCompression !== false
+    ) {
+      const compressed = await compressContext(
+        olderRecent.map(toChatMessage),
+        0,
+        input.conversationId
+      );
+      if (
+        compressed.length === 1 &&
+        compressed[0].role === 'system'
+      ) {
+        usedTemporaryCompression = true;
+        temporarySummary = [
+          {
+            messageId: `temporary-summary:${input.conversationId}`,
+            role: 'assistant',
+            content: compressed[0].content,
+            timestamp: olderRecent[olderRecent.length - 1].timestamp,
+            source: 'temporary_summary',
+            relevanceScore: 0.7,
+            estimatedTokens: estimateTextTokens(compressed[0].content),
+            sourceMessageIds: olderRecent.map(
+              message => message.messageId
+            ),
+          },
+        ];
+      }
     }
 
-    // 步骤 4: 获取统计信息
-    const stats = memoryWithMessages.getStats();
-    const estimatedTokens = this.estimateTokens(context);
+    const candidateMessages = buildCandidates({
+      compressionStatus,
+      summaries,
+      relevantMessages,
+      olderRecent,
+      temporarySummary,
+    });
+    const packed = packHistoryWithinBudget(
+      mandatoryRecent.map((message, index) => ({
+        id: `recent:${message.messageId}:${index}`,
+        value: message,
+        content: message.content,
+        score: 10,
+        occurredAt: message.timestamp,
+      })),
+      candidateMessages.map((message, index) => ({
+        id: `${message.source || 'raw'}:${message.messageId}:${index}`,
+        value: message,
+        content: message.content,
+        score: scoreMemoryCandidate(message),
+        occurredAt: message.timestamp,
+      })),
+      historyBudget
+    );
 
-    console.log(`📝 最终上下文包含 ${context.length} 条消息，预估 ${estimatedTokens} tokens`);
+    const mandatoryIdSet = new Set(
+      mandatoryRecent.map(message => message.messageId)
+    );
+    const selectedLongTerm = packed.selected
+      .filter(message => !mandatoryIdSet.has(message.messageId))
+      .sort(
+        (left, right) =>
+          left.timestamp.getTime() - right.timestamp.getTime()
+      );
+    const context: ChatMessage[] = [
+      { role: 'system', content: input.systemPrompt },
+      ...selectedLongTerm.map(toContextMessage),
+      ...mandatoryRecent.map(toChatMessage),
+      { role: 'user', content: input.currentMessage },
+    ];
 
     return {
       context,
       stats: {
-        ...stats,
-        estimatedTokens,
+        totalMessages:
+          recentMessages.length +
+          relevantMessages.length +
+          summaries.length,
+        recentMessages: recentMessages.length,
+        relevantMessages:
+          relevantMessages.length + summaries.length,
+        uniqueMessages: new Set(
+          [
+            ...recentMessages,
+            ...relevantMessages,
+            ...summaries,
+          ].map(message => message.messageId)
+        ).size,
+        estimatedTokens:
+          estimateMessagesTokens(context) +
+          estimateJsonTokens(input.tools),
         retrievalMode,
+        compressionStatus,
+        inputBudgetTokens,
+        selectedHistoryTokens: packed.usedTokens,
+        droppedHistoryItems: packed.droppedIds.length,
+        usedTemporaryCompression,
       },
     };
   }
+}
 
-  /**
-   * 估计 token 数量
-   */
-  private estimateTokens(messages: ChatMessage[]): number {
-    const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0);
-    return Math.ceil(totalChars / 3);
+function removeDuplicatedCurrentMessage(
+  messages: HistoricalMessage[],
+  currentMessage: string
+): HistoricalMessage[] {
+  const last = messages[messages.length - 1];
+  if (
+    last?.role === 'user' &&
+    last.content.trim() === currentMessage.trim()
+  ) {
+    return messages.slice(0, -1);
+  }
+  return messages;
+}
+
+function buildCandidates(input: {
+  compressionStatus: CompressionStatus;
+  summaries: HistoricalMessage[];
+  relevantMessages: HistoricalMessage[];
+  olderRecent: HistoricalMessage[];
+  temporarySummary: HistoricalMessage[];
+}): HistoricalMessage[] {
+  const common = [
+    ...input.summaries,
+    ...input.temporarySummary,
+    ...input.relevantMessages,
+  ];
+
+  if (input.compressionStatus === 'failed') {
+    // Failed summary generation explicitly falls back to raw Mongo messages.
+    return deduplicate([...common, ...input.olderRecent]);
+  }
+  if (input.compressionStatus === 'running') {
+    // Existing summaries/memory remain usable while the new job is running.
+    return deduplicate([
+      ...common,
+      ...(input.summaries.length === 0 &&
+      input.temporarySummary.length === 0
+        ? input.olderRecent
+        : []),
+    ]);
+  }
+  if (input.summaries.length > 0) {
+    return deduplicate(common);
+  }
+  return deduplicate([...common, ...input.olderRecent]);
+}
+
+function deduplicate(
+  messages: HistoricalMessage[]
+): HistoricalMessage[] {
+  const seen = new Set<string>();
+  return messages.filter(message => {
+    const key = `${message.source || 'raw'}:${message.messageId}:${message.content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function scoreMemoryCandidate(message: HistoricalMessage): number {
+  const relevance = message.relevanceScore ?? 0.3;
+  switch (message.source) {
+    case 'summary':
+      return 0.8 + relevance;
+    case 'temporary_summary':
+      return 0.75 + relevance;
+    case 'memory_chunk':
+      return 0.6 + relevance;
+    case 'recent':
+      return 0.45 + relevance;
+    default:
+      return 0.4 + relevance;
   }
 }
 
+function toChatMessage(message: HistoricalMessage): ChatMessage {
+  return { role: message.role, content: message.content };
+}
+
+function toContextMessage(message: HistoricalMessage): ChatMessage {
+  if (
+    message.source === 'summary' ||
+    message.source === 'temporary_summary'
+  ) {
+    return { role: 'system', content: message.content };
+  }
+  return toChatMessage(message);
+}
