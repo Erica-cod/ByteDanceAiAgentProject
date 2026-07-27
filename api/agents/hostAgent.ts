@@ -15,10 +15,29 @@ import { comparePositions, simpleComparePositions, compareSelfSimilarity, type S
  * Host 决策类型
  */
 export type HostAction = 
-  | 'continue'           // 继续讨论
-  | 'converge'           // 进入收敛阶段
-  | 'force_opposition'   // 强制反方角色
-  | 'terminate';         // 终止讨论
+  | 'revise'             // Planner 根据明确问题修订
+  | 'challenge'          // Critic 执行压力测试
+  | 'verify'             // Critic 验证修订结果
+  | 'finalize'           // 进入 Reporter
+  | 'terminate';         // 达到预算，带未解决风险结束
+
+export interface HostPolicyConfig {
+  minRounds: number;
+  maxRounds: number;
+  agreementThreshold: number;
+  coverageThreshold: number;
+  stagnationThreshold: number;
+  maxStagnationRounds: number;
+}
+
+export const DEFAULT_HOST_POLICY: HostPolicyConfig = {
+  minRounds: 2,
+  maxRounds: 5,
+  agreementThreshold: 0.9,
+  coverageThreshold: 0.9,
+  stagnationThreshold: 0.02,
+  maxStagnationRounds: 2,
+};
 
 /**
  * Host 决策
@@ -42,6 +61,17 @@ export interface ConsensusAnalysis {
   most_different_pair?: [number, number];
   stubborn_agents: string[];    // 顽固的Agent
   trend: number[];              // 共识趋势（历史相似度）
+  coverage: number;             // Critic 三项有效性检查覆盖率
+  unresolved_high_risks: string[];
+  high_risk_trend: number[];
+  coverage_trend: number[];
+  progress_delta: number;
+  stagnation_rounds: number;
+  validity_check: {
+    feasible: boolean;
+    realistic: boolean;
+    complete: boolean;
+  };
 }
 
 /**
@@ -61,14 +91,19 @@ export class HostAgent extends BaseAgent {
   
   // Agent自相似度历史
   private selfSimilarityHistory: Map<string, number[]> = new Map();
+  private readonly policy: HostPolicyConfig;
 
-  constructor(config?: Partial<AgentConfig>) {
+  constructor(
+    config?: Partial<AgentConfig>,
+    policy?: Partial<HostPolicyConfig>
+  ) {
     super({
       agentId: 'host',
       temperature: 0.3,  // 低温度，保持决策的一致性
       maxTokens: 2000,
       ...config,
     });
+    this.policy = { ...DEFAULT_HOST_POLICY, ...policy };
   }
 
   protected getDefaultSystemPrompt(): string {
@@ -76,37 +111,31 @@ export class HostAgent extends BaseAgent {
 
 ## 你的职责
 
-1. **流程控制**：决定讨论是否继续、收敛或终止
-2. **共识检测**：分析各Agent的立场相似度
+1. **流程控制**：根据未解决风险和有效性检查决定修订、验证或结束
+2. **共识检测**：相似度只用于检测重复或过快共识，不代表方案正确
 3. **分歧管理**：当分歧过大时，引导讨论方向
 4. **顽固检测**：发现不愿改变立场的Agent
 5. **最终决策**：决定何时结束讨论并生成报告
 
 ## 决策规则
 
-### 1. 高共识（相似度 > 0.90）
-- 行动：进入收敛阶段 (converge)
-- 要求所有Agent列出剩余不确定性和最坏情况
-- 准备调用Reporter生成最终报告
+### 1. 存在未解决高风险
+- 行动：revise，让Planner逐项回应具体风险
 
-### 2. 中度共识（0.70 < 相似度 <= 0.90）
-- 行动：继续讨论 (continue)
-- 指定需要重点讨论的问题
-- 给出明确的改进方向
+### 2. Planner完成修订
+- 行动：verify，只让Critic验证修订是否真正解决问题
 
-### 3. 低共识（相似度 <= 0.70）
-- 行动：强制反方角色 (force_opposition)
-- 指定一个Agent扮演"魔鬼代言人"
-- 要求从反方角度论证
+### 3. 首轮过快达成一致
+- 行动：challenge，额外执行一次压力测试，防止互相迎合
 
-### 4. 顽固Agent检测
-如果某个Agent连续2轮自相似度 > 0.98：
-- 发出更新命令
-- 要求修改假设或降低置信度
+### 4. 满足结构化终止条件
+- feasible、realistic、complete 全部为真
+- 没有未解决高风险
+- 覆盖率达到阈值
+- 行动：finalize
 
 ### 5. 达到最大轮次
-- 行动：终止讨论 (terminate)
-- 即使未完全达成共识，也要生成报告
+- 行动：terminate，并把未解决风险交给Reporter披露
 
 ## 输出要求
 
@@ -167,14 +196,25 @@ export class HostAgent extends BaseAgent {
         content: `决策分析失败，默认继续讨论。错误: ${error.message}`,
         metadata: {
           decision: {
-            action: 'continue',
-            reason: '决策失败，默认继续',
-            next_agents: ['planner', 'critic'],
+            action: 'verify',
+            reason: '决策失败，降级为Critic验证',
+            next_agents: ['critic'],
           },
           analysis: {
             consensus_level: 0.5,
             stubborn_agents: [],
             trend: this.consensusTrend,
+            coverage: 0,
+            unresolved_high_risks: [],
+            high_risk_trend: [],
+            coverage_trend: [],
+            progress_delta: 0,
+            stagnation_rounds: 0,
+            validity_check: {
+              feasible: false,
+              realistic: false,
+              complete: false,
+            },
           },
         },
         timestamp: new Date().toISOString(),
@@ -239,11 +279,51 @@ export class HostAgent extends BaseAgent {
       }
     }
 
-    // 记录共识趋势
-    this.consensusTrend.push(consensus_level);
+    // 从会话状态恢复趋势，保证断点续传后不会从空数组重新开始。
+    const previousState = context.host_state ?? {};
+    const previousConsensusTrend: number[] =
+      previousState.consensus_trend ?? this.consensusTrend;
+    this.consensusTrend = [...previousConsensusTrend, consensus_level];
 
     // 检测顽固Agent
     const stubborn_agents = await this.detectStubbornAgents(context, round);
+
+    const critique = context.critic_output?.metadata?.critique;
+    const validity_check = {
+      feasible: Boolean(critique?.validity_check?.feasible),
+      realistic: Boolean(critique?.validity_check?.realistic),
+      complete: Boolean(critique?.validity_check?.complete),
+    };
+    const coverage =
+      Object.values(validity_check).filter(Boolean).length /
+      Object.keys(validity_check).length;
+    const unresolved_high_risks: string[] = (critique?.risks ?? [])
+      .filter((risk: any) => risk.severity === 'high')
+      .map((risk: any) => risk.risk);
+    const previousHighRiskTrend: number[] =
+      previousState.high_risk_trend ?? [];
+    const previousCoverageTrend: number[] =
+      previousState.coverage_trend ?? [];
+    const previousRiskCount =
+      previousHighRiskTrend[previousHighRiskTrend.length - 1];
+    const previousCoverage =
+      previousCoverageTrend[previousCoverageTrend.length - 1];
+    const riskProgress =
+      previousRiskCount === undefined
+        ? 0
+        : (previousRiskCount - unresolved_high_risks.length) /
+          Math.max(previousRiskCount, 1);
+    const coverageProgress =
+      previousCoverage === undefined ? 0 : coverage - previousCoverage;
+    const progress_delta =
+      previousRiskCount === undefined && previousCoverage === undefined
+        ? 1
+        : (riskProgress + coverageProgress) / 2;
+    const previousStagnationRounds = previousState.stagnation_rounds ?? 0;
+    const stagnation_rounds =
+      Math.abs(progress_delta) < this.policy.stagnationThreshold
+        ? previousStagnationRounds + 1
+        : 0;
 
     return {
       consensus_level,
@@ -251,6 +331,16 @@ export class HostAgent extends BaseAgent {
       most_different_pair,
       stubborn_agents,
       trend: [...this.consensusTrend],
+      coverage,
+      unresolved_high_risks,
+      high_risk_trend: [
+        ...previousHighRiskTrend,
+        unresolved_high_risks.length,
+      ],
+      coverage_trend: [...previousCoverageTrend, coverage],
+      progress_delta,
+      stagnation_rounds,
+      validity_check,
     };
   }
 
@@ -335,67 +425,138 @@ export class HostAgent extends BaseAgent {
     round: number,
     context: any
   ): HostDecision {
-    const { consensus_level, stubborn_agents } = analysis;
-    const maxRounds = context.max_rounds || 5;
+    const {
+      consensus_level,
+      unresolved_high_risks,
+      coverage,
+      validity_check,
+      stagnation_rounds,
+    } = analysis;
+    const maxRounds = context.max_rounds || this.policy.maxRounds;
+    const executedAgents: string[] = context.executed_agents ?? [];
 
     console.log(`🤔 [Host] 决策依据: 共识=${consensus_level.toFixed(3)}, 轮次=${round}/${maxRounds}`);
 
-    // 1. 达到最大轮次 -> 终止
+    // 1. 达到最大轮次 -> 带未解决风险终止
     if (round >= maxRounds) {
       return {
         action: 'terminate',
-        reason: `已达到最大轮次 (${maxRounds})，终止讨论`,
+        reason:
+          unresolved_high_risks.length > 0
+            ? `已达到最大轮次 (${maxRounds})，保留 ${unresolved_high_risks.length} 个未解决高风险`
+            : `已达到最大轮次 (${maxRounds})，终止讨论`,
+        next_agents: ['reporter'],
+        constraints: {
+          must_address: unresolved_high_risks,
+          avoid: ['隐藏尚未解决的风险'],
+        },
+      };
+    }
+
+    // 2. 本轮只有Planner修订，必须交给Critic验证，不能直接结束。
+    if (
+      executedAgents.includes('planner') &&
+      !executedAgents.includes('critic')
+    ) {
+      return {
+        action: 'verify',
+        reason: 'Planner已完成修订，需要Critic验证风险是否真正关闭',
+        next_agents: ['critic'],
+        constraints: {
+          must_address: this.extractKeyIssues(context),
+          avoid: ['只复述旧风险，不评价修订结果'],
+        },
+      };
+    }
+
+    // 3. 先判断有没有真实进展；重复并不等于收敛。
+    if (
+      stagnation_rounds >= this.policy.maxStagnationRounds &&
+      unresolved_high_risks.length > 0
+    ) {
+      return {
+        action: 'revise',
+        reason: `连续 ${stagnation_rounds} 轮没有实质进展，要求Planner更换方案或关键假设`,
+        next_agents: ['planner'],
+        constraints: {
+          must_address: unresolved_high_risks,
+          avoid: ['重复原方案', '只调整措辞不调整设计'],
+        },
+      };
+    }
+
+    // 4. 高风险优先交给Planner逐项修订，而不是继续扩大分歧。
+    if (unresolved_high_risks.length > 0) {
+      return {
+        action: 'revise',
+        reason: `仍有 ${unresolved_high_risks.length} 个高风险需要关闭`,
+        next_agents: ['planner'],
+        constraints: {
+          must_address: unresolved_high_risks,
+          avoid: ['泛化回应', '忽略最坏情况'],
+        },
+      };
+    }
+
+    const structurallyReady =
+      validity_check.feasible &&
+      validity_check.realistic &&
+      validity_check.complete &&
+      coverage >= this.policy.coverageThreshold;
+
+    // 5. 只有结构检查已通过但首轮过快一致时，才增加压力测试。
+    if (
+      round < this.policy.minRounds &&
+      consensus_level >= this.policy.agreementThreshold &&
+      structurallyReady
+    ) {
+      return {
+        action: 'challenge',
+        reason: `首轮共识过高 (${consensus_level.toFixed(2)})，增加一次反方压力测试`,
+        next_agents: ['critic'],
+        constraints: {
+          must_address: ['剩余不确定性', '最坏情况分析', '关键假设失效场景'],
+          avoid: ['为了达成一致而省略风险'],
+        },
+      };
+    }
+
+    const readyToFinalize =
+      round >= this.policy.minRounds &&
+      structurallyReady;
+    if (readyToFinalize) {
+      return {
+        action: 'finalize',
+        reason: `可行性、现实性和完整性均已通过，覆盖率 ${(coverage * 100).toFixed(0)}%`,
         next_agents: ['reporter'],
       };
     }
 
-    // 2. 高共识 (> 0.90) -> 收敛
-    if (consensus_level > 0.90) {
+    // 6. 没有高风险但结构检查未通过，先修订再验证。
+    if (
+      !validity_check.feasible ||
+      !validity_check.realistic ||
+      !validity_check.complete
+    ) {
       return {
-        action: 'converge',
-        reason: `共识水平高 (${consensus_level.toFixed(2)})，进入收敛阶段`,
-        next_agents: ['planner', 'critic', 'reporter'],
+        action: 'revise',
+        reason: '结构化有效性检查尚未全部通过',
+        next_agents: ['planner'],
         constraints: {
-          must_address: ['剩余不确定性', '最坏情况分析'],
-          avoid: ['重复之前的论点'],
+          must_address: this.extractKeyIssues(context),
+          avoid: ['只追求语义一致'],
         },
       };
     }
 
-    // 3. 低共识 (<= 0.70) -> 强制反方
-    if (consensus_level <= 0.70 && round >= 2) {
-      return {
-        action: 'force_opposition',
-        reason: `共识水平低 (${consensus_level.toFixed(2)})，需要更多反方论证`,
-        next_agents: ['critic'],
-        constraints: {
-          must_address: ['反方论证', '失败可能性'],
-          avoid: ['重复之前的观点'],
-        },
-      };
-    }
-
-    // 4. 检测到顽固Agent -> 发出更新命令
-    if (stubborn_agents.length > 0) {
-      return {
-        action: 'continue',
-        reason: `检测到顽固Agent (${stubborn_agents.join(', ')})，要求更新立场`,
-        next_agents: stubborn_agents,
-        constraints: {
-          must_address: ['修改关键假设', '降低置信度', '指出对方逻辑漏洞'],
-          avoid: ['完全重复上一轮观点'],
-        },
-      };
-    }
-
-    // 5. 中度共识 (0.70 ~ 0.90) -> 继续讨论
+    // 7. 默认由Critic做最后验证。
     return {
-      action: 'continue',
-      reason: `共识水平中等 (${consensus_level.toFixed(2)})，继续讨论`,
-      next_agents: ['planner', 'critic'],
+      action: 'verify',
+      reason: '尚未满足结束条件，继续验证剩余不确定性',
+      next_agents: ['critic'],
       constraints: {
         must_address: this.extractKeyIssues(context),
-        avoid: ['模糊的论述', '缺乏数据支持的假设'],
+        avoid: ['重复之前的论点'],
       },
     };
   }
@@ -443,6 +604,9 @@ export class HostAgent extends BaseAgent {
     content += `## 共识分析\n\n`;
     content += `- **共识水平**: ${(analysis.consensus_level * 100).toFixed(1)}%\n`;
     content += `- **趋势**: ${this.formatTrend(analysis.trend)}\n`;
+    content += `- **结构覆盖率**: ${(analysis.coverage * 100).toFixed(0)}%\n`;
+    content += `- **未解决高风险**: ${analysis.unresolved_high_risks.length}\n`;
+    content += `- **停滞轮数**: ${analysis.stagnation_rounds}\n`;
     
     if (analysis.stubborn_agents.length > 0) {
       content += `- **顽固Agent**: ${analysis.stubborn_agents.join(', ')}\n`;
@@ -476,9 +640,10 @@ export class HostAgent extends BaseAgent {
    */
   private getActionName(action: HostAction): string {
     const names: Record<HostAction, string> = {
-      continue: '继续讨论',
-      converge: '进入收敛阶段',
-      force_opposition: '强制反方角色',
+      revise: '修订方案',
+      challenge: '反方压力测试',
+      verify: '验证修订',
+      finalize: '生成最终报告',
       terminate: '终止讨论',
     };
     return names[action];

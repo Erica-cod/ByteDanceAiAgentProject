@@ -9,9 +9,13 @@
 
 import { MessageEntity } from '../../../domain/entities/message.entity.js';
 import { IMessageRepository } from '../../interfaces/repositories/message.repository.interface.js';
+import type { IConversationMemoryIndexer } from '../../services/conversation-memory-indexer.js';
 
 export class CreateMessageUseCase {
-  constructor(private messageRepository: IMessageRepository) {}
+  constructor(
+    private messageRepository: IMessageRepository,
+    private memoryIndexer?: IConversationMemoryIndexer
+  ) {}
 
   async execute(
     conversationId: string,
@@ -37,6 +41,8 @@ export class CreateMessageUseCase {
     );
 
     await this.messageRepository.save(message);
+    // 消息先可靠落库，再并行构建派生索引；索引失败不能阻断聊天/SSE。
+    this.memoryIndexer?.indexMessageInBackground(message);
     return message;
   }
 }

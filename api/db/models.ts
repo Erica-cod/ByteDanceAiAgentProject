@@ -32,7 +32,7 @@ export interface Message {
   clientMessageId?: string; // 前端生成的临时消息ID（用于本地缓存与服务端持久化对齐）
   conversationId: string;   // Parent conversation ID
   userId: string;           // Owner user ID
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   contentPreview?: string;  // ✅ 新增：内容预览（前1000字符，用于快速加载）
   contentLength?: number;   // ✅ 新增：完整内容长度
@@ -44,6 +44,35 @@ export interface Message {
     tokens?: number;
     duration?: number;
   };
+}
+
+// ==================== 对话长期记忆索引 ====================
+
+/**
+ * 从原始消息派生出的可检索记忆块。
+ *
+ * messages 仍然是事实源；该集合只负责全文/向量召回，可以安全重建。
+ */
+export interface MemoryItem {
+  _id?: string;
+  memoryId: string;              // `${messageId}:${chunkIndex}`
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  role: 'user' | 'assistant' | 'system';
+  kind: 'message_chunk';
+  chunkIndex: number;
+  text: string;
+  contentHash: string;
+  embedding?: number[];
+  embeddingModel?: string;
+  embeddingVersion: string;
+  embeddingStatus: 'ready' | 'unavailable' | 'failed';
+  importance: number;            // 0～1，供最终重排使用
+  status: 'active' | 'superseded' | 'deleted';
+  occurredAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Request/Response types

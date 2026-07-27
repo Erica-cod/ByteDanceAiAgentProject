@@ -6,7 +6,7 @@
  * 功能：
  * - 滑动窗口记忆管理
  * - Token 限制截断
- * - 关键词匹配增强
+ * - BM25/关键词与向量混合召回
  */
 
 import { z } from 'zod';
@@ -34,6 +34,22 @@ const MemoryConfigSchema = z.object({
   
   // 关键词匹配时额外检索的消息数
   keywordMatchCount: z.number().int().positive().default(3),
+
+  // 是否启用混合召回。不可用时自动降级到关键词匹配。
+  enableHybridRetrieval: z.boolean().default(true),
+
+  // 进入混合排序前，两路各自保留的候选数。
+  lexicalCandidateCount: z.number().int().positive().default(20),
+  vectorCandidateCount: z.number().int().positive().default(20),
+
+  // 记忆最终返回数量和时间衰减半衰期。
+  hybridMatchCount: z.number().int().positive().default(5),
+  recencyHalfLifeDays: z.number().positive().default(30),
+
+  // 最终重排权重；运行时会自动归一化。
+  relevanceWeight: z.number().nonnegative().default(0.7),
+  recencyWeight: z.number().nonnegative().default(0.1),
+  importanceWeight: z.number().nonnegative().default(0.2),
 });
 
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
@@ -110,7 +126,17 @@ export class ConversationMemoryEntity {
     console.log(`📊 配置: 窗口大小=${this.config.windowSize}, Token限制=${this.config.maxTokens}`);
 
     // 合并相关消息和最近消息
-    const allHistoricalMessages = this.mergeAndSortMessages();
+    const allHistoricalMessages = this
+      .mergeAndSortMessages()
+      .filter((message, index, messages) => {
+        // chat.ts 会先保存本轮用户消息，再构建上下文。避免把同一问题重复发送两次。
+        const isLastHistoricalMessage = index === messages.length - 1;
+        return !(
+          isLastHistoricalMessage &&
+          message.role === 'user' &&
+          message.content.trim() === currentMessage.trim()
+        );
+      });
     console.log(`✅ 合并后共 ${allHistoricalMessages.length} 条历史消息`);
 
     // 转换为 ChatMessage 格式

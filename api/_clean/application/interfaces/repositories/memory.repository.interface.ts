@@ -5,6 +5,23 @@
  */
 
 import { HistoricalMessage, MemoryConfig } from '../../../domain/entities/conversation-memory.entity.js';
+import type { MemoryItem } from '../../../../db/models.js';
+
+export interface HybridMemorySearchInput {
+  conversationId: string;
+  userId: string;
+  query: string;
+  excludeMessageIds: Set<string>;
+  limit: number;
+  lexicalCandidateCount: number;
+  vectorCandidateCount: number;
+  recencyHalfLifeDays: number;
+  weights: {
+    relevance: number;
+    recency: number;
+    importance: number;
+  };
+}
 
 /**
  * 记忆仓储接口
@@ -41,6 +58,23 @@ export interface IMemoryRepository {
     excludeMessageIds: Set<string>,
     limit: number
   ): Promise<HistoricalMessage[]>;
+
+  /**
+   * 混合召回：BM25/关键词 + 向量 + 时间/重要性重排。
+   * 未配置 Atlas Search 或 Embedding 时由实现自动降级。
+   */
+  findHybridRelevantMessages?(
+    input: HybridMemorySearchInput
+  ): Promise<HistoricalMessage[]>;
+
+  /**
+   * 写入从原始消息派生出的记忆块。
+   */
+  replaceMemoryItemsForMessage?(
+    messageId: string,
+    userId: string,
+    items: MemoryItem[]
+  ): Promise<void>;
 
   /**
    * 获取对话的总消息数

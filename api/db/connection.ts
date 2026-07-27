@@ -70,6 +70,10 @@ async function createIndexes() {
     // Messages collection indexes
     await db.collection('messages').createIndex({ messageId: 1 }, { unique: true });
     await db.collection('messages').createIndex({ conversationId: 1, timestamp: 1 });
+    await db.collection('messages').createIndex(
+      { userId: 1, conversationId: 1, timestamp: -1 },
+      { name: 'user_conversation_time_index' }
+    );
     await db.collection('messages').createIndex({ userId: 1 });
     // 幂等写入用：同一会话/用户下，同一个 clientMessageId 只允许出现一次（只对有 clientMessageId 的文档建索引）
     // 注意：partialFilterExpression 不支持 $ne，使用 $type 来确保字段存在且为字符串类型
@@ -93,6 +97,21 @@ async function createIndexes() {
     await db.collection('multi_agent_sessions').createIndex(
       { expiresAt: 1 },
       { expireAfterSeconds: 0, name: 'ttl_index' }
+    );
+
+    // 对话长期记忆：普通索引用于租户过滤、回退检索与幂等更新。
+    // Atlas Search / Vector Search 索引需在 Atlas 控制台或部署脚本中单独创建。
+    await db.collection('memory_items').createIndex(
+      { memoryId: 1 },
+      { unique: true, name: 'memory_id_unique' }
+    );
+    await db.collection('memory_items').createIndex(
+      { userId: 1, conversationId: 1, status: 1, occurredAt: -1 },
+      { name: 'memory_scope_time_index' }
+    );
+    await db.collection('memory_items').createIndex(
+      { messageId: 1, embeddingVersion: 1 },
+      { name: 'memory_message_version_index' }
     );
     // 查询索引：提高按sessionId和userId查询的性能
     await db.collection('multi_agent_sessions').createIndex(
