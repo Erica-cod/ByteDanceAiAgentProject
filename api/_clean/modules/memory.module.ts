@@ -2,6 +2,7 @@ import { IMemoryRepository } from '../application/interfaces/repositories/memory
 import { MongoMemoryRepository } from '../infrastructure/repositories/memory.repository.js';
 import { GetConversationContextUseCase } from '../application/use-cases/memory/get-conversation-context.use-case.js';
 import { GetMemoryStatsUseCase } from '../application/use-cases/memory/get-memory-stats.use-case.js';
+import { ConversationMemoryMaintenanceService } from '../application/services/conversation-memory-maintenance.js';
 
 export class MemoryModule {
   constructor(private instances: Map<string, any>) {}
@@ -15,4 +16,16 @@ export class MemoryModule {
 
   getGetConversationContextUseCase() { return new GetConversationContextUseCase(this.getMemoryRepository()); }
   getGetMemoryStatsUseCase() { return new GetMemoryStatsUseCase(this.getMemoryRepository()); }
+
+  getConversationMemoryMaintenanceService() {
+    if (!this.instances.has('ConversationMemoryMaintenanceService')) {
+      this.instances.set(
+        'ConversationMemoryMaintenanceService',
+        new ConversationMemoryMaintenanceService(this.getMemoryRepository())
+      );
+    }
+    return this.instances.get(
+      'ConversationMemoryMaintenanceService'
+    ) as ConversationMemoryMaintenanceService;
+  }
 }

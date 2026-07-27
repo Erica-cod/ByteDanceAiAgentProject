@@ -56,6 +56,11 @@ export abstract class BaseAgent {
   // 历史记录
   protected history: AgentOutput[] = [];
   protected lastPosition?: PositionSummary;
+  private accumulatedTokenUsage = {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+  };
 
   constructor(config: AgentConfig) {
     this.agentId = config.agentId;
@@ -123,7 +128,16 @@ export abstract class BaseAgent {
 
         for (const line of lines) {
           if (line.trim()) {
-            const content = volcengineService.parseStreamLine(line);
+            const event = volcengineService.parseStreamEvent(line);
+            if (event?.usage) {
+              this.accumulatedTokenUsage.prompt_tokens +=
+                event.usage.prompt_tokens;
+              this.accumulatedTokenUsage.completion_tokens +=
+                event.usage.completion_tokens;
+              this.accumulatedTokenUsage.total_tokens +=
+                event.usage.total_tokens;
+            }
+            const content = event?.content;
             if (content) {
               fullResponse += content;
               
@@ -203,12 +217,31 @@ export abstract class BaseAgent {
     return this.agentId;
   }
 
+  consumeTokenUsage(): {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  } | undefined {
+    const usage = { ...this.accumulatedTokenUsage };
+    this.accumulatedTokenUsage = {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    };
+    return usage.total_tokens > 0 ? usage : undefined;
+  }
+
   /**
    * 重置Agent状态
    */
   reset(): void {
     this.history = [];
     this.lastPosition = undefined;
+    this.accumulatedTokenUsage = {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    };
   }
 
   /**

@@ -6,7 +6,12 @@
 
 import { connectToDatabase } from '../../../db/connection.js';
 import type { Collection } from 'mongodb';
-import type { MemoryItem, Message } from '../../../db/models.js';
+import type {
+  ConversationTokenState,
+  MemoryItem,
+  MemorySummary,
+  Message,
+} from '../../../db/models.js';
 import {
   IMemoryRepository,
   type HybridMemorySearchInput,
@@ -18,8 +23,10 @@ import {
 import { embeddingService, type IEmbeddingService } from '../llm/embedding.service.js';
 import {
   rankHybridMemoryItems,
+  tokenizeForMemorySearch,
   type RankableMemoryItem,
 } from '../../domain/services/hybrid-memory-ranking.js';
+import { estimateTextTokens } from '../../domain/services/token-budget.js';
 
 /**
  * MongoDB 记忆仓储实现
@@ -201,6 +208,9 @@ export class MongoMemoryRepository implements IMemoryRepository {
         role: source.role === 'system' ? 'assistant' : source.role,
         content: source.text,
         timestamp: new Date(source.occurredAt),
+        source: 'memory_chunk' as const,
+        relevanceScore: item.finalScore,
+        estimatedTokens: estimateTextTokens(source.text),
       };
     });
   }
@@ -235,6 +245,316 @@ export class MongoMemoryRepository implements IMemoryRepository {
       }),
       { ordered: false }
     );
+  }
+
+  async getConversationTokenState(
+    conversationId: string,
+    userId: string
+  ): Promise<ConversationTokenState | null> {
+    const db = await connectToDatabase();
+    return await db
+      .collection<ConversationTokenState>('conversation_token_states')
+      .findOne({ conversationId, userId });
+  }
+
+  async recordConversationTokenUsage(input: {
+    conversationId: string;
+    userId: string;
+    inputTokens: number;
+    totalTokens: number;
+    unsummarizedTokenDelta: number;
+    source: 'provider' | 'estimated';
+  }): Promise<ConversationTokenState> {
+    const db = await connectToDatabase();
+    const collection = db.collection<ConversationTokenState>(
+      'conversation_token_states'
+    );
+    const now = new Date();
+
+    await collection.updateOne(
+      {
+        conversationId: input.conversationId,
+        userId: input.userId,
+      },
+      {
+        $set: {
+          lastInputTokens: Math.max(0, input.inputTokens),
+          lastUsageSource: input.source,
+          updatedAt: now,
+        },
+        $inc: {
+          lifetimeBillableTokens: Math.max(0, input.totalTokens),
+          unsummarizedTokens: Math.max(0, input.unsummarizedTokenDelta),
+        },
+        $setOnInsert: {
+          compressionStatus: 'idle',
+          compressionFailureCount: 0,
+          createdAt: now,
+        },
+      },
+      { upsert: true }
+    );
+
+    const state = await collection.findOne({
+      conversationId: input.conversationId,
+      userId: input.userId,
+    });
+    if (!state) {
+      throw new Error('记录会话 token 状态后未能重新读取');
+    }
+    return state;
+  }
+
+  async claimConversationCompression(
+    conversationId: string,
+    userId: string,
+    now: Date
+  ): Promise<boolean> {
+    const db = await connectToDatabase();
+    const collection = db.collection<ConversationTokenState>(
+      'conversation_token_states'
+    );
+    const claimed = await collection.findOneAndUpdate(
+      {
+        conversationId,
+        userId,
+        $and: [
+          {
+            $or: [
+              { compressionStatus: { $ne: 'running' } },
+              {
+                compressionStartedAt: {
+                  $lte: new Date(now.getTime() - 10 * 60 * 1_000),
+                },
+              },
+            ],
+          },
+          {
+            $or: [
+              { compressionRetryAt: { $exists: false } },
+              { compressionRetryAt: { $lte: now } },
+            ],
+          },
+        ],
+      },
+      {
+        $set: {
+          compressionStatus: 'running',
+          compressionStartedAt: now,
+          updatedAt: now,
+        },
+        $unset: {
+          lastCompressionError: '',
+          compressionRetryAt: '',
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    return Boolean(claimed);
+  }
+
+  async completeConversationCompression(
+    conversationId: string,
+    userId: string,
+    processedTokens: number,
+    summarizedThroughMessageId: string
+  ): Promise<void> {
+    const db = await connectToDatabase();
+    const collection = db.collection<ConversationTokenState>(
+      'conversation_token_states'
+    );
+    const now = new Date();
+
+    await collection.updateOne(
+      { conversationId, userId },
+      [
+        {
+          $set: {
+            unsummarizedTokens: {
+              $max: [
+                0,
+                {
+                  $subtract: [
+                    '$unsummarizedTokens',
+                    Math.max(0, processedTokens),
+                  ],
+                },
+              ],
+            },
+            summarizedThroughMessageId,
+            compressionStatus: 'idle',
+            compressionFailureCount: 0,
+            updatedAt: now,
+          },
+        },
+        {
+          $unset: [
+            'compressionStartedAt',
+            'compressionRetryAt',
+            'lastCompressionError',
+          ],
+        },
+      ]
+    );
+  }
+
+  async failConversationCompression(
+    conversationId: string,
+    userId: string,
+    error: string,
+    retryAt: Date
+  ): Promise<void> {
+    const db = await connectToDatabase();
+    await db
+      .collection<ConversationTokenState>('conversation_token_states')
+      .updateOne(
+        { conversationId, userId },
+        {
+          $set: {
+            compressionStatus: 'failed',
+            compressionRetryAt: retryAt,
+            lastCompressionError: error.slice(0, 500),
+            updatedAt: new Date(),
+          },
+          $inc: { compressionFailureCount: 1 },
+          $unset: { compressionStartedAt: '' },
+        }
+      );
+  }
+
+  async releaseConversationCompression(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    const db = await connectToDatabase();
+    await db
+      .collection<ConversationTokenState>('conversation_token_states')
+      .updateOne(
+        { conversationId, userId },
+        {
+          $set: {
+            compressionStatus: 'idle',
+            updatedAt: new Date(),
+          },
+          $unset: { compressionStartedAt: '' },
+        }
+      );
+  }
+
+  async getMessagesForSummary(
+    conversationId: string,
+    userId: string,
+    afterMessageId: string | undefined,
+    keepRecentCount: number,
+    maxMessages: number
+  ): Promise<HistoricalMessage[]> {
+    const db = await connectToDatabase();
+    const collection = db.collection<Message>('messages');
+    const filter: Record<string, any> = { conversationId, userId };
+
+    if (afterMessageId) {
+      const watermark = await collection.findOne({
+        conversationId,
+        userId,
+        messageId: afterMessageId,
+      });
+      if (watermark) {
+        filter.timestamp = { $gt: watermark.timestamp };
+      }
+    }
+
+    const messages = await collection
+      .find(filter)
+      .sort({ timestamp: 1 })
+      .limit(Math.max(1, maxMessages + keepRecentCount))
+      .toArray();
+
+    const compressibleCount = Math.max(0, messages.length - keepRecentCount);
+    return messages
+      .slice(0, Math.min(compressibleCount, maxMessages))
+      .map(message => ({
+        ...this.toHistoricalMessage(message),
+        source: 'recent' as const,
+        estimatedTokens: estimateTextTokens(message.content),
+      }));
+  }
+
+  async saveMemorySummary(summary: MemorySummary): Promise<void> {
+    const db = await connectToDatabase();
+    const collection = db.collection<MemorySummary>('memory_summaries');
+
+    await collection.updateMany(
+      {
+        conversationId: summary.conversationId,
+        userId: summary.userId,
+        sourceMessageIds: { $in: summary.sourceMessageIds },
+        summaryId: { $ne: summary.summaryId },
+        status: 'active',
+      },
+      {
+        $set: {
+          status: 'superseded',
+          updatedAt: summary.updatedAt,
+        },
+      }
+    );
+
+    const { createdAt, ...mutableFields } = summary;
+    await collection.updateOne(
+      { summaryId: summary.summaryId },
+      {
+        $set: mutableFields,
+        $setOnInsert: { createdAt },
+      },
+      { upsert: true }
+    );
+  }
+
+  async findRelevantMemorySummaries(
+    conversationId: string,
+    userId: string,
+    query: string,
+    limit: number
+  ): Promise<HistoricalMessage[]> {
+    const db = await connectToDatabase();
+    const summaries = await db
+      .collection<MemorySummary>('memory_summaries')
+      .find({
+        conversationId,
+        userId,
+        status: 'active',
+      })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+
+    const queryTokens = new Set(tokenizeForMemorySearch(query));
+    return summaries
+      .map(summary => {
+        const content = formatMemorySummary(summary);
+        const summaryTokens = new Set(tokenizeForMemorySearch(content));
+        const matches = [...queryTokens].filter(token =>
+          summaryTokens.has(token)
+        ).length;
+        const relevanceScore =
+          queryTokens.size === 0 ? 0.2 : matches / queryTokens.size;
+        return {
+          messageId: summary.summaryId,
+          role: 'assistant' as const,
+          content,
+          timestamp: new Date(summary.createdAt),
+          source: 'summary' as const,
+          relevanceScore,
+          estimatedTokens: summary.summaryTokenCount,
+          sourceMessageIds: summary.sourceMessageIds,
+        };
+      })
+      .sort(
+        (left, right) =>
+          (right.relevanceScore ?? 0) - (left.relevanceScore ?? 0) ||
+          right.timestamp.getTime() - left.timestamp.getTime()
+      )
+      .slice(0, Math.max(0, limit));
   }
 
   /**
@@ -334,5 +654,19 @@ export class MongoMemoryRepository implements IMemoryRepository {
       return [];
     }
   }
+}
+
+function formatMemorySummary(summary: MemorySummary): string {
+  const sections = [`[长期记忆摘要] ${summary.summary}`];
+  if (summary.goals.length > 0) {
+    sections.push(`目标：${summary.goals.join('；')}`);
+  }
+  if (summary.preferences.length > 0) {
+    sections.push(`偏好：${summary.preferences.join('；')}`);
+  }
+  if (summary.constraints.length > 0) {
+    sections.push(`约束：${summary.constraints.join('；')}`);
+  }
+  return sections.join('\n');
 }
 

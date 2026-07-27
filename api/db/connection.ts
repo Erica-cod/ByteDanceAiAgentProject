@@ -113,6 +113,22 @@ async function createIndexes() {
       { messageId: 1, embeddingVersion: 1 },
       { name: 'memory_message_version_index' }
     );
+    await db.collection('memory_summaries').createIndex(
+      { summaryId: 1 },
+      { unique: true, name: 'memory_summary_id_unique' }
+    );
+    await db.collection('memory_summaries').createIndex(
+      { userId: 1, conversationId: 1, status: 1, createdAt: -1 },
+      { name: 'memory_summary_scope_index' }
+    );
+    await db.collection('conversation_token_states').createIndex(
+      { conversationId: 1, userId: 1 },
+      { unique: true, name: 'conversation_token_state_unique' }
+    );
+    await db.collection('conversation_token_states').createIndex(
+      { compressionStatus: 1, compressionRetryAt: 1 },
+      { name: 'conversation_compression_retry_index' }
+    );
     // 查询索引：提高按sessionId和userId查询的性能
     await db.collection('multi_agent_sessions').createIndex(
       { sessionId: 1, userId: 1 },

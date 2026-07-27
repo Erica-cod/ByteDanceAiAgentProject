@@ -34,7 +34,7 @@ interface CacheEnvelopeV1 {
 const CACHE_PREFIX = 'chat_cache_v1:';
 const LEGACY_PREFIX = 'chat_'; // 兼容旧 key：chat_${conversationId}
 
-const MAX_MESSAGES_TO_KEEP = 500;
+const MAX_MESSAGES_TO_KEEP = 20;
 const MAX_UNSYNCED_TO_KEEP = 50;
 
 function cacheKey(conversationId: string) {
@@ -100,7 +100,7 @@ export function writeConversationCache(conversationId: string, messages: CachedM
   } catch (e) {
     // localStorage 可能满了：尽量只保留最近的消息，避免页面崩
     try {
-      const minimal = trimMessages(messages, 200, 10);
+      const minimal = trimMessages(messages, 10, 10);
       localStorage.setItem(cacheKey(conversationId), JSON.stringify({ ...env, messages: minimal }));
       localStorage.setItem(`${LEGACY_PREFIX}${conversationId}`, JSON.stringify(minimal));
     } catch {

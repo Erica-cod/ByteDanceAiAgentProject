@@ -96,6 +96,18 @@ export class OllamaStreamParser implements StreamParser {
     // ── done 处理 ──
     if (data.done) {
       result.done = true;
+      if (
+        Number.isFinite(data.prompt_eval_count) ||
+        Number.isFinite(data.eval_count)
+      ) {
+        const promptTokens = Number(data.prompt_eval_count) || 0;
+        const completionTokens = Number(data.eval_count) || 0;
+        result.tokenUsage = {
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: promptTokens + completionTokens,
+        };
+      }
 
       if (this.pendingToolCalls.length > 0) {
         result.finishReason = 'tool_calls';

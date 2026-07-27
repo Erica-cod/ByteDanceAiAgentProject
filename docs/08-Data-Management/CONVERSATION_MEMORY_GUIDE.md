@@ -1,323 +1,179 @@
-# 对话记忆管理功能说明
+# 对话记忆与 token 预算
 
-## 📚 功能概述
+## 目标
 
-实现了 AI 模型的**对话上下文保持**功能，使模型能够"记住"之前的对话内容，提供更连贯的多轮对话体验。
+这套记忆系统同时解决三个不同问题：
 
----
+- 页面再次打开时快速显示最近对话。
+- MongoDB 保留完整、可审计的原始消息。
+- 给模型构建上下文时，在输入预算内优先放入最有价值的信息。
 
-## 🎯 实现方案
+摘要和向量索引都是派生数据。它们可以重建，不能替代 `messages` 事实源。
 
-### **阶段 1: 滑动窗口 + 关键词匹配** ✅ 已实现
+## 数据分层
 
-**核心特性：**
-- ✅ 滑动窗口记忆：保留最近 N 轮对话
-- ✅ Token 智能截断：防止超出模型上下文限制
-- ✅ 关键词匹配增强：查找相关的历史对话
-- ✅ 配置化设计：可根据场景调整参数
+| 层 | 内容 | 生命周期 |
+| --- | --- | --- |
+| LocalStorage | 每个会话最近 10 轮（20 条）完整消息 | 秒开缓存，可淘汰 |
+| `messages` | 所有原始 user/assistant 消息 | 主链路同步持久化 |
+| `memory_items` | 1200 字符切片、120 字符重叠、Embedding、重要性 | 后台派生，可重建 |
+| `memory_summaries` | 摘要、目标、偏好、约束、`sourceMessageIds` | 后台派生，可重建 |
+| `conversation_token_states` | 输入压力、累计账单、未摘要增量、任务状态 | 每轮更新 |
+| `multi_agent_sessions` | 多 Agent 执行检查点 | TTL 短期状态 |
 
-**工作原理：**
+LocalStorage 常见配额约为数 MiB，但不同浏览器和 origin 的策略不完全相同，因此不能把“5MB”当业务协议。本项目直接按轮数控制；离线产生但还没有同步的旧消息会暂时超出 20 条上限，以避免刷新后丢失。
+
+## 写入链路
+
+```text
+用户/助手消息
+→ 同步写入 MongoDB messages
+→ 返回/继续 SSE 主链路
+→ 后台切片
+→ Embedding（不可用时保留全文索引）
+→ memory_items
 ```
-用户对话 1 → 保存到数据库
-用户对话 2 → 保存到数据库
-...
-用户对话 15 → 保存到数据库
 
-新消息到来时:
-1. 从数据库读取最近 10 轮对话（20 条消息）
-2. 搜索更早但相关的对话（基于关键词）
-3. 合并并排序所有消息
-4. 根据 Token 限制截断（保留最近的）
-5. 发送给模型生成回复
+每轮模型完成后，供应商 usage 和新增原文 token 会写入 `conversation_token_states`。达到阈值时再启动另一个后台任务：
+
+```text
+原子抢占 compressionStatus
+→ 读取 watermark 之后的旧原文
+→ 保留最近 2 轮，不参与长期压缩
+→ 本地摘要 Agent 提取 summary/goals/preferences/constraints
+→ 写 memory_summaries（包含 sourceMessageIds）
+→ 推进 summarizedThroughMessageId
 ```
 
----
+切片/Embedding 已由消息索引任务完成，摘要任务复用原始消息范围和派生检索层。任何后台失败都不能回滚或删除 `messages`。
 
-### **阶段 2: 向量检索记忆** 🚧 计划中（明天实现）
+## token 双账本
 
-**计划特性：**
-- 🔮 语义相似度检索：使用 Embedding 向量
-- 🔮 长期记忆管理：可处理超长对话历史
-- 🔮 混合检索策略：结合关键词和语义
-- 🔮 跨对话检索：查找用户所有对话中的相关信息
-
-**技术栈：**
-- Ollama Embeddings (nomic-embed-text)
-- FAISS 本地向量存储
-- LangChain.js 向量检索
-
----
-
-## 📖 使用说明
-
-### **1. 基本使用**
-
-功能已自动集成，无需额外配置即可使用默认设置：
-
-```typescript
-// 默认配置
+```ts
 {
-  windowSize: 10,           // 保留最近 10 轮对话
-  maxTokens: 4000,          // 最大 4000 tokens
-  enableKeywordMatch: true, // 启用关键词匹配
-  keywordMatchCount: 3      // 额外检索 3 条相关消息
+  conversationId: "conv-123",
+  lastInputTokens: 7200,
+  lifetimeBillableTokens: 32500,
+  unsummarizedTokens: 4600,
+  summarizedThroughMessageId: "msg-88",
+  compressionStatus: "idle"
 }
 ```
 
-### **2. 自定义配置**
+- `lastInputTokens`：最近一次模型调用的真实输入，判断上下文压力。
+- `lifetimeBillableTokens`：所有模型调用 `total_tokens` 的累计，统计成本。
+- `unsummarizedTokens`：上次摘要后新增 user + assistant 原文的估算 token。
+- `summarizedThroughMessageId`：摘要水位。
+- `compressionStatus`：`idle | running | failed`。
 
-#### **方法 1：环境变量配置**
+`lifetimeBillableTokens` 不能用来判断上下文是否超限，因为历史内容会在多轮调用中重复计费。
 
-在 `.env.local` 或 `.env.production` 中添加：
+OpenAI 兼容接口启用：
+
+```json
+{
+  "stream": true,
+  "stream_options": {
+    "include_usage": true
+  }
+}
+```
+
+流解析器会等待最后一个 `choices=[]` 的 usage chunk，再结束请求。Ollama 的 `prompt_eval_count` 和 `eval_count` 会映射到相同结构。供应商没有返回 usage 时才使用本地估算。
+
+## 摘要触发
+
+当前默认满足任一条件时尝试启动：
+
+- `unsummarizedTokens >= 4000`。
+- `lastInputTokens >= inputBudget × 65%`。
+
+`inputBudget`：
+
+```text
+inputBudget = contextWindow
+              - outputReserve
+              - ceil(contextWindow × safetyMarginRatio)
+```
+
+同一会话通过 MongoDB 原子更新抢占，避免并发生成重复摘要。失败记录错误和 5 分钟后的重试时间；`running` 超过 10 分钟视为可能失联，允许其他 worker 重新抢占。
+
+这些默认值是工程起点，需要结合摘要质量、P95 延迟和费用调整。
+
+## 构建上下文
+
+先扣除固定开销：
+
+```text
+historyBudget = inputBudget
+                - system prompt
+                - 当前 user 消息
+                - tools JSON Schema
+```
+
+装入顺序：
+
+1. system prompt 和当前问题。
+2. 最近 2 轮完整原文，作为强制历史。
+3. 相关的持久摘要。
+4. BM25/Embedding/RRF 召回的长期记忆。
+5. 候选按“相关性价值 / token 成本”选择，达到预算后停止。
+
+最近消息按时间顺序发送；摘要作为 system memory 发送。工具 Schema 也占输入 token，不能只计算文本消息。
+
+## 摘要未完成时的降级
+
+```text
+摘要可用
+→ 最近原文 + 摘要 + 相关记忆
+
+摘要正在生成
+→ 最近原文 + 已有摘要/记忆
+→ 丢弃低相关、高 token 成本片段
+→ 压力仍高且没有摘要时，临时同步压缩或截断
+
+摘要失败
+→ 从 messages / memory_items 继续做原文全文或混合检索
+```
+
+用户请求从不等待后台摘要。摘要是压缩加速层，不是唯一事实源。
+
+## 检索降级
+
+- Atlas Text/Vector Search 可用：数据库侧缩小候选集。
+- Atlas 不可用：在有界候选集内做应用层 BM25 和余弦计算。
+- Embedding 不可用：降级到 BM25/关键词。
+- `memory_items` 尚未生成：直接查询 MongoDB `messages`。
+
+混合结果使用 RRF 融合，再叠加相关性、时间衰减和重要性。默认权重和候选数只是当前配置，不应描述成通用最优参数。
+
+## 关键代码
+
+- `src/utils/conversation/secureConversationCache.ts`
+- `api/_clean/domain/services/token-budget.ts`
+- `api/_clean/application/services/conversation-memory-indexer.ts`
+- `api/_clean/application/services/conversation-memory-maintenance.ts`
+- `api/_clean/application/use-cases/memory/get-conversation-context.use-case.ts`
+- `api/_clean/infrastructure/repositories/memory.repository.ts`
+- `api/handlers/stream-adapter.ts`
+
+## 验证
 
 ```bash
-# 滑动窗口大小（保留最近几轮对话）
-MEMORY_WINDOW_SIZE=15
-
-# 最大 Token 限制
-MEMORY_MAX_TOKENS=6000
-
-# 是否启用关键词匹配
-MEMORY_ENABLE_KEYWORD_MATCH=true
+npx tsc --noEmit
+npm run test:jest -- --runInBand \
+  test/jest/conversation-memory-budget.test.ts \
+  test/jest/memory-hybrid.test.ts
 ```
 
-#### **方法 2：代码配置**
+测试覆盖 token 预留、候选装箱、带来源 ID 的摘要持久化、OpenAI usage-only chunk、Ollama usage 映射、混合检索和当前用户消息去重。
 
-修改 `api/config/memoryConfig.ts` 中的 `DEFAULT_MEMORY_CONFIG`：
+## 生产化边界
 
-```typescript
-export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  windowSize: 15,      // 改为 15 轮
-  maxTokens: 6000,     // 改为 6000 tokens
-  enableKeywordMatch: true,
-  keywordMatchCount: 5,
-};
-```
+当前后台摘要通过 BFF 进程内异步任务启动，适合单体和个人项目。多实例或高可靠场景应升级为持久队列/Outbox，并增加：
 
----
-
-## 🔧 配置参数说明
-
-### **windowSize - 滑动窗口大小**
-
-含义：保留最近几轮对话（1 轮 = 1 条用户消息 + 1 条助手回复）
-
-| 值 | 适用场景 | 说明 |
-|---|---|---|
-| 5-8 | 简单问答、快速对话 | 上下文较少，响应快 |
-| 10-15 | 标准对话（推荐） | 平衡性能和上下文 |
-| 20+ | 复杂任务、长对话 | 需要更多历史信息 |
-
-**示例：**
-```
-windowSize = 3 时：
-用户: "我喜欢披萨"
-助手: "很好！"
-用户: "推荐一家餐厅"
-助手: "市中心有一家..."
-用户: "营业时间？"      ← 当前消息
-助手: "..."             ← 模型能看到最近 3 轮共 6 条消息
-```
-
-### **maxTokens - Token 限制**
-
-含义：发送给模型的最大 token 数（约 1 token = 3-4 个字符）
-
-| 值 | 适用模型 | 说明 |
-|---|---|---|
-| 2000-4000 | 一般模型 | 标准配置 |
-| 6000-8000 | 长上下文模型 | DeepSeek-R1, GPT-4 等 |
-| 16000+ | 超长上下文模型 | Claude, GPT-4 Turbo 等 |
-
-**注意：** 确保不超过模型的上下文窗口限制！
-
-### **enableKeywordMatch - 关键词匹配**
-
-含义：是否搜索更早但相关的对话
-
-- `true`：启用（推荐）- 可能找到相关历史
-- `false`：禁用 - 只使用最近消息，速度更快
-
-**示例：**
-```
-对话历史：
-1. "我的名字是张三" (20轮前)
-2. ...
-10. "今天天气真好" (最近)
-11. "我想出去玩" (最近)
-
-用户问："我叫什么名字？"
-
-启用关键词匹配：会找到第1条消息 ✅
-禁用：只看最近10轮，找不到 ❌
-```
-
----
-
-## 🧪 测试验证
-
-### **测试场景 1：基础上下文保持**
-
-```
-1. 用户: "我喜欢吃披萨"
-   助手: "很好！披萨是一种很受欢迎的食物。"
-
-2. 用户: "推荐一家好吃的店"
-   助手: "市中心有家XX披萨店，口碑很好。"   ✅ 记住了"披萨"
-
-3. 用户: "他们的营业时间是？"
-   助手: "XX披萨店的营业时间是..."          ✅ 记住了"那家店"
-```
-
-### **测试场景 2：长对话测试**
-
-```
-进行 15+ 轮对话，验证：
-- ✅ 最近的对话始终被记住
-- ✅ Token 超限时正确截断
-- ✅ 对话流畅不中断
-```
-
-### **测试场景 3：关键词检索**
-
-```
-1. 用户: "我的邮箱是 test@example.com" (10轮前)
-2-10. [其他无关对话]
-11. 用户: "我的邮箱是什么？"
-    助手: "您的邮箱是 test@example.com"   ✅ 通过关键词找到了
-```
-
----
-
-## 📊 性能监控
-
-在控制台日志中可以看到：
-
-```
-🧠 ConversationMemoryService - 开始构建对话上下文
-📊 配置: 窗口大小=10, Token限制=4000
-✅ 获取到 18 条最近消息
-🔍 通过关键词匹配找到 2 条相关历史消息
-📝 最终上下文包含 22 条消息
-📊 预估 token 数: 3245
-```
-
----
-
-## 🔄 阶段对比
-
-### **阶段 0（之前）- 无记忆**
-```typescript
-❌ 问题：
-const messages = [
-  { role: 'system', content: SYSTEM_PROMPT },
-  { role: 'user', content: currentMessage }  // 只有当前消息
-];
-
-用户: "我喜欢披萨"
-助手: "很好！"
-用户: "推荐一家店"
-助手: "你想找什么类型的店？"  ❌ 不知道用户喜欢披萨
-```
-
-### **阶段 1（当前）- 滑动窗口**
-```typescript
-✅ 改进：
-const messages = await memoryService.getConversationContext(
-  conversationId, userId, currentMessage, SYSTEM_PROMPT
-);
-// 包含最近 10 轮对话 + 相关历史
-
-用户: "我喜欢披萨"
-助手: "很好！"
-用户: "推荐一家店"
-助手: "基于您喜欢披萨，推荐XX店"  ✅ 记住了上下文
-```
-
-### **阶段 2（明天）- 向量检索**
-```typescript
-🔮 未来：
-// 将使用语义相似度，不只是关键词
-// 可以处理更长的对话历史
-// 检索更精准
-```
-
----
-
-## 📝 代码位置
-
-### **核心文件：**
-- `api/services/conversationMemoryService.ts` - 记忆服务实现
-- `api/config/memoryConfig.ts` - 配置管理
-- `api/lambda/chat.ts` - 集成点（790-850 行）
-
-### **配置文件：**
-- `.env.example` - 环境变量模板
-- `.env.production` - 生产环境配置
-
----
-
-## 🐛 故障排查
-
-### **问题：模型还是不记得之前的对话**
-
-**检查：**
-1. 确认 conversationId 正确传递
-2. 查看控制台日志确认消息数量
-3. 检查数据库中是否保存了消息
-
-```bash
-# 检查数据库
-npm run db:shell
-> db.messages.find({ conversationId: "xxx" }).count()
-```
-
-### **问题：响应变慢**
-
-**原因：** 可能窗口太大或关键词匹配开销
-
-**解决：**
-```bash
-# 减小窗口
-MEMORY_WINDOW_SIZE=5
-
-# 或禁用关键词匹配
-MEMORY_ENABLE_KEYWORD_MATCH=false
-```
-
-### **问题：Token 超限错误**
-
-**原因：** maxTokens 设置超过模型限制
-
-**解决：**
-```bash
-# 降低限制
-MEMORY_MAX_TOKENS=2000
-```
-
----
-
-## 🎉 效果展示
-
-使用前后对比：
-
-| 特性 | 阶段 0（无记忆） | 阶段 1（滑动窗口） |
-|---|---|---|
-| 记住用户偏好 | ❌ | ✅ |
-| 连续对话 | ❌ | ✅ |
-| 代词理解 | ❌ | ✅ |
-| 历史查询 | ❌ | ✅（关键词） |
-| 长对话支持 | ❌ | ✅（10轮+） |
-
----
-
-## 🚀 下一步
-
-明天将实现**阶段 2：向量检索记忆**，带来：
-- 🔮 语义理解（不只是关键词）
-- 🔮 更长的记忆（100+ 轮对话）
-- 🔮 更精准的检索
-- 🔮 跨对话记忆
-
-敬请期待！
-
+- 至少一次投递与幂等消费。
+- 死信、重试、任务积压和耗时监控。
+- Embedding/摘要模型版本迁移。
+- 摘要事实一致性和关键证据召回评测。
+- 用户主动删除时，原文与派生层的级联 tombstone。

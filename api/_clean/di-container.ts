@@ -88,6 +88,9 @@ class SimpleContainer {
   getMemoryRepository() { return this.memory.getMemoryRepository(); }
   getGetConversationContextUseCase() { return this.memory.getGetConversationContextUseCase(); }
   getGetMemoryStatsUseCase() { return this.memory.getGetMemoryStatsUseCase(); }
+  getConversationMemoryMaintenanceService() {
+    return this.memory.getConversationMemoryMaintenanceService();
+  }
 
   // ==================== Plan ====================
   getPlanRepository() { return this.plan.getPlanRepository(); }

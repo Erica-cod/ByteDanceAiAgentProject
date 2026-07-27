@@ -27,13 +27,14 @@ async function saveMessage(
   content: string,
   clientAssistantMessageId?: string,
   thinking?: string,
-  sources?: Array<{ title: string; url: string }>
+  sources?: Array<{ title: string; url: string }>,
+  metadata?: { tokens?: number; duration?: number }
 ): Promise<void> {
   const container = getContainer();
   const createMessageUseCase = container.getCreateMessageUseCase();
   await createMessageUseCase.execute(
     conversationId, userId, 'assistant', content,
-    clientAssistantMessageId, undefined, thinking, sources
+    clientAssistantMessageId, undefined, thinking, sources, metadata
   );
 }
 
@@ -48,13 +49,16 @@ interface AgentStreamOptions {
   clientAssistantMessageId?: string;
   onFinally?: () => void;
   requestText?: string;
+  estimatedInputTokens?: number;
+  inputBudgetTokens?: number;
   adapter: StreamAdapter;
 }
 
 function handleAgentStream(opts: AgentStreamOptions): Response {
   const {
     stream, conversationId, userId, modelType,
-    messages, clientAssistantMessageId, onFinally,
+    messages, clientAssistantMessageId, onFinally, requestText,
+    estimatedInputTokens, inputBudgetTokens,
     adapter,
   } = opts;
 
@@ -76,6 +80,13 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
   let searchSources: Array<{ title: string; url: string }> | undefined;
   let messageSaved = false;
   const streamStartTime = Date.now();
+  const accumulatedUsage = {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+  };
+  let hasProviderUsage = false;
+  let lastCallUsage: ParsedChunk['tokenUsage'];
 
   async function processStream(currentStream: any, currentAdapter: StreamAdapter, depth: number = 0): Promise<void> {
     if (depth >= MAX_TOOL_DEPTH) {
@@ -99,6 +110,16 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
       for (const line of lines) {
         const parsed = currentAdapter.parseLine(line);
         if (!parsed) continue;
+        if (parsed.tokenUsage) {
+          hasProviderUsage = true;
+          lastCallUsage = parsed.tokenUsage;
+          accumulatedUsage.prompt_tokens +=
+            parsed.tokenUsage.prompt_tokens;
+          accumulatedUsage.completion_tokens +=
+            parsed.tokenUsage.completion_tokens;
+          accumulatedUsage.total_tokens +=
+            parsed.tokenUsage.total_tokens;
+        }
 
         // ── 内容推送 ──
         if (parsed.content) {
@@ -143,6 +164,12 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
           const finalContent = currentAdapter.getAccumulatedContent();
           const finalThinking = currentAdapter.getAccumulatedThinking();
           const rawContent = currentAdapter.getRawAccumulatedContent();
+          const durationMs = Date.now() - streamStartTime;
+          const finalUsage = hasProviderUsage
+            ? { ...accumulatedUsage }
+            : undefined;
+          const tokensUsed = finalUsage?.total_tokens
+            || Math.ceil((finalContent.length + finalThinking.length) / 3);
 
           if (!sseWriter.isClosed() && finalContent) {
             const { thinking, content: mainContent } = extractThinkingAndContent(finalContent);
@@ -158,8 +185,42 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
               const { thinking } = extractThinkingAndContent(rawContent || finalContent);
               await saveMessage(
                 conversationId, userId, rawContent || finalContent,
-                clientAssistantMessageId, thinking, searchSources
+                clientAssistantMessageId, thinking, searchSources,
+                { tokens: tokensUsed, duration: durationMs }
               );
+              const maintenance =
+                container.getConversationMemoryMaintenanceService();
+              void maintenance.recordTurnAndSchedule({
+                conversationId,
+                userId,
+                requestText: requestText || '',
+                responseText: rawContent || finalContent,
+                usage: finalUsage
+                  ? {
+                      ...finalUsage,
+                      // Pressure means the last actual model input, while
+                      // total_tokens remains the billable sum across tool hops.
+                      prompt_tokens:
+                        lastCallUsage?.prompt_tokens ??
+                        finalUsage.prompt_tokens,
+                    }
+                  : undefined,
+                estimatedInputTokens:
+                  estimatedInputTokens ??
+                  Math.ceil(
+                    messages.reduce(
+                      (total, message) =>
+                        total + message.content.length,
+                      0
+                    ) / 3
+                  ),
+                inputBudgetTokens,
+              }).catch(error => {
+                console.warn(
+                  '[MemorySummary] failed to record/schedule turn',
+                  error
+                );
+              });
               console.log(`💾 消息已保存${searchSources ? ` (含 ${searchSources.length} 个来源)` : ''}`);
             } catch (error) {
               console.error('❌ 保存消息失败:', error);
@@ -167,13 +228,10 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
           }
 
           // 上报 metrics
-          const durationMs = Date.now() - streamStartTime;
-          const tokensUsed = parsed.tokenUsage?.total_tokens
-            || Math.ceil((finalContent.length + finalThinking.length) / 3);
           try {
             const recordMetric = container.getRecordMetricUseCase();
             await recordMetric.execute({ type: 'llm_request', durationMs, tokensUsed });
-            console.log(`📊 [Token] ${parsed.tokenUsage ? `用量: ${tokensUsed}` : `估算: ~${tokensUsed}`} tokens, duration=${durationMs}ms`);
+            console.log(`📊 [Token] ${finalUsage ? `用量: ${tokensUsed}` : `估算: ~${tokensUsed}`} tokens, duration=${durationMs}ms`);
           } catch (metricsErr) {
             console.warn('⚠️ 上报 metrics 失败:', metricsErr);
           }
@@ -184,9 +242,10 @@ function handleAgentStream(opts: AgentStreamOptions): Response {
               done: true,
               assistantMessageId: clientAssistantMessageId,
               sources: searchSources,
-              tokenUsage: parsed.tokenUsage || undefined,
+              tokenUsage: finalUsage,
             });
           }
+          return;
         }
       }
     }
@@ -315,11 +374,14 @@ export async function handleVolcanoStream(
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
   onFinally?: () => void,
-  requestText?: string
+  requestText?: string,
+  estimatedInputTokens?: number,
+  inputBudgetTokens?: number
 ): Promise<Response> {
   return handleAgentStream({
     stream, conversationId, userId, modelType,
     messages, clientAssistantMessageId, onFinally, requestText,
+    estimatedInputTokens, inputBudgetTokens,
     adapter: new OpenAIStreamAdapter(),
   });
 }
@@ -332,7 +394,9 @@ export async function handleLocalStream(
   messages: ChatMessage[],
   clientAssistantMessageId?: string,
   onFinally?: () => void,
-  requestText?: string
+  requestText?: string,
+  estimatedInputTokens?: number,
+  inputBudgetTokens?: number
 ): Promise<Response> {
   const { getRegistry } = await import('../_clean/infrastructure/llm/providers/registry.js');
   const registry = getRegistry();
@@ -345,6 +409,7 @@ export async function handleLocalStream(
   return handleAgentStream({
     stream, conversationId, userId, modelType,
     messages, clientAssistantMessageId, onFinally, requestText,
+    estimatedInputTokens, inputBudgetTokens,
     adapter,
   });
 }

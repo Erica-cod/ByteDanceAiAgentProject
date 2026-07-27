@@ -67,6 +67,10 @@ export interface MemoryConfig {
   relevanceWeight?: number;
   recencyWeight?: number;
   importanceWeight?: number;
+  contextWindowTokens?: number;
+  outputReserveTokens?: number;
+  safetyMarginRatio?: number;
+  completeRecentRounds?: number;
 
   embeddingModel?: {
     provider: 'ollama' | 'openai' | 'local';
@@ -95,6 +99,10 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   relevanceWeight: 0.7,
   recencyWeight: 0.1,
   importanceWeight: 0.2,
+  contextWindowTokens: 16_000,
+  outputReserveTokens: 2_000,
+  safetyMarginRatio: 0.08,
+  completeRecentRounds: 2,
   embeddingModel: {
     provider: 'ollama',
     model: 'nomic-embed-text',
@@ -112,6 +120,12 @@ export function getRecommendedConfig(modelType: 'local' | 'volcano'): MemoryConf
       ...DEFAULT_MEMORY_CONFIG,
       windowSize: 8,
       maxTokens: 3000,
+      contextWindowTokens: Number(
+        process.env.OLLAMA_CONTEXT_WINDOW_TOKENS ?? 8_192
+      ),
+      outputReserveTokens: Number(
+        process.env.OLLAMA_OUTPUT_RESERVE_TOKENS ?? 1_500
+      ),
     };
   } else {
     // 云端模型可以使用更大的窗口
@@ -119,6 +133,12 @@ export function getRecommendedConfig(modelType: 'local' | 'volcano'): MemoryConf
       ...DEFAULT_MEMORY_CONFIG,
       windowSize: 12,
       maxTokens: 6000,
+      contextWindowTokens: Number(
+        process.env.ARK_CONTEXT_WINDOW_TOKENS ?? 32_768
+      ),
+      outputReserveTokens: Number(
+        process.env.ARK_OUTPUT_RESERVE_TOKENS ?? 4_000
+      ),
     };
   }
 }

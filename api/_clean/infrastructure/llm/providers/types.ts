@@ -99,6 +99,12 @@ export interface ParsedChunk {
   finishReason?: 'stop' | 'tool_calls' | null;
   /** 是否结束 */
   done: boolean;
+  /** 供应商在流末尾返回的真实 token 用量。 */
+  tokenUsage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export interface StreamParser {

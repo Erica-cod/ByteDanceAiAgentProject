@@ -50,6 +50,14 @@ const MemoryConfigSchema = z.object({
   relevanceWeight: z.number().nonnegative().default(0.7),
   recencyWeight: z.number().nonnegative().default(0.1),
   importanceWeight: z.number().nonnegative().default(0.2),
+
+  // 模型总上下文、输出预留与安全边界。
+  contextWindowTokens: z.number().int().positive().default(16_000),
+  outputReserveTokens: z.number().int().nonnegative().default(2_000),
+  safetyMarginRatio: z.number().min(0).max(0.3).default(0.08),
+
+  // 最近两轮始终优先保留完整原文。
+  completeRecentRounds: z.number().int().positive().default(2),
 });
 
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
@@ -62,6 +70,10 @@ export interface HistoricalMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  source?: 'recent' | 'memory_chunk' | 'summary' | 'temporary_summary';
+  relevanceScore?: number;
+  estimatedTokens?: number;
+  sourceMessageIds?: string[];
 }
 
 /**
