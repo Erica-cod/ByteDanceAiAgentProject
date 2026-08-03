@@ -38,6 +38,9 @@ const MemoryConfigSchema = z.object({
   // 是否启用混合召回。不可用时自动降级到关键词匹配。
   enableHybridRetrieval: z.boolean().default(true),
 
+  // 原文切片与长期摘要是否使用同一召回、计分和预算竞争链路。
+  enableUnifiedMemoryScoring: z.boolean().default(true),
+
   // 进入混合排序前，两路各自保留的候选数。
   lexicalCandidateCount: z.number().int().positive().default(20),
   vectorCandidateCount: z.number().int().positive().default(20),

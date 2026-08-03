@@ -36,6 +36,12 @@ export interface HybridMemorySearchInput {
   };
 }
 
+export interface UnifiedMemorySearchInput
+  extends HybridMemorySearchInput {
+  /** 原文和摘要进入统一排序后，最多返回给预算装箱层的候选数。 */
+  combinedCandidateLimit: number;
+}
+
 /**
  * 记忆仓储接口
  */
@@ -78,6 +84,14 @@ export interface IMemoryRepository {
    */
   findHybridRelevantMessages?(
     input: HybridMemorySearchInput
+  ): Promise<HistoricalMessage[]>;
+
+  /**
+   * 原文切片与长期摘要共用 BM25 + Embedding + RRF 和同一效用公式。
+   * 实现不可用时，上层回退到分开的旧召回链路。
+   */
+  findUnifiedRelevantMemories?(
+    input: UnifiedMemorySearchInput
   ): Promise<HistoricalMessage[]>;
 
   /**

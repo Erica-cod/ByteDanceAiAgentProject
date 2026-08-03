@@ -17,7 +17,7 @@
 | LocalStorage | 每个会话最近 10 轮（20 条）完整消息 | 秒开缓存，可淘汰 |
 | `messages` | 所有原始 user/assistant 消息 | 主链路同步持久化 |
 | `memory_items` | 1200 字符切片、120 字符重叠、Embedding、重要性 | 后台派生，可重建 |
-| `memory_summaries` | 摘要、目标、偏好、约束、`sourceMessageIds` | 后台派生，可重建 |
+| `memory_summaries` | 摘要、目标、偏好、约束、Embedding、重要性、`sourceMessageIds` | 后台派生，可重建 |
 | `conversation_token_states` | 输入压力、累计账单、未摘要增量、任务状态 | 每轮更新 |
 | `multi_agent_sessions` | 多 Agent 执行检查点 | TTL 短期状态 |
 
@@ -41,6 +41,7 @@ LocalStorage 常见配额约为数 MiB，但不同浏览器和 origin 的策略�
 → 读取 watermark 之后的旧原文
 → 保留最近 2 轮，不参与长期压缩
 → 本地摘要 Agent 提取 summary/goals/preferences/constraints
+→ 为完整结构化摘要生成 Embedding（失败则保留 BM25 降级）
 → 写 memory_summaries（包含 sourceMessageIds）
 → 推进 summarizedThroughMessageId
 ```
@@ -115,9 +116,9 @@ historyBudget = inputBudget
 
 1. system prompt 和当前问题。
 2. 最近 2 轮完整原文，作为强制历史。
-3. 相关的持久摘要。
-4. BM25/Embedding/RRF 召回的长期记忆。
-5. 候选按“相关性价值 / token 成本”选择，达到预算后停止。
+3. 原文切片和持久摘要进入同一个 BM25 + Embedding + RRF 候选池。
+4. 使用统一 utility 公式计算价值；按 `utility / tokenCost^0.7` 选择。
+5. 用 `sourceMessageIds` 惩罚与最近原文、已选候选重复的内容，达到预算后停止。
 
 最近消息按时间顺序发送；摘要作为 system memory 发送。工具 Schema 也占输入 token，不能只计算文本消息。
 
@@ -147,10 +148,52 @@ historyBudget = inputBudget
 
 混合结果使用 RRF 融合，再叠加相关性、时间衰减和重要性。默认权重和候选数只是当前配置，不应描述成通用最优参数。
 
+## 原文与摘要统一计分实现及离线对照
+
+当前默认启用 B，同时保留 A 作为回滚和线上 A/B 对照。设置
+`MEMORY_UNIFIED_SCORING=false` 可切回 A：
+
+- A（旧链路）：原文使用 BM25 + Embedding + RRF；摘要使用关键词重合；最后按 `score / tokens` 装箱。
+- B（当前默认）：原文和摘要共同进行 BM25 + Embedding + RRF，使用同一个 utility 公式，再按 `utility / tokens^0.7` 装箱。
+
+B 在仓储层只生成一次 query embedding；新摘要写入时同时保存摘要 embedding。旧摘要没有 embedding 也能继续走 BM25，因此升级不要求停机回填。仓储层返回统一候选后，上下文层先扣除最近两轮的 token，再进行带来源重叠惩罚的预算装箱。
+
+B 的共同公式包含：
+
+```text
+utility = retrieval relevance
+          + source fidelity
+          + information density
+          + source coverage
+          - redundancy penalty
+```
+
+它仍允许原文和摘要拥有不同的特征值：原文的事实保真度更高，摘要的信息密度和覆盖率更高。统一的是公式和量纲，不是强行假设两类数据完全相同。
+
+固定样本覆盖精确日期、语义偏好、来源重复和精确错误码。实验结果：
+
+| 指标 | A：分开计分 | B：统一计分 |
+| --- | ---: | ---: |
+| 证据召回 | 62.5% | 100% |
+| 精确原文召回 | 0% | 100% |
+| 重复 token 比例 | 17.9% | 0% |
+| 平均预算利用率 | 57.1% | 77.1% |
+
+第一轮统一计分只达到 87.5% 证据召回和 50% 精确原文召回，原因是“原文可靠性”错误奖励了一个零相关的短原文。增加相关性门槛后才得到上表结果。这说明统一计分必须满足：
+
+1. BM25、向量和其他信号先在共同候选集内归一化。
+2. 零相关候选不能靠类型、重要性或低 token 成本进入上下文。
+3. 日期、数字、错误码、路径、版本和“原话”查询要提高原文保真权重。
+4. 使用 `sourceMessageIds` 做覆盖去重，避免摘要和其来源原文无意义地重复占预算。
+5. token 成本使用次线性惩罚，避免极短碎片天然碾压完整证据。
+
+结论：两类候选可以共用一个计分公式，但不能只用简单的“相关性 / token”。代码已经默认接入统一链路，但上表仍只来自 4 组人工构造的回归样本，只证明实现方向可行，不能当作生产收益结论。正式扩大流量前仍需要真实脱敏会话、人工证据标签、更多预算档位和不同 Embedding 模型的评测；出现回归时可通过环境变量立即切回旧链路。
+
 ## 关键代码
 
 - `src/utils/conversation/secureConversationCache.ts`
 - `api/_clean/domain/services/token-budget.ts`
+- `api/_clean/domain/services/memory-candidate-scoring.ts`
 - `api/_clean/application/services/conversation-memory-indexer.ts`
 - `api/_clean/application/services/conversation-memory-maintenance.ts`
 - `api/_clean/application/use-cases/memory/get-conversation-context.use-case.ts`
@@ -163,10 +206,11 @@ historyBudget = inputBudget
 npx tsc --noEmit
 npm run test:jest -- --runInBand \
   test/jest/conversation-memory-budget.test.ts \
-  test/jest/memory-hybrid.test.ts
+  test/jest/memory-hybrid.test.ts \
+  test/jest/memory-scoring-experiment.test.ts
 ```
 
-测试覆盖 token 预留、候选装箱、带来源 ID 的摘要持久化、OpenAI usage-only chunk、Ollama usage 映射、混合检索和当前用户消息去重。
+测试覆盖 token 预留、统一候选链路、候选装箱、来源重叠惩罚、带来源 ID 的摘要持久化、OpenAI usage-only chunk、Ollama usage 映射、混合检索和当前用户消息去重。
 
 ## 生产化边界
 

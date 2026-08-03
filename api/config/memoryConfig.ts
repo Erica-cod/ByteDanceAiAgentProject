@@ -58,6 +58,7 @@ export interface MemoryConfig {
    * 是否启用混合召回。Embedding 或 Atlas Search 不可用时自动降级。
    */
   enableHybridRetrieval?: boolean;
+  enableUnifiedMemoryScoring?: boolean;
   enableVectorRetrieval?: boolean;
   vectorRetrievalCount?: number;
   lexicalCandidateCount?: number;
@@ -90,6 +91,8 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   keywordMatchCount: 3,
   
   enableHybridRetrieval: true,
+  enableUnifiedMemoryScoring:
+    process.env.MEMORY_UNIFIED_SCORING !== 'false',
   enableVectorRetrieval: true,
   vectorRetrievalCount: 5,
   lexicalCandidateCount: 20,
@@ -156,6 +159,9 @@ export function getConfigFromEnv(): Partial<MemoryConfig> {
       : undefined,
     enableKeywordMatch: process.env.MEMORY_ENABLE_KEYWORD_MATCH 
       ? process.env.MEMORY_ENABLE_KEYWORD_MATCH === 'true' 
+      : undefined,
+    enableUnifiedMemoryScoring: process.env.MEMORY_UNIFIED_SCORING
+      ? process.env.MEMORY_UNIFIED_SCORING !== 'false'
       : undefined,
   };
 }

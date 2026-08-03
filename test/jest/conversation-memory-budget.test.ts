@@ -269,6 +269,76 @@ describe('context fallback while background memory is unavailable', () => {
       'raw Mongo fact: deadline is Friday'
     );
   });
+
+  test('uses the unified raw/summary candidate pool before token packing', async () => {
+    const legacyHybrid = jest.fn(async () => []);
+    const legacySummaries = jest.fn(async () => []);
+    const unifiedSearch = jest.fn(async () => [
+      {
+        messageId: 'summary:preference',
+        role: 'assistant' as const,
+        content: '[长期记忆摘要] prefers TypeScript',
+        timestamp: new Date('2026-07-01'),
+        source: 'summary' as const,
+        relevanceScore: 0.8,
+        estimatedTokens: 20,
+        sourceMessageIds: ['message-0'],
+      },
+      {
+        messageId: 'raw:preference',
+        role: 'user' as const,
+        content: 'original TypeScript preference',
+        timestamp: new Date('2026-07-01'),
+        source: 'memory_chunk' as const,
+        relevanceScore: 0.9,
+        estimatedTokens: 70,
+        sourceMessageIds: ['message-0'],
+      },
+    ]);
+    const repository: IMemoryRepository = {
+      ...createContextRepository({
+        compressionStatus: 'running',
+        summaries: [],
+        relevant: [],
+      }),
+      findUnifiedRelevantMemories: unifiedSearch,
+      findHybridRelevantMessages: legacyHybrid,
+      findRelevantMemorySummaries: legacySummaries,
+    };
+
+    const result = await new GetConversationContextUseCase(
+      repository
+    ).execute({
+      conversationId: 'conv',
+      userId: 'user',
+      currentMessage: 'current question',
+      systemPrompt: 'system',
+      enableCompression: false,
+      config: {
+        enableUnifiedMemoryScoring: true,
+        windowSize: 10,
+        completeRecentRounds: 2,
+        contextWindowTokens: 100,
+        outputReserveTokens: 20,
+        safetyMarginRatio: 0,
+      },
+    });
+
+    expect(unifiedSearch).toHaveBeenCalledTimes(1);
+    expect(legacyHybrid).not.toHaveBeenCalled();
+    expect(legacySummaries).not.toHaveBeenCalled();
+    expect(result.context.map(message => message.content)).toContain(
+      '[长期记忆摘要] prefers TypeScript'
+    );
+    expect(result.context.map(message => message.content)).not.toContain(
+      'original TypeScript preference'
+    );
+    expect(
+      result.context.filter(message =>
+        message.content.startsWith('recent-')
+      )
+    ).toHaveLength(4);
+  });
 });
 
 function createContextRepository(options: {
